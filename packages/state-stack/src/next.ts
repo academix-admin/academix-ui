@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @academix/state-stack/next
+ * @academix-admin/state-stack/next
  * Next.js adapter — wires the App Router's `usePathname` into state-stack so
  * route-scoped state (`useDemandState`) aligns with client-side navigation.
  *
@@ -9,7 +9,7 @@
  * providers component or the root layout's client boundary):
  *
  *   'use client';
- *   import { connectNextRouter } from '@academix/state-stack/next';
+ *   import { connectNextRouter } from '@academix-admin/state-stack/next';
  *   connectNextRouter();
  *
  * Requires `next` >= 13 (App Router) as a peer dependency.
@@ -21,7 +21,7 @@ import { usePathname } from 'next/navigation';
 // relative module, the bundler would emit a second copy of the core and
 // `connectNextRouter()` would configure a different singleton than the one the
 // app's hooks read from — making the adapter a silent no-op.
-import { initStateStack } from '@academix/state-stack';
+import { initStateStack } from '@academix-admin/state-stack';
 
 /** A hook returning the current route pathname, or null before it is known. */
 type UsePathnameHook = () => string | null;

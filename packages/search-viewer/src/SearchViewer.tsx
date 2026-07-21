@@ -1,5 +1,5 @@
 // import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-// import { Sheet } from "@academix/modal-sheet";
+// import { Sheet } from "@academix-admin/modal-sheet";
 
 // // ==================== Types ====================
 // type Padding = {
@@ -1244,7 +1244,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { Sheet } from "@academix/modal-sheet";
+import { Sheet } from "@academix-admin/modal-sheet";
 
 // ==================== Types ====================
 

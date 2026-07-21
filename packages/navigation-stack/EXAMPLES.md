@@ -1,4 +1,4 @@
-# @academix/navigation-stack — Examples
+# @academix-admin/navigation-stack — Examples
 
 Real-world patterns, adapted from a production app. Each snippet is a client
 component (`'use client'`).
@@ -24,7 +24,7 @@ pages.
 ```tsx
 'use client';
 
-import NavigationStack from '@academix/navigation-stack';
+import NavigationStack from '@academix-admin/navigation-stack';
 import PaymentPage from './payment-page/payment-page';
 import TopUpPage from './top-up-page/top-up-page';
 import WithdrawPage from './withdraw-page/withdraw-page';
@@ -56,7 +56,7 @@ prop.
 
 ```tsx
 'use client';
-import { useNav } from '@academix/navigation-stack';
+import { useNav } from '@academix-admin/navigation-stack';
 
 function PaymentPage() {
   const nav = useNav();
@@ -106,7 +106,7 @@ current page. Handlers: `onEnter`, `onExit`, `onPause`, `onResume`,
 
 ```tsx
 'use client';
-import { useNav, usePageLifecycle } from '@academix/navigation-stack';
+import { useNav, usePageLifecycle } from '@academix-admin/navigation-stack';
 
 function QuizPage() {
   const nav = useNav();
@@ -146,7 +146,7 @@ function TransactionsPage() {
 }
 
 // Consumer page — read it back
-import { useObject } from '@academix/navigation-stack';
+import { useObject } from '@academix-admin/navigation-stack';
 
 function DetailPage({ params }: { params?: { id: string } }) {
   const result = useObject<(id: string) => Transaction | undefined>(

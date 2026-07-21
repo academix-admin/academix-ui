@@ -1,4 +1,4 @@
-// Public API barrel for @academix/navigation-stack.
+// Public API barrel for @academix-admin/navigation-stack.
 // Implementation is split across ./types, ./constants, ./scroll, ./gestures,
 // ./di, ./core/* , ./hooks and ./components. The original single-file
 // implementation is preserved (reference only) at ./_legacy/NavigationStack.legacy.tsx.

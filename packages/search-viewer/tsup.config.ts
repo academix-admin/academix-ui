@@ -37,7 +37,7 @@ export default defineConfig({
     'react/jsx-runtime',
     'motion',
     'motion/react',
-    '@academix/modal-sheet',
+    '@academix-admin/modal-sheet',
   ],
   onSuccess: () => preserveUseClient('dist'),
 });

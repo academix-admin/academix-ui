@@ -1,4 +1,4 @@
-# @academix/state-stack
+# @academix-admin/state-stack
 
 Production-ready, **framework-agnostic** cross-tab state management for React.
 
@@ -20,7 +20,7 @@ Production-ready, **framework-agnostic** cross-tab state management for React.
 ## Install
 
 ```bash
-npm install @academix/state-stack
+npm install @academix-admin/state-stack
 npm install react react-dom
 ```
 
@@ -38,7 +38,7 @@ npm install react react-dom
 
 ```tsx
 'use client';
-import { useDemandState } from '@academix/state-stack';
+import { useDemandState } from '@academix-admin/state-stack';
 
 function SearchPage() {
   const [query, load, setQuery, ctl] = useDemandState('', {
@@ -71,7 +71,7 @@ explicit `scope` to share across routes, or configure route resolution (below).
 ## Atoms & derived state
 
 ```tsx
-import { useAtom, useComputed } from '@academix/state-stack';
+import { useAtom, useComputed } from '@academix-admin/state-stack';
 
 const [count, setCount] = useAtom('counter', 0);
 const doubled = useComputed(() => count * 2, 0, [count]);
@@ -80,7 +80,7 @@ const doubled = useComputed(() => count * 2, 0, [count]);
 ## Typed stores with methods — `createStateStack`
 
 ```tsx
-import { createStateStack } from '@academix/state-stack';
+import { createStateStack } from '@academix-admin/state-stack';
 
 const { useStack } = createStateStack({
   cart: {
@@ -115,7 +115,7 @@ object (each method returns a `Promise<void>`), and metadata
 ## The `StateStack` façade
 
 ```ts
-import { StateStack } from '@academix/state-stack';
+import { StateStack } from '@academix-admin/state-stack';
 
 StateStack.init({ storagePrefix: 'myapp', preferredStorage: 'auto' });
 StateStack.clearScope('route:/checkout');
@@ -128,7 +128,7 @@ StateStack.clearByPrefix('search');
 Call once at startup (before any state hooks render):
 
 ```ts
-import { initStateStack } from '@academix/state-stack';
+import { initStateStack } from '@academix-admin/state-stack';
 
 initStateStack({
   storagePrefix: 'myapp',        // namespace persisted keys
@@ -155,7 +155,7 @@ initStateStack({ usePathname: myRouterUsePathnameHook });
 
 ```tsx
 'use client';
-import { connectNextRouter } from '@academix/state-stack/next';
+import { connectNextRouter } from '@academix-admin/state-stack/next';
 
 connectNextRouter(); // wires next/navigation's usePathname
 ```

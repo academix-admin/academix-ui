@@ -40,7 +40,7 @@ export default defineConfig({
     'next/navigation',
     // Keep the /next adapter importing the package's public entry at runtime so
     // there is exactly one state-stack core instance (see src/next.ts).
-    '@academix/state-stack',
+    '@academix-admin/state-stack',
   ],
   onSuccess: () => preserveUseClient('dist'),
 });

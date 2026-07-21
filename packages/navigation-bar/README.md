@@ -1,4 +1,4 @@
-# @academix/navigation-bar
+# @academix-admin/navigation-bar
 
 A configurable React navigation / tab bar with **normal**, **floating** and
 **auto-hide-on-scroll** modes.
@@ -6,7 +6,7 @@ A configurable React navigation / tab bar with **normal**, **floating** and
 ## Install
 
 ```bash
-npm install @academix/navigation-bar
+npm install @academix-admin/navigation-bar
 npm install react react-dom
 ```
 
@@ -14,7 +14,7 @@ npm install react react-dom
 
 ```tsx
 'use client';
-import NavigationBar from '@academix/navigation-bar';
+import NavigationBar from '@academix-admin/navigation-bar';
 
 const items = [
   { key: 'home', label: 'Home', icon: <HomeIcon /> },

@@ -47,7 +47,7 @@ export function useDemandState<T>(
       '[StateStack] useDemandState: resolved pathname is null. ' +
         "State will be scoped to 'route:unknown', risking key collisions. " +
         'Provide an explicit `scope` via opts, or configure `usePathname` via ' +
-        'initStateStack (or the @academix/state-stack/next adapter) to avoid this.'
+        'initStateStack (or the @academix-admin/state-stack/next adapter) to avoid this.'
     );
   }
 

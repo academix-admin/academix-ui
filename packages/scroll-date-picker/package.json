@@ -1,5 +1,5 @@
 {
-  "name": "@academix/scroll-date-picker",
+  "name": "@academix-admin/scroll-date-picker",
   "version": "0.1.0",
   "description": "A smooth, touch-friendly wheel/scroll date picker for React — zero dependencies beyond React.",
   "keywords": [

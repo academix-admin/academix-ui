@@ -1,5 +1,5 @@
 {
-  "name": "@academix/side-drawer",
+  "name": "@academix-admin/side-drawer",
   "version": "0.1.0",
   "description": "A lightweight portal-based React side drawer / off-canvas panel.",
   "keywords": ["react", "drawer", "side-drawer", "off-canvas", "portal", "overlay"],

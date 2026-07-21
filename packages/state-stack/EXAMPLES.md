@@ -1,4 +1,4 @@
-# @academix/state-stack — Examples
+# @academix-admin/state-stack — Examples
 
 Real-world patterns, adapted from a production app. Each snippet is a client
 component or hook (`'use client'`).
@@ -21,7 +21,7 @@ typed `useStack` hook. State, methods and metadata come back as
 
 ```tsx
 'use client';
-import { createStateStack, type StackConfig } from '@academix/state-stack';
+import { createStateStack, type StackConfig } from '@academix-admin/state-stack';
 import { UserData } from '@/models/user-data';
 
 const methods = {
@@ -72,7 +72,7 @@ re-derives when inputs (e.g. language) change. Wrap it in a domain hook:
 
 ```tsx
 'use client';
-import { useDemandState } from '@academix/state-stack';
+import { useDemandState } from '@academix-admin/state-stack';
 import type { RedeemCodeModel } from '@/models/redeem-code-model';
 
 export const useRedeemCodes = (lang: string) =>
@@ -120,7 +120,7 @@ cross-component event/notification channel.
 
 ```tsx
 'use client';
-import { useAtom } from '@academix/state-stack';
+import { useAtom } from '@academix-admin/state-stack';
 
 interface QuizDisplayEvent {
   isOpen: boolean;
@@ -161,7 +161,7 @@ From a store's `__meta`, from a `useDemandState` control object, or globally via
 the `StateStack` façade:
 
 ```tsx
-import { StateStack } from '@academix/state-stack';
+import { StateStack } from '@academix-admin/state-stack';
 
 // Store / demand-state controls
 __meta.clear();               // this key
@@ -184,8 +184,8 @@ pathname hook once at startup.
 ```tsx
 // app/providers.tsx
 'use client';
-import { connectNextRouter } from '@academix/state-stack/next';
-import { initStateStack } from '@academix/state-stack';
+import { connectNextRouter } from '@academix-admin/state-stack/next';
+import { initStateStack } from '@academix-admin/state-stack';
 
 connectNextRouter();
 initStateStack({ storagePrefix: 'academix' });
@@ -198,7 +198,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 **Any other router:**
 
 ```tsx
-import { initStateStack } from '@academix/state-stack';
+import { initStateStack } from '@academix-admin/state-stack';
 import { useMyRouterPathname } from 'my-router';
 
 initStateStack({ usePathname: useMyRouterPathname });

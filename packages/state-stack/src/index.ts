@@ -1,4 +1,4 @@
-// Public API barrel for @academix/state-stack.
+// Public API barrel for @academix-admin/state-stack.
 // The implementation is split across ./types, ./config, ./storage, ./core,
 // ./hooks and ./facade. The original single-file implementation is preserved
 // (for reference only) at ./_legacy/state-stack.legacy.tsx.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getCachedLottie, preloadLottie } from '../src/index';
 
-describe('@academix/lottie-cache', () => {
+describe('@academix-admin/lottie-cache', () => {
   it('exports its functions', () => {
     expect(typeof getCachedLottie).toBe('function');
     expect(typeof preloadLottie).toBe('function');

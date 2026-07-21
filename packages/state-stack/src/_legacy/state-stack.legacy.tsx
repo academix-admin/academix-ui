@@ -17,7 +17,7 @@
  * from `window.location` and kept in sync with History API navigations. To wire
  * a framework router (e.g. Next.js `usePathname`), inject a hook once at startup
  * via `initStateStack({ usePathname })`, or use the ready-made adapter exported
- * from `@academix/state-stack/next`.
+ * from `@academix-admin/state-stack/next`.
  */
 
 import React, {
@@ -1637,7 +1637,7 @@ export function useDemandState<T>(
       '[StateStack] useDemandState: resolved pathname is null. ' +
         "State will be scoped to 'route:unknown', risking key collisions. " +
         'Provide an explicit `scope` via opts, or configure `usePathname` via ' +
-        'initStateStack (or the @academix/state-stack/next adapter) to avoid this.'
+        'initStateStack (or the @academix-admin/state-stack/next adapter) to avoid this.'
     );
   }
 

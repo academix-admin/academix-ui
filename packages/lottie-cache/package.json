@@ -1,5 +1,5 @@
 {
-  "name": "@academix/lottie-cache",
+  "name": "@academix-admin/lottie-cache",
   "version": "0.1.0",
   "description": "Tiny in-memory cache + preloader for Lottie animation JSON.",
   "keywords": ["lottie", "cache", "preload", "animation"],

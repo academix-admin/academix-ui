@@ -1,5 +1,5 @@
 import type { EnhancedLifecycleManager } from './core/managers';
-// Shared type definitions for @academix/navigation-stack.
+// Shared type definitions for @academix-admin/navigation-stack.
 import type { ComponentType, ReactNode, ReactElement } from 'react';
 
 export type ScrollBroadcastEvent = {

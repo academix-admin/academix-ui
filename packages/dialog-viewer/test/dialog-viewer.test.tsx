@@ -7,7 +7,7 @@ import DialogViewer, {
   createDestructiveDialog,
 } from '../src/index';
 
-describe('@academix/dialog-viewer', () => {
+describe('@academix-admin/dialog-viewer', () => {
   it('exposes the public API', () => {
     expect(DialogViewer).toBeTruthy();
     expect(typeof useDialogController).toBe('function');

@@ -1,7 +1,7 @@
 {
-  "name": "@academix/bottom-viewer",
+  "name": "@academix-admin/bottom-viewer",
   "version": "0.1.0",
-  "description": "Imperative bottom-sheet viewer for React with a controller hook, built on @academix/modal-sheet.",
+  "description": "Imperative bottom-sheet viewer for React with a controller hook, built on @academix-admin/modal-sheet.",
   "keywords": ["react", "bottom-sheet", "sheet", "modal", "imperative", "controller"],
   "license": "MIT",
   "author": "Academix",
@@ -30,7 +30,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@academix/modal-sheet": "^0.1.0"
+    "@academix-admin/modal-sheet": "^0.1.0"
   },
   "peerDependencies": { "motion": ">=11.0.0", "react": ">=18.0.0", "react-dom": ">=18.0.0" },
   "devDependencies": {

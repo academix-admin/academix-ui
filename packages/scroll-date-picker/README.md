@@ -1,4 +1,4 @@
-# @academix/scroll-date-picker
+# @academix-admin/scroll-date-picker
 
 A smooth, touch-friendly **wheel / scroll date picker** for React — iOS-style
 spinning columns with an optional magnifier, quick "Today / Yesterday" shortcuts,
@@ -7,7 +7,7 @@ and full theming. Zero dependencies beyond React.
 ## Install
 
 ```bash
-npm install @academix/scroll-date-picker
+npm install @academix-admin/scroll-date-picker
 npm install react react-dom
 ```
 
@@ -15,7 +15,7 @@ npm install react react-dom
 
 ```tsx
 'use client';
-import CustomScrollDatePicker from '@academix/scroll-date-picker';
+import CustomScrollDatePicker from '@academix-admin/scroll-date-picker';
 
 export default function Example() {
   return (

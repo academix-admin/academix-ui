@@ -1,4 +1,4 @@
-# @academix/navigation-stack
+# @academix-admin/navigation-stack
 
 A powerful client-side navigation **stack** for React — the ergonomics of a
 native mobile navigator, in the browser.
@@ -22,7 +22,7 @@ native mobile navigator, in the browser.
 ## Install
 
 ```bash
-npm install @academix/navigation-stack
+npm install @academix-admin/navigation-stack
 # peer deps (if not already present)
 npm install react react-dom
 ```
@@ -35,7 +35,7 @@ route. Each page receives navigation via the `useNav()` hook.
 ```tsx
 'use client';
 
-import NavigationStack, { useNav } from '@academix/navigation-stack';
+import NavigationStack, { useNav } from '@academix-admin/navigation-stack';
 
 function HomePage() {
   const nav = useNav();

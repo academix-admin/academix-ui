@@ -1,5 +1,5 @@
 {
-  "name": "@academix/search-viewer",
+  "name": "@academix-admin/search-viewer",
   "version": "0.1.0",
   "description": "Headless-friendly search & selection UI for React — debounced controller, single/multi select, and sheet-based pickers.",
   "keywords": [
@@ -54,7 +54,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@academix/modal-sheet": "^0.1.0"
+    "@academix-admin/modal-sheet": "^0.1.0"
   },
   "peerDependencies": {
     "motion": ">=11.0.0",

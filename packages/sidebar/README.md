@@ -1,11 +1,11 @@
-# @academix/sidebar
+# @academix-admin/sidebar
 
 A flexible, collapsible React **sidebar / side navigation** with nested items.
 
 ## Install
 
 ```bash
-npm install @academix/sidebar
+npm install @academix-admin/sidebar
 npm install react react-dom
 ```
 
@@ -13,7 +13,7 @@ npm install react react-dom
 
 ```tsx
 'use client';
-import Sidebar from '@academix/sidebar';
+import Sidebar from '@academix-admin/sidebar';
 
 const items = [
   { key: 'dashboard', label: 'Dashboard', icon: <GridIcon /> },

@@ -1,4 +1,4 @@
-# @academix/dialog-viewer
+# @academix-admin/dialog-viewer
 
 Imperative React **dialogs** — alert, confirm and destructive — driven by a
 controller hook, so you can open dialogs from anywhere without wiring local
@@ -7,7 +7,7 @@ state.
 ## Install
 
 ```bash
-npm install @academix/dialog-viewer
+npm install @academix-admin/dialog-viewer
 npm install react react-dom
 ```
 
@@ -15,7 +15,7 @@ npm install react react-dom
 
 ```tsx
 'use client';
-import DialogViewer, { useDialog, createConfirmDialog } from '@academix/dialog-viewer';
+import DialogViewer, { useDialog, createConfirmDialog } from '@academix-admin/dialog-viewer';
 
 function DeleteButton() {
   const dialog = useDialog();

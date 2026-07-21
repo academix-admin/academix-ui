@@ -1,4 +1,4 @@
-# @academix/lottie-cache
+# @academix-admin/lottie-cache
 
 A tiny in-memory **cache + preloader** for Lottie animation JSON, so the same
 animation isn't fetched twice. Framework-agnostic — no React required.
@@ -6,13 +6,13 @@ animation isn't fetched twice. Framework-agnostic — no React required.
 ## Install
 
 ```bash
-npm install @academix/lottie-cache
+npm install @academix-admin/lottie-cache
 ```
 
 ## Usage
 
 ```ts
-import { preloadLottie, getCachedLottie } from '@academix/lottie-cache';
+import { preloadLottie, getCachedLottie } from '@academix-admin/lottie-cache';
 
 // Preload (e.g. on app start or route hover):
 const data = await preloadLottie('spinner', '/animations/spinner.json');

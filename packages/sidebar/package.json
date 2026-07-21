@@ -1,5 +1,5 @@
 {
-  "name": "@academix/sidebar",
+  "name": "@academix-admin/sidebar",
   "version": "0.1.0",
   "description": "A flexible, collapsible React sidebar / side navigation with nested items.",
   "keywords": ["react", "sidebar", "side-nav", "navigation", "drawer", "menu"],

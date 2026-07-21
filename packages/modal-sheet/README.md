@@ -1,4 +1,4 @@
-# @academix/modal-sheet
+# @academix-admin/modal-sheet
 
 A flexible, gesture-driven **bottom sheet / modal** for React, built on
 [Motion](https://motion.dev). Drag to dismiss, snap detents, keyboard avoidance,
@@ -14,7 +14,7 @@ safe-area aware, and a clean compound-component API.
 ## Install
 
 ```bash
-npm install @academix/modal-sheet
+npm install @academix-admin/modal-sheet
 # peer deps
 npm install react react-dom motion
 ```
@@ -27,7 +27,7 @@ npm install react react-dom motion
 ```tsx
 'use client';
 import { useState } from 'react';
-import { Sheet } from '@academix/modal-sheet';
+import { Sheet } from '@academix-admin/modal-sheet';
 
 export default function Example() {
   const [open, setOpen] = useState(false);

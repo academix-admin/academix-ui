@@ -1,4 +1,4 @@
-# @academix/search-viewer
+# @academix-admin/search-viewer
 
 A batteries-included **search & selection UI** for React — a debounced search
 controller plus a sheet-based results viewer that handles local filtering *and*
@@ -9,18 +9,18 @@ async, cursor-paginated queries, with loading / empty / error states built in.
 - 📄 Cursor pagination, de-duplication, online/offline result tagging
 - 🧾 First-class loading / no-result / error views
 - 🧰 `useSearchController()` to open/close and track state from anywhere
-- 📱 Presented in a gesture-driven sheet (via `@academix/modal-sheet`)
+- 📱 Presented in a gesture-driven sheet (via `@academix-admin/modal-sheet`)
 - Single & multi-select (`SearchViewer`, `MultipleSearchViewer`, `EachViewer`)
 
 ## Install
 
 ```bash
-npm install @academix/search-viewer
+npm install @academix-admin/search-viewer
 # peer deps (modal-sheet is a direct dependency and installs automatically)
 npm install react react-dom motion
 ```
 
-> Depends on `@academix/modal-sheet` (installed for you) and shares your app's
+> Depends on `@academix-admin/modal-sheet` (installed for you) and shares your app's
 > `motion` peer.
 
 ## Usage
@@ -29,7 +29,7 @@ Drive it with the controller hook, then render the viewer:
 
 ```tsx
 'use client';
-import { SearchViewer, useSearchController, type SearchResult } from '@academix/search-viewer';
+import { SearchViewer, useSearchController, type SearchResult } from '@academix-admin/search-viewer';
 
 type Friend = { id: string; name: string };
 type Cursor = { page: number };

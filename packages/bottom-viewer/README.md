@@ -1,24 +1,24 @@
-# @academix/bottom-viewer
+# @academix-admin/bottom-viewer
 
 An imperative **bottom-sheet viewer** for React — open/close from anywhere via a
-controller hook. Built on [`@academix/modal-sheet`](../modal-sheet).
+controller hook. Built on [`@academix-admin/modal-sheet`](../modal-sheet).
 
 ## Install
 
 ```bash
-npm install @academix/bottom-viewer
+npm install @academix-admin/bottom-viewer
 # peer deps
 npm install react react-dom motion
 ```
 
-> `@academix/modal-sheet` is installed as a dependency; `motion` is a shared peer
+> `@academix-admin/modal-sheet` is installed as a dependency; `motion` is a shared peer
 > dependency.
 
 ## Usage
 
 ```tsx
 'use client';
-import BottomViewer, { useBottomController } from '@academix/bottom-viewer';
+import BottomViewer, { useBottomController } from '@academix-admin/bottom-viewer';
 
 function Page() {
   const sheet = useBottomController();

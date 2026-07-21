@@ -1,5 +1,5 @@
 {
-  "name": "@academix/state-stack",
+  "name": "@academix-admin/state-stack",
   "version": "0.1.0",
   "description": "Production-ready, framework-agnostic cross-tab React state: IndexedDB-first persistence, BroadcastChannel sync, undo/redo, TTL, atoms and route-scoped demand state.",
   "keywords": [
