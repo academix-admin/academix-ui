@@ -10,6 +10,12 @@ under the `@academix` scope.
 | [`@academix/scroll-date-picker`](./packages/scroll-date-picker) | iOS-style wheel/scroll date picker with magnifier, quick-date shortcuts and theming. Zero deps beyond React. |
 | [`@academix/modal-sheet`](./packages/modal-sheet) | Gesture-driven bottom sheet built on Motion — snap detents, keyboard avoidance, compound `Sheet.*` API. |
 | [`@academix/search-viewer`](./packages/search-viewer) | Debounced search & selection UI — local + async cursor-paginated sources, loading/empty/error states. |
+| [`@academix/navigation-bar`](./packages/navigation-bar) | Configurable nav/tab bar — normal, floating and auto-hide-on-scroll modes. |
+| [`@academix/sidebar`](./packages/sidebar) | Flexible, collapsible sidebar / side navigation with nested items. |
+| [`@academix/dialog-viewer`](./packages/dialog-viewer) | Imperative alert / confirm / destructive dialogs via a controller hook. |
+| [`@academix/side-drawer`](./packages/side-drawer) | Lightweight portal-based side drawer / off-canvas panel. |
+| [`@academix/bottom-viewer`](./packages/bottom-viewer) | Imperative bottom-sheet viewer (built on `@academix/modal-sheet`). |
+| [`@academix/lottie-cache`](./packages/lottie-cache) | Tiny in-memory cache + preloader for Lottie animation JSON. |
 
 ## Repo layout
 
