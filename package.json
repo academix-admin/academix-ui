@@ -1,0 +1,24 @@
+{
+  "name": "academix-ui-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Monorepo for Academix open-source React libraries.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "release": "npm run build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.9",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

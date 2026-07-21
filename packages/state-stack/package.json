@@ -1,0 +1,90 @@
+{
+  "name": "@academix/state-stack",
+  "version": "0.1.0",
+  "description": "Production-ready, framework-agnostic cross-tab React state: IndexedDB-first persistence, BroadcastChannel sync, undo/redo, TTL, atoms and route-scoped demand state.",
+  "keywords": [
+    "react",
+    "state-management",
+    "cross-tab",
+    "broadcastchannel",
+    "indexeddb",
+    "persistence",
+    "undo-redo",
+    "atoms",
+    "usesyncexternalstore"
+  ],
+  "license": "MIT",
+  "author": "Academix",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/academix-admin/academix-ui.git",
+    "directory": "packages/state-stack"
+  },
+  "homepage": "https://github.com/academix-admin/academix-ui/tree/main/packages/state-stack#readme",
+  "bugs": {
+    "url": "https://github.com/academix-admin/academix-ui/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "EXAMPLES.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./next": {
+      "import": {
+        "types": "./dist/next.d.ts",
+        "default": "./dist/next.js"
+      },
+      "require": {
+        "types": "./dist/next.d.cts",
+        "default": "./dist/next.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rimraf dist",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "next": ">=13.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "next": "^15.5.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
