@@ -7,6 +7,9 @@ under the `@academix` scope.
 | --- | --- |
 | [`@academix/navigation-stack`](./packages/navigation-stack) | Client-side navigation stack — transitions, swipe-back, scroll restoration, nested stacks, DI and a request/response bus. |
 | [`@academix/state-stack`](./packages/state-stack) | Framework-agnostic cross-tab state — IndexedDB persistence, BroadcastChannel sync, undo/redo, atoms and route-scoped demand state. |
+| [`@academix/scroll-date-picker`](./packages/scroll-date-picker) | iOS-style wheel/scroll date picker with magnifier, quick-date shortcuts and theming. Zero deps beyond React. |
+| [`@academix/modal-sheet`](./packages/modal-sheet) | Gesture-driven bottom sheet built on Motion — snap detents, keyboard avoidance, compound `Sheet.*` API. |
+| [`@academix/search-viewer`](./packages/search-viewer) | Debounced search & selection UI — local + async cursor-paginated sources, loading/empty/error states. |
 
 ## Repo layout
 
