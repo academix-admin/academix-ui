@@ -8,3 +8,6 @@ npm-debug.log*
 .env
 .env.*
 coverage/
+
+# Local validation tarballs (npm pack output)
+.tarballs/
