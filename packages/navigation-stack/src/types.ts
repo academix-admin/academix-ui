@@ -32,7 +32,25 @@ export type TransitionState = "enter" | "idle" | "exit" | "done";
 export type ParsedStack = { code: string; params?: NavParams }[];
 export type NavActionResult =
   | { ok: true }
-  | { ok: false; reason: 'guard' | 'lock' | 'empty-stack' | 'parent-only' };
+  | { ok: false; reason: 'guard' | 'lock' | 'empty-stack' | 'parent-only' | 'redirect-loop' };
+
+/** C2 — Where a redirect points: a route key, or a key with params. */
+export type RedirectTarget = string | { key: string; params?: NavParams };
+
+/**
+ * C2 — go_router-style redirect resolver. Runs BEFORE guards on push/replace/
+ * go (and deep links via pushLocation). Return a target to redirect, or
+ * null/undefined to allow the navigation as-is. Redirect chains are resolved
+ * with a hop limit (5); exceeding it fails with `{ ok:false, reason:'redirect-loop' }`.
+ */
+export type RedirectFn = (ctx: {
+  action: 'push' | 'replace' | 'go';
+  from?: StackEntry | undefined;
+  to: { key: string; params?: NavParams };
+  stackSnapshot: StackEntry[];
+  /** Current location path (same codec as `?nav=`). */
+  location: string;
+}) => RedirectTarget | null | undefined | Promise<RedirectTarget | null | undefined>;
 
 /**
  * C3 — Location snapshot for a stack. `path` uses the same versioned dotted
@@ -106,6 +124,11 @@ export type NavStackAPI = {
    * pushing each segment in order. Resolves with the last push's result.
    */
   pushLocation: (location: string) => Promise<boolean | NavActionResult>;
+
+  // ============ C2: Redirects ============
+
+  /** Register a redirect resolver (runs before guards). Returns an unsubscribe. */
+  addRedirect: (fn: RedirectFn) => () => void;
 
   provideObject: <T>(
     key: string,

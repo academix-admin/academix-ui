@@ -1,4 +1,4 @@
-import type { AsyncLifecycleHandler, GuardFn, LifecycleHandler, LifecycleHook, MiddlewareFn, NavStackAPI, NavigationMap, StackChangeListener, StackEntry } from '../types';
+import type { AsyncLifecycleHandler, GuardFn, LifecycleHandler, LifecycleHook, MiddlewareFn, NavStackAPI, NavigationMap, RedirectFn, StackChangeListener, StackEntry } from '../types';
 // Per-stack registry of live navigation instances.
 import type { ComponentType, ReactNode, ReactElement } from 'react';
 
@@ -7,6 +7,8 @@ export type RegistryEntry = {
   listeners: Set<StackChangeListener>;
   guards: Set<GuardFn>;
   middlewares: Set<MiddlewareFn>;
+  /** C2 — redirect resolvers (optional: entries created by older code paths may lack it). */
+  redirects?: Set<RedirectFn>;
   maxStackSize: number;
   historySyncEnabled: boolean;
   snapshotBuffer: StackEntry[];

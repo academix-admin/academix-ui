@@ -8,6 +8,8 @@ export type {
   SwipeBackOptions,
   NavActionResult,
   NavLocation,
+  RedirectFn,
+  RedirectTarget,
   StackEntry,
   NavStackAPI,
 } from './types';

@@ -1,4 +1,4 @@
-import type { GuardFn, MiddlewareFn, NavActionResult, NavParams, NavStackAPI, NavigationMap, ObjectOptions, StackChangeListener, StackEntry } from '../types';
+import type { GuardFn, MiddlewareFn, NavActionResult, NavParams, NavStackAPI, NavigationMap, ObjectOptions, RedirectFn, RedirectTarget, StackChangeListener, StackEntry } from '../types';
 import { DEFAULT_MAX_STACK_SIZE } from '../constants';
 import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from './managers';
 import { _currentPageUidByStack } from './contexts';
@@ -23,6 +23,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       listeners: new Set(),
       guards: new Set(),
       middlewares: new Set(),
+      redirects: new Set(),
       maxStackSize: DEFAULT_MAX_STACK_SIZE,
       historySyncEnabled: false,
       snapshotBuffer: [],
@@ -191,6 +192,52 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
         }
       }, 50);
     });
+  }
+
+  // ============ C2: Redirect resolution (runs before guards) ============
+  const REDIRECT_LIMIT = 5;
+  async function resolveRedirects(
+    actionType: 'push' | 'replace' | 'go',
+    key: string,
+    params: NavParams
+  ): Promise<{ ok: true; key: string; params: NavParams } | { ok: false; reason: 'redirect-loop' }> {
+    let currentKey = key;
+    let currentParams = params;
+
+    for (let hop = 0; hop <= REDIRECT_LIMIT; hop++) {
+      const redirects = Array.from(regEntry.redirects ?? []) as RedirectFn[];
+      let target: RedirectTarget | null | undefined = null;
+
+      for (const r of redirects) {
+        try {
+          const res = await r({
+            action: actionType,
+            from: regEntry.stack[regEntry.stack.length - 1],
+            to: { key: currentKey, params: currentParams },
+            stackSnapshot: regEntry.stack.slice(),
+            location: buildUrlPath([{ navLink, stack: regEntry.stack }]),
+          });
+          if (res != null) { target = res; break; }
+        } catch (e) {
+          console.warn('Nav redirect threw:', e);
+        }
+      }
+
+      if (target == null) return { ok: true, key: currentKey, params: currentParams };
+      if (hop === REDIRECT_LIMIT) break;
+
+      if (typeof target === 'string') {
+        const parsed = parseRawKey(target, undefined);
+        currentKey = parsed.key;
+        currentParams = parsed.params;
+      } else {
+        currentKey = target.key;
+        currentParams = target.params;
+      }
+    }
+
+    console.warn(`[NavStack:${id}] redirect loop detected (limit ${REDIRECT_LIMIT}) — navigation cancelled.`);
+    return { ok: false, reason: 'redirect-loop' };
   }
 
   const api: NavStackAPI = {
@@ -1064,6 +1111,11 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       return () => regEntry.middlewares.delete(fn);
     },
 
+    addRedirect(fn) {
+      (regEntry.redirects ??= new Set()).add(fn);
+      return () => { regEntry.redirects?.delete(fn); };
+    },
+
     syncWithBrowserHistory(enabled) {
       regEntry.historySyncEnabled = enabled;
       if (enabled) {
@@ -1250,5 +1302,42 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
 
   regEntry.api = api;
   (api as any).lifecycleManager = lifecycleManager;
+  // ============ C2: wrap navigation verbs with redirect resolution ============
+  // Kept as a wrapper (not in-body edits) so the original verb implementations
+  // stay behavior-identical. Deep links via pushLocation flow through push and
+  // are therefore redirected too (go_router semantics).
+  {
+    const wrap = (
+      verb: 'push' | 'replace' | 'go' | 'pushAndReplace',
+      action: 'push' | 'replace' | 'go'
+    ) => {
+      const original = api[verb].bind(api);
+      api[verb] = async (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => {
+        if ((regEntry.redirects?.size ?? 0) > 0) {
+          const parsed = parseRawKey(rawKey, params);
+          const resolved = await resolveRedirects(action, parsed.key, parsed.params);
+          if (!resolved.ok) return resolved;
+          return original(resolved.key, resolved.params, metadata);
+        }
+        return original(rawKey, params, metadata);
+      };
+    };
+    wrap('push', 'push');
+    wrap('replace', 'replace');
+    wrap('go', 'go');
+    wrap('pushAndReplace', 'push');
+
+    const originalPushAndPopUntil = api.pushAndPopUntil.bind(api);
+    api.pushAndPopUntil = async (rawKey, predicate, params, metadata) => {
+      if ((regEntry.redirects?.size ?? 0) > 0) {
+        const parsed = parseRawKey(rawKey, params);
+        const resolved = await resolveRedirects('push', parsed.key, parsed.params);
+        if (!resolved.ok) return resolved;
+        return originalPushAndPopUntil(resolved.key, predicate, resolved.params, metadata);
+      }
+      return originalPushAndPopUntil(rawKey, predicate, params, metadata);
+    };
+  }
+
   return api;
 }

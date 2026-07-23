@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/navigation-stack",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A powerful client-side navigation stack for React: transitions, swipe-back, scroll restoration, lazy pages, nested/group navigation, dependency injection and a request/response bus.",
   "keywords": [
     "react",

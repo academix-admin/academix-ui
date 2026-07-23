@@ -165,6 +165,76 @@ describe('NavigationStack — C3 location & deep links', () => {
   });
 });
 
+describe('NavigationStack — C2 redirects', () => {
+  let lastResult: unknown = null;
+
+  function Home() {
+    const nav = useNav();
+    return (
+      <div>
+        <span>home-page</span>
+        <button onClick={() => nav.push('locked')}>try-locked</button>
+        <button
+          onClick={async () => {
+            lastResult = await nav.push('looper');
+          }}
+        >
+          try-loop
+        </button>
+      </div>
+    );
+  }
+  const Locked = () => <span>locked-page</span>;
+  const Login = () => <span>login-page</span>;
+  const Looper = () => <span>looper-page</span>;
+  const navLink = { home: Home, locked: Locked, login: Login, looper: Looper };
+
+  it('stack-level redirect sends push to another route (runs before render)', async () => {
+    render(
+      <NavigationStack
+        id={`r1-${Math.random().toString(36).slice(2)}`}
+        navLink={navLink}
+        entry="home"
+        transition="none"
+        redirect={(ctx) => (ctx.to.key === 'locked' ? 'login' : null)}
+      />
+    );
+    fireEvent.click(screen.getByText('try-locked'));
+    await waitFor(() => expect(screen.getByText('login-page')).toBeInTheDocument());
+    expect(screen.queryByText('locked-page')).not.toBeInTheDocument();
+  });
+
+  it('cyclic redirects fail with { ok:false, reason:"redirect-loop" }', async () => {
+    lastResult = null;
+    render(
+      <NavigationStack
+        id={`r2-${Math.random().toString(36).slice(2)}`}
+        navLink={navLink}
+        entry="home"
+        transition="none"
+        redirect={(ctx) => (ctx.to.key === 'looper' ? 'looper' : null)}
+      />
+    );
+    fireEvent.click(screen.getByText('try-loop'));
+    await waitFor(() => expect(lastResult).toEqual({ ok: false, reason: 'redirect-loop' }));
+    expect(screen.queryByText('looper-page')).not.toBeInTheDocument();
+  });
+
+  it('routeOptions redirect applies only to its own route', async () => {
+    render(
+      <NavigationStack
+        id={`r3-${Math.random().toString(36).slice(2)}`}
+        navLink={navLink}
+        entry="home"
+        transition="none"
+        routeOptions={{ locked: { redirect: () => 'login' } }}
+      />
+    );
+    fireEvent.click(screen.getByText('try-loop')); // 'looper' is unaffected
+    await waitFor(() => expect(screen.getByText('looper-page')).toBeInTheDocument());
+  });
+});
+
 describe('NavigationStack — cross-page dependency injection', () => {
   function Provider() {
     const nav = useNav();

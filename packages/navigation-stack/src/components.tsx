@@ -1,4 +1,4 @@
-import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI, NavigationMap, RenderRecord, StackEntry, SwipeBackOptions, TransitionRenderer, TransitionState } from './types';
+import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI, NavigationMap, RedirectFn, RenderRecord, StackEntry, SwipeBackOptions, TransitionRenderer, TransitionState } from './types';
 import type { GroupNavigationContextType } from './core/contexts';
 import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, useIsomorphicLayoutEffect } from './constants';
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
@@ -612,6 +612,16 @@ export default function NavigationStack(props: {
    */
   componentTags?: Record<string, NavigationMap>;
   swipeBack?: boolean | SwipeBackOptions;
+  /**
+   * C2 — go_router-style stack-level redirect. Runs before guards on
+   * push/replace/go (and deep links). Return a target to redirect, null to allow.
+   */
+  redirect?: RedirectFn;
+  /**
+   * C2 — per-route options. `routeOptions[key].redirect` runs only when
+   * navigating to that key. NavigationMap itself stays untouched.
+   */
+  routeOptions?: Record<string, { redirect?: RedirectFn }>;
 }) {
   const {
     id,
@@ -633,6 +643,8 @@ export default function NavigationStack(props: {
     additionalNavLinks = [],
     componentTags = {},
     swipeBack = true,
+    redirect,
+    routeOptions,
   } = props;
 
   // Memoize additional navlinks to prevent unnecessary recalculations
@@ -697,6 +709,23 @@ export default function NavigationStack(props: {
 
     return newApi;
   }, [id, mergedNavLink, syncHistory, parentApi, groupContext]);
+
+  // C2: register the stack-level redirect + per-route redirects on the api.
+  useEffect(() => {
+    const disposers: Array<() => void> = [];
+    if (redirect) disposers.push(api.addRedirect(redirect));
+    if (routeOptions) {
+      for (const [routeKey, opts] of Object.entries(routeOptions)) {
+        const routeRedirect = opts?.redirect;
+        if (routeRedirect) {
+          disposers.push(
+            api.addRedirect((ctx) => (ctx.to.key === routeKey ? routeRedirect(ctx) : null))
+          );
+        }
+      }
+    }
+    return () => { disposers.forEach((d) => d()); };
+  }, [api, redirect, routeOptions]);
 
   // Trigger onCreate lifecycle when API is created
   useEffect(() => {
