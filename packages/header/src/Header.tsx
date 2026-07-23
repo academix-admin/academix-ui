@@ -76,6 +76,8 @@ export interface HeaderProps {
   /** Override the back icon. Defaults to the built-in chevron. */
   backIcon?: React.ReactNode;
   backAriaLabel?: string;
+  /** Disable the back button (e.g. while a flow is submitting). */
+  backDisabled?: boolean;
   /** Right-side action buttons. */
   actions?: HeaderAction[];
   /** Escape hatch: extra custom nodes rendered after `actions`. */
@@ -146,6 +148,7 @@ const HEADER_CSS = `
   margin-left: -8px;
 }
 .ax-header__back:hover { background-color: rgba(0, 0, 0, 0.05); }
+.ax-header__back:disabled { opacity: 0.5; cursor: default; }
 .ax-header__back-icon { width: 20px; height: 20px; }
 .ax-header__titles {
   display: flex;
@@ -346,6 +349,7 @@ export function Header({
   showBack,
   backIcon,
   backAriaLabel = 'Go back',
+  backDisabled,
   actions = [],
   rightContent,
   className,
@@ -374,6 +378,7 @@ export function Header({
             className={cx('ax-header__back', classNames.backButton)}
             onClick={onBack}
             aria-label={backAriaLabel}
+            disabled={backDisabled}
           >
             {backIcon ?? <DefaultBackIcon className={cx('ax-header__back-icon', classNames.backIcon)} />}
           </button>

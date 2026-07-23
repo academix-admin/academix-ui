@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/header",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A Flutter AppBar-style React header: back button, title and right-side action icons, with self-contained styles and per-part class overrides.",
   "keywords": ["react", "header", "appbar", "toolbar", "navbar", "back-button"],
   "license": "MIT",
