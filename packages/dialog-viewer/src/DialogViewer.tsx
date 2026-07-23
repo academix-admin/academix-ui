@@ -48,6 +48,11 @@ const getStyles = (id: string) => `
   justify-content: center;
   z-index: 1000;
   padding: 0;
+  /* Keep the centered dialog above the on-screen keyboard: the occluded
+     bottom strip is reserved as padding so flex-centering happens in the
+     visible box. Falls back to 0px with no ViewInsetsProvider mounted. */
+  padding-bottom: var(--ax-keyboard-inset, 0px);
+  transition: padding-bottom 0.15s ease-out;
   margin: 0;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
@@ -65,7 +70,7 @@ const getStyles = (id: string) => `
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px - var(--ax-keyboard-inset, 0px));
   position: relative;
   animation: scaleIn 0.2s ease-out;
   box-sizing: border-box;
@@ -218,7 +223,7 @@ const getStyles = (id: string) => `
   #${id} .dialog-container {
     width: calc(100% - 24px);
     margin: 12px;
-    max-height: calc(100vh - 24px);
+    max-height: calc(100vh - 24px - var(--ax-keyboard-inset, 0px));
     border-radius: 16px;
   }
   

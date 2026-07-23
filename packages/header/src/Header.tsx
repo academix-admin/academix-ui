@@ -105,7 +105,10 @@ const HEADER_CSS = `
 /* ── bar variant (AppBar) ─────────────────────────────────────────────── */
 .ax-header {
   position: fixed;
-  top: 0;
+  /* Ride the visual viewport's top so the on-screen keyboard can't push the
+     fixed header off-screen (esp. iOS). Falls back to 0px when no
+     ViewInsetsProvider is mounted — see --ax-viewport-offset-top contract. */
+  top: var(--ax-viewport-offset-top, 0px);
   left: var(--ax-header-sidebar-width, var(--sidebar-width, 0px));
   right: 0;
   z-index: var(--ax-header-z, 10);
