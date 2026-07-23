@@ -34,6 +34,22 @@ export type NavActionResult =
   | { ok: true }
   | { ok: false; reason: 'guard' | 'lock' | 'empty-stack' | 'parent-only' };
 
+/**
+ * C3 — Location snapshot for a stack. `path` uses the same versioned dotted
+ * codec as the `?nav=` query param (the stable deep-link contract), so a
+ * location captured here can be fed back to `pushLocation`/`?nav=` later.
+ */
+export type NavLocation = {
+  /** Versioned dotted nav path for this stack (same codec as `?nav=`). */
+  path: string;
+  /** Key of the current top entry (null when the stack is empty). */
+  key: string | null;
+  /** Params of the current top entry. */
+  params?: NavParams;
+  /** Full href with the `?nav=` param applied. Empty string during SSR. */
+  href: string;
+};
+
 export type StackEntry = {
   // uid format: "groupId:stackId:pageUid" (composite key for scroll restoration)
   uid: string;
@@ -78,6 +94,18 @@ export type NavStackAPI = {
   peek: () => StackEntry | undefined;
   go: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
   replaceParam: (params: NavParams, merge?: boolean) => Promise<boolean | NavActionResult>;
+
+  // ============ C3: Location & deep links ============
+
+  /** Snapshot of this stack's location (path/key/params/href). */
+  getLocation: () => NavLocation;
+
+  /**
+   * Push a location produced by `getLocation().path`, a full href containing a
+   * `?nav=` param, or a bare dotted nav path. Rebuilds intermediate entries by
+   * pushing each segment in order. Resolves with the last push's result.
+   */
+  pushLocation: (location: string) => Promise<boolean | NavActionResult>;
 
   provideObject: <T>(
     key: string,

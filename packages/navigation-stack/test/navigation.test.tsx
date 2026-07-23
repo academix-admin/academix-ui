@@ -6,6 +6,7 @@ import NavigationStack, {
   useObject,
   useProvideObject,
   usePageLifecycle,
+  useLocation,
 } from '../src/index';
 
 function renderStack(navLink: Record<string, React.ComponentType<any>>, entry: string) {
@@ -102,6 +103,65 @@ describe('NavigationStack — lifecycle', () => {
     fireEvent.click(screen.getByText('go'));
     await waitFor(() => expect(screen.getByText('b-page')).toBeInTheDocument());
     await waitFor(() => expect(events).toContain('B:enter'));
+  });
+});
+
+describe('NavigationStack — C3 location & deep links', () => {
+  let capturedPath = '';
+
+  function Root() {
+    const nav = useNav();
+    const loc = useLocation();
+    return (
+      <div>
+        <span>{`root-loc:${loc?.key}`}</span>
+        <button onClick={() => nav.push('detail', { id: 5 })}>open</button>
+        <button
+          onClick={async () => {
+            await nav.pushLocation(capturedPath);
+          }}
+        >
+          deeplink
+        </button>
+      </div>
+    );
+  }
+  function Detail() {
+    const nav = useNav();
+    const loc = useLocation();
+    return (
+      <div>
+        <span>{`detail-loc:${loc?.key}`}</span>
+        <button
+          onClick={async () => {
+            capturedPath = nav.getLocation().path;
+            await nav.pop();
+          }}
+        >
+          capture-and-back
+        </button>
+      </div>
+    );
+  }
+
+  it('useLocation tracks the top entry reactively', async () => {
+    renderStack({ root: Root, detail: Detail }, 'root');
+    expect(screen.getByText('root-loc:root')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('open'));
+    await waitFor(() => expect(screen.getByText('detail-loc:detail')).toBeInTheDocument());
+  });
+
+  it('pushLocation rebuilds a captured location (prefix-idempotent)', async () => {
+    renderStack({ root: Root, detail: Detail }, 'root');
+    // open detail, capture its location path, pop back to root
+    fireEvent.click(screen.getByText('open'));
+    await waitFor(() => expect(screen.getByText('capture-and-back')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('capture-and-back'));
+    await waitFor(() => expect(screen.getByText('root-loc:root')).toBeInTheDocument());
+    expect(capturedPath.length).toBeGreaterThan(0);
+    // deep-link back using the captured path — shared 'root' prefix is skipped
+    fireEvent.click(screen.getByText('deeplink'));
+    await waitFor(() => expect(screen.getByText('detail-loc:detail')).toBeInTheDocument());
   });
 });
 

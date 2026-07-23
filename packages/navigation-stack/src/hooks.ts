@@ -1,5 +1,5 @@
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext } from './core/contexts';
-import type { NavStackAPI, NavigationMap } from './types';
+import type { NavStackAPI, NavigationMap, NavLocation } from './types';
 import { globalObjectRegistry } from './di/object-registry';
 // Public hooks + tagged-navigation helpers.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
@@ -25,6 +25,25 @@ export function safeWindow<T>(
     console.warn('[SafeWindow] Error accessing window:', err);
     return fallback;
   }
+}
+
+/**
+ * C3 — Reactive location for the enclosing stack. Re-renders whenever the
+ * stack changes; returns null outside a NavigationStack.
+ */
+export function useLocation(): NavLocation | null {
+  const nav = useContext(NavContext);
+  const [location, setLocation] = useState<NavLocation | null>(() =>
+    nav ? nav.getLocation() : null
+  );
+
+  useEffect(() => {
+    if (!nav) return;
+    setLocation(nav.getLocation());
+    return nav.subscribe(() => setLocation(nav.getLocation()));
+  }, [nav]);
+
+  return location;
 }
 
 export function useNav() {

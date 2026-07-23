@@ -7,6 +7,7 @@ export type {
   ScrollBroadcastEvent,
   SwipeBackOptions,
   NavActionResult,
+  NavLocation,
   StackEntry,
   NavStackAPI,
 } from './types';
@@ -18,6 +19,7 @@ export {
   isBrowser,
   safeWindow,
   useNav,
+  useLocation,
   useIsTop,
   useDebugObjects,
   usePageLifecycle,

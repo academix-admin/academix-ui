@@ -4,7 +4,7 @@ import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from '
 import { _currentPageUidByStack } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
-import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack } from './persistence';
+import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam } from './persistence';
 import { globalObjectRegistry } from '../di/object-registry';
 // createApiFor — the per-stack navigation API factory.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
@@ -996,6 +996,62 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       regEntry.listeners.add(fn);
       try { fn(regEntry.stack.slice()); } catch (e) { }
       return () => regEntry.listeners.delete(fn);
+    },
+
+    // ============ C3: Location & deep links ============
+
+    getLocation() {
+      const path = buildUrlPath([{ navLink, stack: regEntry.stack }]);
+      const top = regEntry.stack[regEntry.stack.length - 1];
+      let href = '';
+      if (typeof window !== 'undefined') {
+        try {
+          const url = new URL(window.location.href);
+          const map = parseCombinedNavParam(url.searchParams.get('nav'));
+          map[id] = path;
+          url.searchParams.set('nav', buildCombinedNavParam(map));
+          href = url.toString();
+        } catch { /* keep href = '' */ }
+      }
+      return { path, key: top?.key ?? null, params: top?.params, href };
+    },
+
+    async pushLocation(location) {
+      // Accept: a full href with ?nav=, or a bare dotted nav path.
+      let path = location;
+      if (location.includes('://') || location.startsWith('/') || location.includes('?')) {
+        try {
+          const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+          const url = new URL(location, base);
+          const navParam = url.searchParams.get('nav');
+          if (navParam) {
+            const map = parseCombinedNavParam(navParam);
+            path = map[id] ?? Object.values(map)[0] ?? '';
+          }
+        } catch { /* fall through: treat input as a bare path */ }
+      }
+
+      const stacks = parseUrlPathIntoStacks(path);
+      const target = stacks[0] ?? [];
+
+      // Skip the leading segments that already match the current stack, so
+      // pushing a captured location is idempotent for the shared prefix
+      // (deep-linking from anywhere only pushes what's missing).
+      let startIdx = 0;
+      for (let i = 0; i < target.length && i < regEntry.stack.length; i++) {
+        const k = decodeStackPath(navLink, target[i].code);
+        if (k && regEntry.stack[i].key === k) startIdx = i + 1;
+        else break;
+      }
+
+      let last: boolean | NavActionResult = { ok: false, reason: 'empty-stack' };
+      for (let i = startIdx; i < target.length; i++) {
+        const key = decodeStackPath(navLink, target[i].code);
+        if (!key) continue;
+        // Sequential pushes rebuild the missing entries in order.
+        last = await api.push(key, target[i].params);
+      }
+      return last;
     },
 
     registerGuard(fn) {
