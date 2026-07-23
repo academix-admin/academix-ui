@@ -7,6 +7,7 @@ import NavigationStack, {
   useProvideObject,
   usePageLifecycle,
   useLocation,
+  useOverlayEntry,
 } from '../src/index';
 
 function renderStack(navLink: Record<string, React.ComponentType<any>>, entry: string) {
@@ -232,6 +233,70 @@ describe('NavigationStack — C2 redirects', () => {
     );
     fireEvent.click(screen.getByText('try-loop')); // 'looper' is unaffected
     await waitFor(() => expect(screen.getByText('looper-page')).toBeInTheDocument());
+  });
+});
+
+describe('NavigationStack — C1 overlay entries', () => {
+  function HomeOv() {
+    const nav = useNav();
+    useOverlayEntry(<span>home-toast</span>, []);
+    return (
+      <div>
+        <span>home-ov</span>
+        <button onClick={() => nav.push('second')}>go-second</button>
+        <button
+          onClick={() => {
+            nav.overlay.insert(<span>modal-content</span>, {
+              id: 'modal-1',
+              barrier: true,
+              barrierDismiss: true,
+            });
+          }}
+        >
+          open-modal
+        </button>
+      </div>
+    );
+  }
+  function SecondOv() {
+    const nav = useNav();
+    useOverlayEntry(<span>second-toast</span>, []);
+    return (
+      <div>
+        <span>second-ov</span>
+        <button onClick={() => nav.pop()}>back</button>
+      </div>
+    );
+  }
+  const navLink = { home: HomeOv, second: SecondOv };
+
+  it('useOverlayEntry renders content bound to the current page', async () => {
+    renderStack(navLink, 'home');
+    await waitFor(() => expect(screen.getByText('home-toast')).toBeInTheDocument());
+  });
+
+  it('page-bound overlay hides for other pages and auto-removes on pop', async () => {
+    renderStack(navLink, 'home');
+    await waitFor(() => expect(screen.getByText('home-toast')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('go-second'));
+    await waitFor(() => expect(screen.getByText('second-toast')).toBeInTheDocument());
+    // home's overlay is bound to home, which is no longer top
+    expect(screen.queryByText('home-toast')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('back'));
+    await waitFor(() => expect(screen.getByText('home-toast')).toBeInTheDocument());
+    // second's overlay was auto-removed when its page left the stack
+    expect(screen.queryByText('second-toast')).not.toBeInTheDocument();
+  });
+
+  it('imperative insert with a dismissible barrier removes on barrier click', async () => {
+    const { container } = renderStack(navLink, 'home');
+    fireEvent.click(screen.getByText('open-modal'));
+    await waitFor(() => expect(screen.getByText('modal-content')).toBeInTheDocument());
+    const host = container.querySelector('[data-ax-overlay="modal-1"]') as HTMLElement;
+    expect(host).toBeTruthy();
+    // barrier is the first child (backdrop)
+    fireEvent.click(host.firstElementChild as HTMLElement);
+    await waitFor(() => expect(screen.queryByText('modal-content')).not.toBeInTheDocument());
   });
 });
 

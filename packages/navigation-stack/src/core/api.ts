@@ -6,6 +6,8 @@ import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
 import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam } from './persistence';
 import { globalObjectRegistry } from '../di/object-registry';
+import { getOverlayStore, notifyOverlays, disposeOverlays, clampOffset, type OverlayEntryRec } from '../overlay/registry';
+import type { OverlayRender, OverlayOptions, OverlayHandle } from '../types';
 // createApiFor — the per-stack navigation API factory.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import type { ComponentType, ReactNode, ReactElement } from 'react';
@@ -1116,6 +1118,54 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       return () => { regEntry.redirects?.delete(fn); };
     },
 
+    // ============ C1: Overlays ============
+
+    overlay: {
+      insert(render: OverlayRender, opts: OverlayOptions = {}): OverlayHandle {
+        const store = getOverlayStore(id);
+        const oid = opts.id ?? `ov-${Math.random().toString(36).slice(2, 10)}`;
+        const rec: OverlayEntryRec = {
+          id: oid,
+          render,
+          abovePage: opts.abovePage ?? null,
+          offset: clampOffset(opts.offset),
+          barrier: opts.barrier,
+          barrierDismiss: opts.barrierDismiss,
+        };
+        store.entries.set(oid, rec);
+        notifyOverlays(id);
+        return {
+          id: oid,
+          remove: () => {
+            if (store.entries.delete(oid)) notifyOverlays(id);
+          },
+          update: (r: OverlayRender) => {
+            const e = store.entries.get(oid);
+            if (e) { e.render = r; notifyOverlays(id); }
+          },
+          moveAbove: (pageKeyOrUid: string | null) => {
+            const e = store.entries.get(oid);
+            if (e) { e.abovePage = pageKeyOrUid; notifyOverlays(id); }
+          },
+          setOffset: (offset: number) => {
+            const e = store.entries.get(oid);
+            if (e) { e.offset = clampOffset(offset); notifyOverlays(id); }
+          },
+        };
+      },
+      remove(oid: string) {
+        const store = getOverlayStore(id);
+        if (store.entries.delete(oid)) notifyOverlays(id);
+      },
+      clear() {
+        const store = getOverlayStore(id);
+        if (store.entries.size > 0) {
+          store.entries.clear();
+          notifyOverlays(id);
+        }
+      },
+    },
+
     syncWithBrowserHistory(enabled) {
       regEntry.historySyncEnabled = enabled;
       if (enabled) {
@@ -1239,6 +1289,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       lifecycleManager.dispose();
       transitionManager.dispose();
       memoryManager.dispose();
+      disposeOverlays(id); // C1: drop this stack's overlay entries
       regEntry.listeners.clear();
       regEntry.guards.clear();
       regEntry.middlewares.clear();

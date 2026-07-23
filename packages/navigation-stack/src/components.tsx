@@ -8,6 +8,7 @@ import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseComb
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
 import { useSwipeBack } from './gestures/swipe-back';
+import { subscribeOverlays, getOverlayStore, notifyOverlays } from './overlay/registry';
 
 let _groupStyleMountCount = 0;
 // Rendered components: loaders, transitions, error boundary, group + main stack.
@@ -581,6 +582,70 @@ export function GroupNavigationStack({
 }
 
 // ==================== Component Aggregation Utilities ====================
+
+// ============ C1: OverlayHost ============
+// Renders this stack's overlay entries above the pages, inside the stack
+// container (which is position:relative). Z contract: page-bound overlays at
+// bandIndex*1000+offset, stack-level at stack.length*1000+offset. v1 visibility:
+// page-bound overlays show while their page is the current top; they are
+// auto-removed here when their page leaves the stack.
+function OverlayHost({ api, stack }: { api: NavStackAPI; stack: StackEntry[] }) {
+  const [, force] = useState(0);
+
+  useEffect(() => subscribeOverlays(api.id, () => force((n) => n + 1)), [api.id]);
+
+  // Auto-cleanup: drop page-bound overlays whose page left the stack.
+  useEffect(() => {
+    const store = getOverlayStore(api.id);
+    let changed = false;
+    store.entries.forEach((e, k) => {
+      if (e.abovePage && !stack.some((s) => s.uid === e.abovePage || s.key === e.abovePage)) {
+        store.entries.delete(k);
+        changed = true;
+      }
+    });
+    if (changed) notifyOverlays(api.id);
+  }, [api.id, stack]);
+
+  const top = stack[stack.length - 1];
+  const entries = Array.from(getOverlayStore(api.id).entries.values());
+  if (entries.length === 0) return null;
+
+  return (
+    <>
+      {entries.map((e) => {
+        if (e.abovePage && !(top && (top.uid === e.abovePage || top.key === e.abovePage))) {
+          return null;
+        }
+        const bandIndex = e.abovePage
+          ? Math.max(0, stack.findIndex((s) => s.uid === e.abovePage || s.key === e.abovePage))
+          : stack.length;
+        const z = bandIndex * 1000 + e.offset;
+        const content = typeof e.render === 'function' ? e.render() : e.render;
+        return (
+          <div
+            key={e.id}
+            data-ax-overlay={e.id}
+            style={{ position: 'absolute', inset: 0, zIndex: z, pointerEvents: 'none' }}
+          >
+            {e.barrier != null && e.barrier !== false && (
+              <div
+                onClick={e.barrierDismiss ? () => api.overlay.remove(e.id) : undefined}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  pointerEvents: 'auto',
+                  background: typeof e.barrier === 'string' ? e.barrier : 'rgba(0,0,0,0.4)',
+                }}
+              />
+            )}
+            <div style={{ display: 'inline-block', pointerEvents: 'auto' }}>{content}</div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 export default function NavigationStack(props: {
   id: string;
@@ -1221,6 +1286,7 @@ export default function NavigationStack(props: {
             {renderEntry(r, idx)}
           </React.Fragment>
         ))}
+        <OverlayHost api={api} stack={stackSnapshot} />
       </div>
     </NavContext.Provider>
   );

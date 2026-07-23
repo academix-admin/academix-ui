@@ -52,6 +52,48 @@ export type RedirectFn = (ctx: {
   location: string;
 }) => RedirectTarget | null | undefined | Promise<RedirectTarget | null | undefined>;
 
+// ============ C1: Overlay entries (Flutter OverlayEntry-style) ============
+
+/** Overlay content: a node, or a function returning one (re-run on update()). */
+export type OverlayRender = ReactNode | (() => ReactNode);
+
+/**
+ * Z-band contract: stack entry `i` owns band `i*1000`; its overlays sit at
+ * `i*1000 + offset (1..999)`. Stack-level overlays (no `abovePage`) sit above
+ * all pages at `stack.length*1000 + offset`.
+ */
+export interface OverlayOptions {
+  /** Stable id (auto-generated when omitted). */
+  id?: string;
+  /**
+   * Bind the overlay above a page (route key or uid). Bound overlays are
+   * visible while their page is the current top, and are auto-removed when the
+   * page leaves the stack. Omit for a stack-level overlay above all pages.
+   */
+  abovePage?: string;
+  /** Slot within the 1000-wide band (clamped to 1..999). Default 500. */
+  offset?: number;
+  /** Backdrop behind the content: true = default dim, string = CSS color. */
+  barrier?: boolean | string;
+  /** Clicking the barrier removes the overlay. Default false. */
+  barrierDismiss?: boolean;
+}
+
+export interface OverlayHandle {
+  id: string;
+  remove: () => void;
+  update: (render: OverlayRender) => void;
+  /** Re-bind above another page (key/uid), or null for stack-level. */
+  moveAbove: (pageKeyOrUid: string | null) => void;
+  setOffset: (offset: number) => void;
+}
+
+export interface NavOverlayAPI {
+  insert: (render: OverlayRender, opts?: OverlayOptions) => OverlayHandle;
+  remove: (id: string) => void;
+  clear: () => void;
+}
+
 /**
  * C3 — Location snapshot for a stack. `path` uses the same versioned dotted
  * codec as the `?nav=` query param (the stable deep-link contract), so a
@@ -129,6 +171,11 @@ export type NavStackAPI = {
 
   /** Register a redirect resolver (runs before guards). Returns an unsubscribe. */
   addRedirect: (fn: RedirectFn) => () => void;
+
+  // ============ C1: Overlays ============
+
+  /** Overlay entries for this stack (see OverlayOptions for the z-band contract). */
+  overlay: NavOverlayAPI;
 
   provideObject: <T>(
     key: string,

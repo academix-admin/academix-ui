@@ -10,6 +10,10 @@ export type {
   NavLocation,
   RedirectFn,
   RedirectTarget,
+  OverlayRender,
+  OverlayOptions,
+  OverlayHandle,
+  NavOverlayAPI,
   StackEntry,
   NavStackAPI,
 } from './types';
@@ -22,6 +26,7 @@ export {
   safeWindow,
   useNav,
   useLocation,
+  useOverlayEntry,
   useIsTop,
   useDebugObjects,
   usePageLifecycle,

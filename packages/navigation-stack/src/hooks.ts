@@ -1,5 +1,5 @@
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext } from './core/contexts';
-import type { NavStackAPI, NavigationMap, NavLocation } from './types';
+import type { NavStackAPI, NavigationMap, NavLocation, OverlayRender, OverlayOptions } from './types';
 import { globalObjectRegistry } from './di/object-registry';
 // Public hooks + tagged-navigation helpers.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
@@ -44,6 +44,32 @@ export function useLocation(): NavLocation | null {
   }, [nav]);
 
   return location;
+}
+
+/**
+ * C1 — Declarative overlay entry (Flutter OverlayEntry-style). Inserts on
+ * mount, removes on unmount, re-inserts when `deps` change. By default the
+ * overlay is bound above the page that rendered this hook (auto-removed when
+ * that page leaves the stack); pass `opts.abovePage` (or omit binding by
+ * passing `{ abovePage: undefined }` explicitly via opts spread) to override.
+ */
+export function useOverlayEntry(
+  render: OverlayRender,
+  deps: React.DependencyList = [],
+  opts?: OverlayOptions
+): void {
+  const nav = useContext(NavContext);
+  const currentPageUid = useContext(CurrentPageContext);
+
+  useEffect(() => {
+    if (!nav) return;
+    const handle = nav.overlay.insert(render, {
+      abovePage: currentPageUid ?? undefined,
+      ...opts,
+    });
+    return () => handle.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nav, currentPageUid, ...deps]);
 }
 
 export function useNav() {
