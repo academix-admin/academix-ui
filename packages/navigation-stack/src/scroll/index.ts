@@ -197,9 +197,17 @@ export function useUnifiedScrollRestoration(
     }
   }, []);
 
-  // Same scrollable container detection as group version
+  // Same scrollable container detection as group version.
+  // Prefer an explicitly registered scroll element (e.g. a ColumnBody/RowBody that
+  // claimed the scroll from its page wrapper) — the wrapper itself is then
+  // `overflow:hidden` and would be the wrong element to listen to / restore. Falls
+  // back to the page wrapper for default pages (which register themselves).
   const findScrollableContainer = (uid: string): ContainerData | null => {
-    const pageElement = document.querySelector(`[data-nav-uid="${uid}"]`) as HTMLElement;
+    const registered = scrollBroadcaster.getRegisteredContainer(uid);
+    const pageElement =
+      registered && document.contains(registered)
+        ? registered
+        : (document.querySelector(`[data-nav-uid="${uid}"]`) as HTMLElement);
 
     if (!pageElement) {
       return null;

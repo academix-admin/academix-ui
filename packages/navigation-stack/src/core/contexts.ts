@@ -27,6 +27,18 @@ export const NavContext = createContext<NavStackAPI | null>(null);
 export const CurrentPageContext = createContext<string | null>(null);
 export const _currentPageUidByStack = new Map<string, string>();
 
+/**
+ * Lets a ColumnBody/RowBody inside a page tell its page wrapper "I am the scroll
+ * region." When claimed, the wrapper stops being a scroller and becomes a
+ * keyboard-aware flex column (so a header/bottom-bar sibling stays pinned and the
+ * body scrolls under it); the claimed element becomes the scroll-restore target.
+ */
+export type PageBodyContextValue = {
+  uid: string;
+  claimScroll: (el: HTMLElement | null) => void;
+};
+export const PageBodyContext = createContext<PageBodyContextValue | null>(null);
+
 export function findParentNavContext(): NavStackAPI | null {
   try {
     return useContext(NavContext);

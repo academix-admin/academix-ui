@@ -1,7 +1,7 @@
 import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI, NavigationMap, RedirectFn, RenderRecord, StackEntry, SwipeBackOptions, TransitionRenderer, TransitionState } from './types';
 import type { GroupNavigationContextType } from './core/contexts';
 import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, useIsomorphicLayoutEffect } from './constants';
-import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
+import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry } from './core/registry';
 import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack } from './core/persistence';
@@ -114,6 +114,119 @@ export function MissingRoute({
   );
 }
 
+/**
+ * Shared per-page wrapper used by every transition renderer. It renders the
+ * `.navstack-page` div and owns scroll registration. By default it IS the page
+ * scroller (current behavior). When a ColumnBody/RowBody inside it claims the
+ * scroll (via PageBodyContext), it switches to a keyboard-aware flex column
+ * (`overflow:hidden` + `padding-bottom: var(--ax-keyboard-inset)`) so a header/
+ * bottom-bar sibling stays pinned and the claimed body scrolls under it — and the
+ * claimed element becomes the scroll-restore target instead of the wrapper.
+ */
+function NavPageShell({
+  uid,
+  isTop,
+  transitionClassName = '',
+  children,
+}: {
+  uid: string;
+  isTop: boolean;
+  transitionClassName?: string;
+  children: React.ReactNode;
+}) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const [bodyEl, setBodyEl] = useState<HTMLElement | null>(null);
+  const claimed = bodyEl != null;
+
+  const claimScroll = useCallback((el: HTMLElement | null) => setBodyEl(el), []);
+  const ctxValue = useMemo(() => ({ uid, claimScroll }), [uid, claimScroll]);
+
+  // Register the ACTIVE scroll element (claimed body, else the wrapper itself)
+  // for scroll restoration, broadcast an initial position, AND relay every scroll
+  // so listeners (e.g. a NavigationBar in autohide mode) always get events even
+  // when the scroller has moved into a ColumnBody. Re-runs when the claim changes
+  // so everything follows the scroll into the ColumnBody.
+  useEffect(() => {
+    const el = bodyEl ?? wrapperRef.current;
+    if (!el) return;
+
+    const emit = () => {
+      if (!document.contains(el)) return;
+      const clientHeight = el.clientHeight;
+      const scrollHeight = el.scrollHeight;
+      const position = el.scrollTop;
+      const max = Math.max(scrollHeight - clientHeight, 0);
+      const percentage = max > 0 ? (position / max) * 100 : 0;
+      scrollBroadcaster.broadcast({
+        uid,
+        pageKey: uid,
+        position,
+        scrollPosition: position,
+        scrollPercentage: percentage,
+        container: el,
+        clientHeight,
+        scrollHeight,
+        timestamp: Date.now(),
+      });
+    };
+
+    try {
+      scrollBroadcaster.registerContainer(uid, el);
+      const raf = requestAnimationFrame(emit);
+      el.addEventListener('scroll', emit, { passive: true });
+      return () => {
+        cancelAnimationFrame(raf);
+        el.removeEventListener('scroll', emit);
+      };
+    } catch (e) {
+      console.error(`[NavPageShell] register error uid=${uid}:`, e);
+    }
+  }, [uid, bodyEl]);
+
+  useEffect(
+    () => () => {
+      try {
+        scrollBroadcaster.unregisterContainer(uid);
+      } catch (e) { }
+    },
+    [uid],
+  );
+
+  const style: React.CSSProperties = claimed
+    ? {
+        // Keyboard-agnostic: the ColumnBody just fills its wrapper as a flex column.
+        // Keyboard-awareness belongs to the app shell, which sizes itself to the
+        // visible viewport (see academix-web ViewInsetsProvider + mainContainer).
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+      }
+    : {
+        overflowY: isTop ? 'auto' : 'hidden',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        width: '100%',
+        height: '100%',
+      };
+
+  return (
+    <PageBodyContext.Provider value={ctxValue}>
+      <div
+        ref={wrapperRef}
+        className={`navstack-page ${transitionClassName}`.trim()}
+        inert={!isTop}
+        data-nav-uid={uid}
+        style={style}
+      >
+        {children}
+      </div>
+    </PageBodyContext.Provider>
+  );
+}
+
 export function SlideTransitionRenderer({
   children,
   state,
@@ -152,57 +265,9 @@ export function SlideTransitionRenderer({
         : "";
 
   return (
-    <div
-      key={uid}
-      className={`${baseClass} ${slideCls}`}
-      inert={!isTop}
-      data-nav-uid={uid}
-      ref={(el) => {
-        if (!el) {
-          try {
-            scrollBroadcaster.unregisterContainer(uid);
-          } catch (e) { }
-          return;
-        }
-
-        try {
-          scrollBroadcaster.registerContainer(uid, el);
-
-          requestAnimationFrame(() => {
-            if (!document.contains(el)) return;
-
-            const clientHeight = el.clientHeight;
-            const scrollHeight = el.scrollHeight;
-            const position = el.scrollTop;
-            const max = Math.max(scrollHeight - clientHeight, 0);
-            const percentage = max > 0 ? (position / max) * 100 : 0;
-
-            scrollBroadcaster.broadcast({
-              uid,
-              pageKey: uid,
-              position,
-              scrollPosition: position,
-              scrollPercentage: percentage,
-              container: el,
-              clientHeight,
-              scrollHeight,
-              timestamp: Date.now(),
-            });
-          });
-        } catch (e) {
-          console.error(`[RefCallback] Error for uid=${uid}:`, e);
-        }
-      }}
-      style={{
-        overflowY: isTop ? 'auto' : 'hidden',
-        overflowX: 'hidden',
-        WebkitOverflowScrolling: 'touch',
-        width: '100%',
-        height: '100%',
-      }}
-    >
+    <NavPageShell uid={uid} isTop={isTop} transitionClassName={slideCls}>
       {children}
-    </div>
+    </NavPageShell>
   );
 }
 
@@ -238,57 +303,9 @@ export function FadeTransitionRenderer({
         : "";
 
   return (
-    <div
-      key={uid}
-      className={`${baseClass} ${fadeCls}`}
-      inert={!isTop}
-      data-nav-uid={uid}
-      ref={(el) => {
-        if (!el) {
-          try {
-            scrollBroadcaster.unregisterContainer(uid);
-          } catch (e) { }
-          return;
-        }
-
-        try {
-          scrollBroadcaster.registerContainer(uid, el);
-
-          requestAnimationFrame(() => {
-            if (!document.contains(el)) return;
-
-            const clientHeight = el.clientHeight;
-            const scrollHeight = el.scrollHeight;
-            const position = el.scrollTop;
-            const max = Math.max(scrollHeight - clientHeight, 0);
-            const percentage = max > 0 ? (position / max) * 100 : 0;
-
-            scrollBroadcaster.broadcast({
-              uid,
-              pageKey: uid,
-              position,
-              scrollPosition: position,
-              scrollPercentage: percentage,
-              container: el,
-              clientHeight,
-              scrollHeight,
-              timestamp: Date.now(),
-            });
-          });
-        } catch (e) {
-          console.error(`[RefCallback] Error for uid=${uid}:`, e);
-        }
-      }}
-      style={{
-        overflowY: isTop ? 'auto' : 'hidden',
-        overflowX: 'hidden',
-        WebkitOverflowScrolling: 'touch',
-        width: '100%',
-        height: '100%',
-      }}
-    >
+    <NavPageShell uid={uid} isTop={isTop} transitionClassName={fadeCls}>
       {children}
-    </div>
+    </NavPageShell>
   );
 }
 
@@ -1172,15 +1189,7 @@ export default function NavigationStack(props: {
       }
     }
 
-    const defaultPageStyle: React.CSSProperties = {
-      overflowY: 'auto',
-      overflowX: 'hidden',
-      WebkitOverflowScrolling: 'touch',
-      width: '100%',
-      height: '100%',
-    };
-
-    const builtInRenderer: TransitionRenderer = ({ children, state: s, isTop: t, index, style = {} }) => {
+    const builtInRenderer: TransitionRenderer = ({ children, state: s, isTop: t, index }) => {
       const baseClass = "navstack-page";
       const uid = currentEntry.uid;
 
@@ -1201,55 +1210,9 @@ export default function NavigationStack(props: {
       }
 
       return (
-        <div
-          key={uid}
-          className={`${baseClass}`}
-          inert={!t}
-          data-nav-uid={uid}
-          ref={(el) => {
-            if (!el) {
-              try {
-                scrollBroadcaster.unregisterContainer(uid);
-              } catch (e) { }
-              return;
-            }
-
-            try {
-              scrollBroadcaster.registerContainer(uid, el);
-
-              requestAnimationFrame(() => {
-                if (!document.contains(el)) return;
-
-                const clientHeight = el.clientHeight;
-                const scrollHeight = el.scrollHeight;
-                const position = el.scrollTop;
-                const max = Math.max(scrollHeight - clientHeight, 0);
-                const percentage = max > 0 ? (position / max) * 100 : 0;
-
-                scrollBroadcaster.broadcast({
-                  uid,
-                  pageKey: uid,
-                  position,
-                  scrollPosition: position,
-                  scrollPercentage: percentage,
-                  container: el,
-                  clientHeight,
-                  scrollHeight,
-                  timestamp: Date.now(),
-                });
-              });
-            } catch (e) {
-              console.error(`[RefCallback] Error for uid=${uid}:`, e);
-            }
-          }}
-          style={{
-            ...defaultPageStyle,
-            overflowY: t ? 'auto' : 'hidden',
-            ...style,
-          }}
-        >
+        <NavPageShell uid={uid} isTop={t}>
           {children}
-        </div>
+        </NavPageShell>
       );
     };
 
