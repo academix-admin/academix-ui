@@ -134,22 +134,16 @@ function NavPageShell({
   transitionClassName?: string;
   children: React.ReactNode;
 }) {
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [bodyEl, setBodyEl] = useState<HTMLElement | null>(null);
   const claimed = bodyEl != null;
 
   const claimScroll = useCallback((el: HTMLElement | null) => setBodyEl(el), []);
   const ctxValue = useMemo(() => ({ uid, claimScroll }), [uid, claimScroll]);
 
-  // Register the ACTIVE scroll element (claimed body, else the wrapper itself)
-  // for scroll restoration, broadcast an initial position, AND relay every scroll
-  // so listeners (e.g. a NavigationBar in autohide mode) always get events even
-  // when the scroller has moved into a ColumnBody. Re-runs when the claim changes
-  // so everything follows the scroll into the ColumnBody.
-  useEffect(() => {
-    const el = bodyEl ?? wrapperRef.current;
-    if (!el) return;
-
+  // Attach a scroll relay + registration to a scroll element: registers it as the
+  // scroll-restore target and broadcasts every scroll so a NavigationBar in
+  // autohide mode keeps getting events. Returns a cleanup.
+  const attachScroll = useCallback((el: HTMLElement) => {
     const emit = () => {
       if (!document.contains(el)) return;
       const clientHeight = el.clientHeight;
@@ -169,19 +163,41 @@ function NavPageShell({
         timestamp: Date.now(),
       });
     };
+    scrollBroadcaster.registerContainer(uid, el);
+    el.addEventListener('scroll', emit, { passive: true });
+    const raf = requestAnimationFrame(emit);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener('scroll', emit);
+    };
+  }, [uid]);
 
-    try {
-      scrollBroadcaster.registerContainer(uid, el);
-      const raf = requestAnimationFrame(emit);
-      el.addEventListener('scroll', emit, { passive: true });
-      return () => {
-        cancelAnimationFrame(raf);
-        el.removeEventListener('scroll', emit);
-      };
-    } catch (e) {
-      console.error(`[NavPageShell] register error uid=${uid}:`, e);
-    }
-  }, [uid, bodyEl]);
+  // The wrapper's scroll relay is wired via a CALLBACK REF (not a useEffect) so it
+  // always re-attaches to the LIVE wrapper element. A plain page's `bodyEl` never
+  // changes, so a `[uid, bodyEl]` effect would leave the scroll listener on a
+  // stale, detached wrapper after any re-render — which silently broke autohide on
+  // every non-Scaffold page. Only relays while NOT claimed (when claimed, the
+  // ColumnBody below is the scroller).
+  const wrapCleanup = useRef<null | (() => void)>(null);
+  const setWrapperEl = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (wrapCleanup.current) {
+        wrapCleanup.current();
+        wrapCleanup.current = null;
+      }
+      if (el && bodyEl == null) {
+        wrapCleanup.current = attachScroll(el);
+      }
+    },
+    [attachScroll, bodyEl],
+  );
+
+  // When a ColumnBody claims the scroll, it becomes the scroller — relay + register
+  // it (overriding the wrapper). `bodyEl` in deps → robustly re-attaches on change.
+  useEffect(() => {
+    if (!bodyEl) return;
+    return attachScroll(bodyEl);
+  }, [bodyEl, attachScroll]);
 
   useEffect(
     () => () => {
@@ -215,7 +231,7 @@ function NavPageShell({
   return (
     <PageBodyContext.Provider value={ctxValue}>
       <div
-        ref={wrapperRef}
+        ref={setWrapperEl}
         className={`navstack-page ${transitionClassName}`.trim()}
         inert={!isTop}
         data-nav-uid={uid}
