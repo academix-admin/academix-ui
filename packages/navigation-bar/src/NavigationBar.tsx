@@ -256,8 +256,14 @@ export default function NavigationBar({
     }
 
     if (mode === 'autohide') {
-      setHidden(current > prevScroll.current && current > 50);
-      prevScroll.current = current;
+      // Ignore repeat events at the same position. Scroll can be broadcast more than
+      // once per frame (e.g. a page wrapper relayed by two sources); a duplicate at
+      // the same position would compute `current > prevScroll` as false and wrongly
+      // re-show the bar right after hiding it. Only react when the position changes.
+      if (current !== prevScroll.current) {
+        setHidden(current > prevScroll.current && current > 50);
+        prevScroll.current = current;
+      }
     }
   }, [mode, floatScrollThreshold, snapPoint]);
 
