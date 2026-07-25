@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useInsertionEffect } from 'react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -302,15 +302,24 @@ const HEADER_CSS = `
 `;
 
 let stylesInjected = false;
+function ensureStyles() {
+  if (stylesInjected || typeof document === 'undefined') return;
+  stylesInjected = true;
+  const el = document.createElement('style');
+  el.setAttribute('data-ax-header', '');
+  el.textContent = HEADER_CSS;
+  document.head.appendChild(el);
+}
+
+// Inject at MODULE EVALUATION on the client — before any Header first renders — so the very
+// first paint is already styled (no flash of unstyled header on a cold page load, which the
+// old useEffect injection caused because effects run AFTER paint).
+ensureStyles();
+
 function useInjectStyles() {
-  useEffect(() => {
-    if (stylesInjected || typeof document === 'undefined') return;
-    stylesInjected = true;
-    const el = document.createElement('style');
-    el.setAttribute('data-ax-header', '');
-    el.textContent = HEADER_CSS;
-    document.head.appendChild(el);
-  }, []);
+  // Safety net: if the module was only evaluated during SSR (document undefined above),
+  // inject on the client before paint. useInsertionEffect runs before layout/paint.
+  useInsertionEffect(ensureStyles, []);
 }
 
 // ─── Default back icon (the app's chevron) ──────────────────────────────────

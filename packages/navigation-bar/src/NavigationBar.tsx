@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useInsertionEffect } from 'react';
 
 export type NavigationBarScrollEvent = {
   container: HTMLElement | 'window';
@@ -125,9 +125,11 @@ const getStyles = (id: string) => `
     `;
 
 const useInjectStyles = (id: string) => {
-  useEffect(() => {
+  // useInsertionEffect runs BEFORE the browser paints, so the style is present on first
+  // paint — no flash of unstyled nav on a cold load (useEffect ran after paint).
+  useInsertionEffect(() => {
     if (typeof document === 'undefined') return;
-    
+
     const styleId = `navigation-bar-styles-${id}`;
     let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
 

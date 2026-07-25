@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useInsertionEffect } from 'react';
 
 export interface NavItem {
   id: string;
@@ -165,9 +165,10 @@ const getStyles = (id: string) => `
 `;
 
 const useInjectSidebarStyles = (id: string) => {
-  useEffect(() => {
+  // Inject before paint (useInsertionEffect) so the first paint is styled — no FOUC.
+  useInsertionEffect(() => {
     if (typeof document === 'undefined') return;
-    
+
     const styleId = `sidebar-styles-${id}`;
     if (document.getElementById(styleId)) return;
 

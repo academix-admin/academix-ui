@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/navigation-bar",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A configurable React navigation/tab bar with normal, floating and auto-hide-on-scroll modes.",
   "keywords": [
     "react",
