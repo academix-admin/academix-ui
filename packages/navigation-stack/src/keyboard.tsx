@@ -43,12 +43,16 @@ export function useViewportInsets(): void {
     if (!vv) return; // no VisualViewport: leave 0px fallbacks
 
     let frame = 0;
-    // Proactive "keyboard open" signal driven by input focus, NOT only by the
-    // measured inset. On iOS the FIRST focus reads inset ~0 (Safari scrolls the
-    // document instead of shrinking, so vvOffsetTop cancels the height loss), which
-    // left the bottom nav showing until the keyboard was dropped + reopened. Focus
-    // fires immediately and reliably, so we OR it with the inset.
-    let focused = false;
+    // Proactive "keyboard open" signal driven by input focus, NOT only by the measured
+    // inset. On iOS the FIRST focus reads inset ~0 (Safari scrolls the document instead of
+    // shrinking, so vvOffsetTop cancels the height loss), which left the bottom nav showing
+    // until the keyboard was dropped + reopened. Focus fires immediately, so we OR it in.
+    //
+    // The focus state is derived LIVE from document.activeElement (not a cached boolean):
+    // an overlay (SearchViewer/dialog) whose focused input is REMOVED from the DOM on close
+    // does not fire `focusout`/`blur` in Chromium — a cached `focused=true` would then stay
+    // stuck and leave the nav hidden forever. A MutationObserver catches that silent removal
+    // so the signal self-clears even when no viewport resize fires.
     const isField = (el: any): boolean =>
       !!el &&
       /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) &&
@@ -56,9 +60,24 @@ export function useViewportInsets(): void {
       (el as HTMLInputElement).type !== 'hidden' &&
       (el as HTMLElement).getAttribute?.('contenteditable') !== 'true';
 
+    const activeField = (): Element | null => (isField(document.activeElement) ? document.activeElement : null);
+
     const setKb = (open: boolean) => {
       if (open) root.setAttribute('data-ax-keyboard', 'open');
       else root.removeAttribute('data-ax-keyboard');
+    };
+
+    // Watch for the focused field being detached from the DOM (silent, no focusout).
+    let watched: Element | null = null;
+    let mo: MutationObserver | null = null;
+    const stopWatch = () => { if (mo) { mo.disconnect(); mo = null; } watched = null; };
+    const startWatch = (el: Element) => {
+      watched = el;
+      if (mo || typeof MutationObserver === 'undefined') return;
+      mo = new MutationObserver(() => {
+        if (watched && !watched.isConnected) { stopWatch(); apply(); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
     };
 
     const apply = () => {
@@ -72,7 +91,7 @@ export function useViewportInsets(): void {
       root.style.setProperty('--ax-keyboard-inset', `${inset}px`);
       root.style.setProperty('--ax-viewport-offset-top', `${Math.round(vv.offsetTop)}px`);
       root.style.setProperty('--ax-vv-height', `${Math.round(vh)}px`);
-      setKb(focused || inset > 60);
+      setKb(!!activeField() || inset > 60);
     };
 
     const schedule = () => {
@@ -83,12 +102,14 @@ export function useViewportInsets(): void {
     const onResume = () => apply();
 
     const onFocusIn = (e: Event) => {
-      if (isField(e.target)) { focused = true; setKb(true); }
+      if (isField(e.target)) { setKb(true); startWatch(e.target as Element); }
     };
     const onFocusOut = () => {
-      // Defer: focus may be moving to another field; only close when nothing is focused.
+      // Defer: focus may be moving to another field; re-derive the authoritative state.
       window.setTimeout(() => {
-        if (!isField(document.activeElement)) { focused = false; apply(); }
+        const el = activeField();
+        if (el) startWatch(el);
+        else { stopWatch(); apply(); }
       }, 60);
     };
 
@@ -116,6 +137,7 @@ export function useViewportInsets(): void {
       document.removeEventListener('visibilitychange', onResume);
       document.removeEventListener('focusin', onFocusIn, true);
       document.removeEventListener('focusout', onFocusOut, true);
+      stopWatch();
       root.style.removeProperty('--ax-keyboard-inset');
       root.style.removeProperty('--ax-viewport-offset-top');
       root.style.removeProperty('--ax-vv-height');
