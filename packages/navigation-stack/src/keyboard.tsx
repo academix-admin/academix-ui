@@ -43,6 +43,23 @@ export function useViewportInsets(): void {
     if (!vv) return; // no VisualViewport: leave 0px fallbacks
 
     let frame = 0;
+    // Proactive "keyboard open" signal driven by input focus, NOT only by the
+    // measured inset. On iOS the FIRST focus reads inset ~0 (Safari scrolls the
+    // document instead of shrinking, so vvOffsetTop cancels the height loss), which
+    // left the bottom nav showing until the keyboard was dropped + reopened. Focus
+    // fires immediately and reliably, so we OR it with the inset.
+    let focused = false;
+    const isField = (el: any): boolean =>
+      !!el &&
+      /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) &&
+      !(el as HTMLInputElement).readOnly &&
+      (el as HTMLInputElement).type !== 'hidden' &&
+      (el as HTMLElement).getAttribute?.('contenteditable') !== 'true';
+
+    const setKb = (open: boolean) => {
+      if (open) root.setAttribute('data-ax-keyboard', 'open');
+      else root.removeAttribute('data-ax-keyboard');
+    };
 
     const apply = () => {
       frame = 0;
@@ -55,8 +72,7 @@ export function useViewportInsets(): void {
       root.style.setProperty('--ax-keyboard-inset', `${inset}px`);
       root.style.setProperty('--ax-viewport-offset-top', `${Math.round(vv.offsetTop)}px`);
       root.style.setProperty('--ax-vv-height', `${Math.round(vh)}px`);
-      if (inset > 60) root.setAttribute('data-ax-keyboard', 'open');
-      else root.removeAttribute('data-ax-keyboard');
+      setKb(focused || inset > 60);
     };
 
     const schedule = () => {
@@ -65,6 +81,16 @@ export function useViewportInsets(): void {
     };
     const onVV = () => apply();
     const onResume = () => apply();
+
+    const onFocusIn = (e: Event) => {
+      if (isField(e.target)) { focused = true; setKb(true); }
+    };
+    const onFocusOut = () => {
+      // Defer: focus may be moving to another field; only close when nothing is focused.
+      window.setTimeout(() => {
+        if (!isField(document.activeElement)) { focused = false; apply(); }
+      }, 60);
+    };
 
     apply();
     const t1 = window.setTimeout(apply, 300);
@@ -75,6 +101,8 @@ export function useViewportInsets(): void {
     window.addEventListener('orientationchange', schedule);
     window.addEventListener('pageshow', onResume);
     document.addEventListener('visibilitychange', onResume);
+    document.addEventListener('focusin', onFocusIn, true);
+    document.addEventListener('focusout', onFocusOut, true);
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
@@ -86,6 +114,8 @@ export function useViewportInsets(): void {
       window.removeEventListener('orientationchange', schedule);
       window.removeEventListener('pageshow', onResume);
       document.removeEventListener('visibilitychange', onResume);
+      document.removeEventListener('focusin', onFocusIn, true);
+      document.removeEventListener('focusout', onFocusOut, true);
       root.style.removeProperty('--ax-keyboard-inset');
       root.style.removeProperty('--ax-viewport-offset-top');
       root.style.removeProperty('--ax-vv-height');
