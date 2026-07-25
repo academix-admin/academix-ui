@@ -60,7 +60,18 @@ export function useViewportInsets(): void {
       (el as HTMLInputElement).type !== 'hidden' &&
       (el as HTMLElement).getAttribute?.('contenteditable') !== 'true';
 
-    const activeField = (): Element | null => (isField(document.activeElement) ? document.activeElement : null);
+    const activeField = (): Element | null => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || !isField(el)) return null;
+      const r = el.getBoundingClientRect();
+      // A focused field with no box, or one pushed OUT of the visible viewport — e.g. an
+      // overlay (SearchViewer/sheet) SWIPED off-screen while its input keeps focus — must not
+      // hold the keyboard signal open. (A keyboard-open field is scrolled INTO view, so it
+      // still passes.) This complements the MutationObserver, which only catches DOM removal.
+      if (r.width === 0 && r.height === 0) return null;
+      const onScreen = r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
+      return onScreen ? el : null;
+    };
 
     const setKb = (open: boolean) => {
       if (open) root.setAttribute('data-ax-keyboard', 'open');
@@ -124,6 +135,9 @@ export function useViewportInsets(): void {
     document.addEventListener('visibilitychange', onResume);
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
+    // Swipe-to-dismiss (react-modal-sheet etc.) may not blur/remove the input synchronously;
+    // re-derive on touch release so a sheet swiped off-screen restores the nav.
+    document.addEventListener('touchend', schedule, { passive: true });
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
@@ -137,6 +151,7 @@ export function useViewportInsets(): void {
       document.removeEventListener('visibilitychange', onResume);
       document.removeEventListener('focusin', onFocusIn, true);
       document.removeEventListener('focusout', onFocusOut, true);
+      document.removeEventListener('touchend', schedule);
       stopWatch();
       root.style.removeProperty('--ax-keyboard-inset');
       root.style.removeProperty('--ax-viewport-offset-top');
