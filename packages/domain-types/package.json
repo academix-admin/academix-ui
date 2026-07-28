@@ -23,9 +23,12 @@
     "clean": "rimraf dist",
     "dev": "tsup --watch",
     "gen:db": "supabase gen types typescript --project-id iewqfmkngcgayxbbnpiz --schema public > src/database.types.ts",
+    "gen": "node scripts/gen.mjs",
+    "verify": "node scripts/gen.mjs && git diff --exit-code -- src/generated",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "quicktype": "23.2.6",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
