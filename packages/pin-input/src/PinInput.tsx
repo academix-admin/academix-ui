@@ -17,6 +17,8 @@ export interface PinInputClassNames {
   container?: string;
   /** appended to the container while `error` is true. */
   containerError?: string;
+  /** appended to the container while `loading` is true. */
+  containerLoading?: string;
   /** each single-character box. */
   input?: string;
 }
@@ -27,6 +29,8 @@ export interface PinInputProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   error?: boolean;
+  /** a verify/submit is in flight — disables the boxes and applies `classNames.containerLoading`. */
+  loading?: boolean;
   /** render digits masked (as `*`) unless `revealed`. */
   mask?: boolean;
   /** when `mask`, show the real digits. */
@@ -46,6 +50,7 @@ export function PinInput({
   onChange,
   disabled = false,
   error = false,
+  loading = false,
   mask = false,
   revealed = false,
   autoFocus = true,
@@ -54,6 +59,7 @@ export function PinInput({
   inputProps,
 }: PinInputProps) {
   const inputs = Array(length).fill(0);
+  const isDisabled = disabled || loading;
 
   const getFirstInvalidIndex = (val: string) => {
     for (let i = 0; i < length; i++) {
@@ -145,7 +151,7 @@ export function PinInput({
 
   const containerClass = `${className ?? classNames.container ?? ''}${
     error && classNames.containerError ? ` ${classNames.containerError}` : ''
-  }`.trim() || undefined;
+  }${loading && classNames.containerLoading ? ` ${classNames.containerLoading}` : ''}`.trim() || undefined;
 
   return (
     <div className={containerClass}>
@@ -161,7 +167,7 @@ export function PinInput({
           onChange={(e) => handleChange(e, index)}
           onKeyDown={(e) => handleKeyDown(e, index)}
           onPaste={handlePaste}
-          disabled={disabled}
+          disabled={isDisabled}
           className={classNames.input}
           autoFocus={autoFocus && index === 0 && !error}
           onFocus={(e) => handleFocus(e, index)}

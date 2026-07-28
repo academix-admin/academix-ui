@@ -22,6 +22,8 @@ export interface KeypadClassNames {
   backspace?: string;
   /** appended to the mask-toggle key. */
   toggle?: string;
+  /** appended to the outer wrapper while `loading` (style your overlay/dimming here). */
+  loading?: string;
 }
 
 export interface KeypadProps {
@@ -30,6 +32,10 @@ export interface KeypadProps {
   length?: number;
   disabled?: boolean;
   error?: boolean;
+  /** disables every key (a verify/submit in flight) and applies `classNames.loading`. */
+  loading?: boolean;
+  /** rendered inside the wrapper while `loading` (e.g. a spinner); position via `classNames.loading`. */
+  loadingIndicator?: React.ReactNode;
   /** render the reveal/mask (eye) toggle key. */
   showMaskToggle?: boolean;
   /** current reveal state (for the toggle icon/label). */
@@ -50,6 +56,8 @@ export function Keypad({
   length = 6,
   disabled = false,
   error,
+  loading = false,
+  loadingIndicator,
   showMaskToggle = false,
   revealed = false,
   onToggleReveal,
@@ -57,6 +65,8 @@ export function Keypad({
   classNames = {},
   className,
 }: KeypadProps) {
+  const busy = disabled || loading;
+
   const handleDigitInput = (digit: number) => {
     if (value.length < length) {
       onChange(value + digit);
@@ -74,16 +84,19 @@ export function Keypad({
   };
 
   const btn = classNames.button ?? '';
+  const wrapperClass = `${className ?? classNames.keypad ?? ''}${
+    loading && classNames.loading ? ` ${classNames.loading}` : ''
+  }`.trim() || undefined;
 
   return (
-    <div className={className ?? classNames.keypad}>
+    <div className={wrapperClass} aria-busy={loading || undefined}>
       <div className={classNames.grid}>
         {DIGITS.map((digit) => (
           <button
             key={digit}
             type="button"
             onClick={() => handleDigitInput(digit)}
-            disabled={disabled}
+            disabled={busy}
             className={btn || undefined}
           >
             {digit}
@@ -92,7 +105,7 @@ export function Keypad({
         <button
           type="button"
           onClick={handleBackspace}
-          disabled={disabled}
+          disabled={busy}
           className={`${btn} ${classNames.backspace ?? ''}`.trim() || undefined}
         >
           {backspaceLabel}
@@ -101,7 +114,7 @@ export function Keypad({
           <button
             type="button"
             onClick={() => onToggleReveal?.(!revealed)}
-            disabled={disabled}
+            disabled={busy}
             className={`${btn} ${classNames.toggle ?? ''}`.trim() || undefined}
             title={revealed ? 'Hide' : 'Show'}
             aria-label={revealed ? 'Hide' : 'Show'}
@@ -110,6 +123,7 @@ export function Keypad({
           </button>
         )}
       </div>
+      {loading && loadingIndicator}
     </div>
   );
 }

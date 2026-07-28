@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/pin-input",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Headless segmented code input (OTP / PIN) + on-screen numeric Keypad — accessible, device-proven focus/paste behavior, style every slot via classNames.",
   "keywords": [
     "react",
