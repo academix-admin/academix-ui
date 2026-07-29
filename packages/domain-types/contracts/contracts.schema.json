@@ -1,30 +1,189 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "AcademixContracts",
-  "description": "SINGLE SOURCE for Academix RPC/Lambda wire contracts. Every response + nested wire type is a key under `definitions` (the key IS the generated type name). The root just references them all so the generator emits every type. Author each shape from its function's RETURN builder; regenerate TS + Dart from here.",
+  "description": "SINGLE SOURCE for Academix RPC/Lambda wire contracts. Each key under `definitions` is a wire type (the key IS the generated type name — kept identical to academix-web's current `Backend*` interfaces so the generated types are drop-in). Author each shape from its function's RETURN builder. The root references the top-level ones so the generator emits every reachable type. Regenerate TS + Dart with `npm run gen`.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "getUserBalanceResponse": { "$ref": "#/definitions/GetUserBalanceResponse" }
+    "getUserBalanceResponse": { "$ref": "#/definitions/GetUserBalanceResponse" },
+    "backendUserBalanceModel": { "$ref": "#/definitions/BackendUserBalanceModel" },
+    "backendTransactionModel": { "$ref": "#/definitions/BackendTransactionModel" },
+    "backendUserEngagementModel": { "$ref": "#/definitions/BackendUserEngagementModel" },
+    "backendDailyPerformance": { "$ref": "#/definitions/BackendDailyPerformance" },
+    "backendDailyStreaksModel": { "$ref": "#/definitions/BackendDailyStreaksModel" }
   },
   "definitions": {
     "GetUserBalanceResponse": {
       "type": "object", "additionalProperties": false,
+      "description": "public.get_user_balance response envelope",
       "required": ["status", "user_balance_details"],
       "properties": {
         "status": { "type": ["string", "null"] },
         "error": { "type": ["string", "null"] },
-        "user_balance_details": { "oneOf": [ { "$ref": "#/definitions/UserBalanceWire" }, { "type": "null" } ] }
+        "user_balance_details": { "oneOf": [{ "$ref": "#/definitions/BackendUserBalanceModel" }, { "type": "null" }] }
       }
     },
-    "UserBalanceWire": {
+    "BackendUserBalanceModel": {
       "type": "object", "additionalProperties": false,
-      "description": "public.get_user_balance RETURN builder",
+      "description": "public.get_user_balance -> user_balance_details",
       "required": ["users_id", "users_balance_amount", "users_balance_updated_at"],
       "properties": {
         "users_id": { "type": "string" },
         "users_balance_amount": { "type": "number" },
         "users_balance_updated_at": { "type": "string" }
+      }
+    },
+
+    "BackendTransactionModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_user_transactions / fetch_user_transaction_by_id transaction row",
+      "required": [
+        "transaction_id", "sort_created_id", "transaction_fee", "transaction_type", "transaction_created_at",
+        "transaction_sender_rate", "transaction_receiver_rate", "transaction_sender_amount", "transaction_sender_status",
+        "transaction_receiver_amount", "transaction_receiver_status", "transaction_sender_reference"
+      ],
+      "properties": {
+        "pools_id": { "type": ["string", "null"] },
+        "transaction_id": { "type": "string" },
+        "sort_created_id": { "type": "string" },
+        "transaction_fee": { "type": "number" },
+        "transaction_type": { "type": "string" },
+        "transaction_created_at": { "type": "string" },
+        "transaction_sender_rate": { "type": "number" },
+        "transaction_receiver_rate": { "type": "number" },
+        "transaction_sender_amount": { "type": "number" },
+        "transaction_sender_status": { "type": "string" },
+        "transaction_receiver_amount": { "type": "number" },
+        "transaction_receiver_status": { "type": "string" },
+        "transaction_sender_reference": { "type": "string" },
+        "payment_profile_sender_details": { "oneOf": [{ "$ref": "#/definitions/BackendPaymentProfileDetails" }, { "type": "null" }] },
+        "payment_profile_receiver_details": { "oneOf": [{ "$ref": "#/definitions/BackendPaymentProfileDetails" }, { "type": "null" }] }
+      }
+    },
+    "BackendPaymentProfileDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["users_details", "payment_method_details", "payment_wallet_details"],
+      "properties": {
+        "users_details": { "$ref": "#/definitions/BackendUserDetails" },
+        "payment_method_details": { "$ref": "#/definitions/BackendPaymentMethodDetails" },
+        "payment_wallet_details": { "$ref": "#/definitions/BackendPaymentWalletDetails" }
+      }
+    },
+    "BackendPaymentMethodDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["payment_method_id", "payment_method_identity", "payment_method_checker"],
+      "properties": {
+        "payment_method_id": { "type": "string" },
+        "payment_method_identity": { "type": "string" },
+        "payment_method_checker": { "type": "string" }
+      }
+    },
+    "BackendPaymentWalletDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["payment_wallet_id", "payment_wallet_identity", "payment_wallet_currency"],
+      "properties": {
+        "payment_wallet_id": { "type": "string" },
+        "payment_wallet_identity": { "type": "string" },
+        "payment_wallet_currency": { "type": "string" }
+      }
+    },
+    "BackendUserDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["users_names"],
+      "properties": {
+        "users_id": { "type": ["string", "null"] },
+        "users_names": { "type": "string" },
+        "payment_details": { "oneOf": [{ "$ref": "#/definitions/BackendPaymentDetails" }, { "type": "null" }] }
+      }
+    },
+    "BackendPaymentDetails": {
+      "type": "object", "additionalProperties": false,
+      "description": "payment profile detail fields (all optional/nullable)",
+      "properties": {
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "country": { "type": ["string", "null"] },
+        "network": { "type": ["string", "null"] },
+        "fullname": { "type": ["string", "null"] },
+        "private_account": { "type": ["boolean", "null"] },
+        "e_naira": { "type": ["boolean", "null"] },
+        "direct_debit": { "type": ["boolean", "null"] },
+        "opay": { "type": ["boolean", "null"] },
+        "bank_name": { "type": ["string", "null"] },
+        "account_number": { "type": ["string", "null"] }
+      }
+    },
+
+    "BackendUserEngagementModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "get_user_engagement -> user_engagement_details",
+      "required": [
+        "user_engagement_total_time", "user_engagement_total_questions", "user_engagement_progress_win_count",
+        "user_engagement_progress_time", "user_engagement_progress_questions", "user_engagement_progress_quiz_count",
+        "user_engagement_progress_points_details"
+      ],
+      "properties": {
+        "user_engagement_total_time": { "type": "number" },
+        "user_engagement_total_questions": { "type": "number" },
+        "user_engagement_progress_win_count": { "type": "number" },
+        "user_engagement_progress_time": { "type": "number" },
+        "user_engagement_progress_questions": { "type": "number" },
+        "user_engagement_progress_quiz_count": { "type": "number" },
+        "user_engagement_progress_points_details": { "$ref": "#/definitions/BackendHomeEngagementProgress" }
+      }
+    },
+    "BackendHomeEngagementProgress": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "current_points", "engagement_levels_id", "points_to_next_level", "current_progress_percent",
+        "next_engagement_levels_id", "engagement_levels_identity", "next_engagement_levels_identity"
+      ],
+      "properties": {
+        "current_points": { "type": "number" },
+        "engagement_levels_id": { "type": "number" },
+        "points_to_next_level": { "type": "number" },
+        "current_progress_percent": { "type": "number" },
+        "next_engagement_levels_id": { "type": "number" },
+        "engagement_levels_identity": { "type": "string" },
+        "next_engagement_levels_identity": { "type": "string" }
+      }
+    },
+
+    "BackendDailyPerformance": {
+      "type": "object", "additionalProperties": false,
+      "description": "get_user_daily_performance -> daily_performance_details",
+      "required": ["daily_performance_for_earning", "daily_performance_for_quiz"],
+      "properties": {
+        "daily_performance_for_earning": { "type": "number" },
+        "daily_performance_for_quiz": { "type": "number" }
+      }
+    },
+
+    "BackendDailyStreaksModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "claim_user_streaks / get_user_streaks -> daily_streaks_details",
+      "required": [
+        "daily_streaks_max", "daily_streaks_date", "daily_streaks_count", "daily_streaks_status",
+        "daily_streaks_awarded", "daily_streaks_reached", "daily_streaks_date_number"
+      ],
+      "properties": {
+        "daily_streaks_max": { "type": "number" },
+        "daily_streaks_date": { "type": "string" },
+        "daily_streaks_count": { "type": "number" },
+        "redeem_code_details": { "oneOf": [{ "$ref": "#/definitions/BackendRewardRedeemCodeModel" }, { "type": "null" }] },
+        "daily_streaks_status": { "type": "string" },
+        "daily_streaks_awarded": { "type": "number" },
+        "daily_streaks_reached": { "type": "boolean" },
+        "daily_streaks_created_at": { "type": ["string", "null"] },
+        "daily_streaks_date_number": { "type": "number" }
+      }
+    },
+    "BackendRewardRedeemCodeModel": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "redeem_code_id": { "type": ["string", "null"] },
+        "redeem_code_value": { "type": ["string", "null"] },
+        "redeem_code_expires": { "type": ["string", "null"] }
       }
     }
   }
