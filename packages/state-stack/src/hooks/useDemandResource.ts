@@ -59,6 +59,8 @@ export function useDemandResource<T>(
   options: DemandResourceOptions & {
     onSuccess?: (data: T) => void;
     onError?: (error: unknown) => void;
+    /** Rebuild the persisted value on hydration (e.g. reconstruct class instances). See useDemandState. */
+    revive?: (raw: unknown) => T;
   } = {}
 ): DemandResource<T> {
   const {

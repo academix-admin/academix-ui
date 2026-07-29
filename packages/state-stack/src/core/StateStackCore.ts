@@ -97,9 +97,17 @@ export class StateStackCore {
     key: string,
     initial: unknown,
     persist: boolean,
-    storage: StorageAdapter
+    storage: StorageAdapter,
+    revive?: (raw: unknown) => unknown
   ): Promise<boolean> {
     const ik = this.subKey(scope, key);
+    // Rebuild rich values (e.g. class instances) from the plain JSON that was persisted. Fail-safe:
+    // if revive throws, keep the parsed plain value rather than breaking hydration.
+    const applyRevive = (parsed: unknown): unknown => {
+      if (!revive) return parsed;
+      try { return revive(parsed); }
+      catch (err) { console.warn('[StateStack] revive failed; using raw persisted value:', err); return parsed; }
+    };
 
     if (!persist) {
       this.hydratedKeys.add(ik);
@@ -122,7 +130,7 @@ export class StateStackCore {
           try {
             const parsed = JSON.parse(stored);
             if (!this.stacks.has(scope)) this.stacks.set(scope, new Map());
-            this.stacks.get(scope)!.set(key, parsed);
+            this.stacks.get(scope)!.set(key, applyRevive(parsed));
             this.hydratedKeys.add(ik);
             this.loadedKeys.add(ik);
             this.notifyHydration(scope, key);
@@ -141,7 +149,7 @@ export class StateStackCore {
             if (legacyStored != null) {
               const parsed = JSON.parse(legacyStored);
               if (!this.stacks.has(scope)) this.stacks.set(scope, new Map());
-              this.stacks.get(scope)!.set(key, parsed);
+              this.stacks.get(scope)!.set(key, applyRevive(parsed));
               this.hydratedKeys.add(ik);
               this.loadedKeys.add(ik);
               this.notifyHydration(scope, key);

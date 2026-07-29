@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import { isEmptyValue, useDemandResource } from '../src/index';
+import { isEmptyValue, useDemandResource, useDemandState } from '../src/index';
+import type { StorageAdapter } from '../src/index';
 
 let uid = 0;
 const uniqScope = () => `demand-test-${Date.now()}-${uid++}`;
@@ -128,5 +129,51 @@ describe('useDemandResource', () => {
     const r2 = renderHook(() => useDemandResource<number[]>([], fetcher, opts));
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
     expect(r2.result.current.data).toEqual([8]);
+  });
+});
+
+class Row {
+  v: number;
+  constructor(r: { v: number }) { this.v = r.v; }
+  double() { return this.v * 2; }
+}
+const mockStorage = (json: string): StorageAdapter => ({
+  getItem: async () => json,
+  setItem: async () => {},
+  removeItem: async () => {},
+});
+
+describe('useDemandState revive (persisted class instances)', () => {
+  it('reconstructs class instances from persisted plain JSON on hydration', async () => {
+    const scope = uniqScope();
+    const storage = mockStorage(JSON.stringify([{ v: 1 }, { v: 2 }]));
+    const revive = (raw: unknown) => (raw as { v: number }[]).map((r) => new Row(r));
+    const { result } = renderHook(() =>
+      useDemandState<Row[]>([], { key: 'k', scope, persist: true, storage, revive })
+    );
+    await waitFor(() => expect(result.current[0].length).toBe(2));
+    expect(result.current[0][0]).toBeInstanceOf(Row);
+    expect(result.current[0][0].double()).toBe(2);
+  });
+
+  it('without revive, hydrated values are plain objects (no methods)', async () => {
+    const scope = uniqScope();
+    const storage = mockStorage(JSON.stringify([{ v: 5 }]));
+    const { result } = renderHook(() =>
+      useDemandState<{ v: number }[]>([], { key: 'k', scope, persist: true, storage })
+    );
+    await waitFor(() => expect(result.current[0].length).toBe(1));
+    expect(result.current[0][0]).toEqual({ v: 5 });
+    expect(Object.getPrototypeOf(result.current[0][0])).toBe(Object.prototype);
+  });
+
+  it('revive throwing falls back to the raw parsed value (never breaks hydration)', async () => {
+    const scope = uniqScope();
+    const storage = mockStorage(JSON.stringify([{ v: 9 }]));
+    const revive = () => { throw new Error('bad revive'); };
+    const { result } = renderHook(() =>
+      useDemandState<{ v: number }[]>([], { key: 'k', scope, persist: true, storage, revive })
+    );
+    await waitFor(() => expect(result.current[0]).toEqual([{ v: 9 }]));
   });
 });

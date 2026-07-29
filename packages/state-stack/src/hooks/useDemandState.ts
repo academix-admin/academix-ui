@@ -56,6 +56,12 @@ export function useDemandState<T>(
      * loader. `deps` changes and TTL expiry still force a reload regardless of this flag.
      */
     revalidateOnMount?: boolean;
+    /**
+     * Rebuild the persisted value on hydration — e.g. reconstruct class instances that JSON storage
+     * flattened to plain objects: `revive: (raw) => (raw as Row[]).map((r) => Model.from(r))`. Applied
+     * once when the value is loaded from storage; fail-safe (a throw keeps the raw parsed value).
+     */
+    revive?: (raw: unknown) => T;
   }
 ): [
   T,
@@ -100,6 +106,8 @@ export function useDemandState<T>(
   const deps = opts?.deps ?? [];
   const clearOnZeroSubscribers = opts?.clearOnZeroSubscribers ?? false;
   const revalidateOnMount = opts?.revalidateOnMount ?? true;
+  const reviveRef = useRef(opts?.revive);
+  reviveRef.current = opts?.revive;
 
   const core = StateStackCore.instance;
   const initialRef = useRef(initial);
@@ -135,7 +143,8 @@ export function useDemandState<T>(
           key,
           initialRef.current,
           persist,
-          storage
+          storage,
+          reviveRef.current
         );
         if (mounted && didHydrate) core.notify(scope, key);
       } catch (err) {
@@ -180,6 +189,36 @@ export function useDemandState<T>(
       return;
     }
     core.resetDemand(scope, key);
+  }, deps);
+
+  // Dev footgun guard: a `deps` entry that changes identity every render but stays deep-equal (a fresh
+  // object/array literal) resets the demand every render → constant refetch. Warn once, debug-only.
+  const prevDepsRef = useRef<React.DependencyList | null>(null);
+  const depsWarnedRef = useRef(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_globalConfig.debug && !depsWarnedRef.current) {
+      const prev = prevDepsRef.current;
+      if (prev && prev.length === deps.length) {
+        for (let i = 0; i < deps.length; i++) {
+          const a = deps[i], b = prev[i];
+          if (!Object.is(a, b) && a && typeof a === 'object') {
+            let equal = false;
+            try { equal = JSON.stringify(a) === JSON.stringify(b); } catch { /* not comparable */ }
+            if (equal) {
+              depsWarnedRef.current = true;
+              console.warn(
+                '[StateStack] useDemandState/useDemandResource: a `deps` entry changes identity every ' +
+                  'render but is deep-equal (a fresh object/array literal). This resets the demand every ' +
+                  'render → constant refetch. Memoize it with useMemo, or pass primitives.'
+              );
+              break;
+            }
+          }
+        }
+      }
+    }
+    prevDepsRef.current = deps;
   }, deps);
 
   const demand = useCallback(
