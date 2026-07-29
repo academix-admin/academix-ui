@@ -34,11 +34,10 @@ quicktype(['-o', path.join(tsOut, 'contracts.ts'), '--just-types']);
 console.log('✓ TS  → src/generated/contracts.ts');
 
 // ── Dart (Flutter) ───────────────────────────────────────────────────────────
-const dartOut = process.env.DART_OUT || path.resolve(PKG, '..', '..', '..', 'academix-app', 'lib', 'domain');
-if (process.env.DART_OUT || existsSync(path.dirname(dartOut))) {
-  mkdirSync(dartOut, { recursive: true });
-  quicktype(['-l', 'dart', '-o', path.join(dartOut, 'academix_contracts.dart')]);
-  console.log(`✓ Dart → ${path.relative(process.cwd(), dartOut)}/academix_contracts.dart`);
-} else {
-  console.log('· Dart skipped (academix-app not found beside academix-ui; set DART_OUT to generate)');
-}
+// Generated INSIDE this package as a self-contained Dart package (dart/). The Flutter app depends on
+// it via a pub `git:` dependency — nothing is written into the app repo and there's no local-path
+// assumption, so any machine/CI reproduces it. (No DART_OUT / sibling-folder coupling.)
+const dartLib = path.join(PKG, 'dart', 'lib', 'src');
+mkdirSync(dartLib, { recursive: true });
+quicktype(['-l', 'dart', '-o', path.join(dartLib, 'academix_contracts.dart')]);
+console.log('✓ Dart → dart/lib/src/academix_contracts.dart');

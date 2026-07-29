@@ -1,0 +1,9 @@
+name: academix_domain_types
+description: >-
+  Generated Academix domain wire models — the Dart side of the single source of truth
+  (@academix-admin/domain-types). Generated from contracts/contracts.schema.json by quicktype;
+  do NOT edit lib/src by hand. Consumed by the Flutter app via a pub git dependency.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ">=3.0.0 <4.0.0"

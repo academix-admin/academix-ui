@@ -24,7 +24,7 @@
     "dev": "tsup --watch",
     "gen:db": "supabase gen types typescript --project-id iewqfmkngcgayxbbnpiz --schema public > src/database.types.ts",
     "gen": "node scripts/gen.mjs",
-    "verify": "node scripts/gen.mjs && git diff --exit-code -- src/generated",
+    "verify": "node scripts/gen.mjs && git diff --exit-code -- src/generated dart/lib/src",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
