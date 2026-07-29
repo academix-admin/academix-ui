@@ -20,6 +20,7 @@ export { browserStorageAdapter } from './storage/browser';
 
 export { createStateStack } from './hooks/createStateStack';
 export { useDemandState } from './hooks/useDemandState';
+export type { DemandSetOptions } from './hooks/useDemandState';
 export { useAtom } from './hooks/useAtom';
 export { useComputed, useToggle, useList } from './hooks/local-hooks';
 

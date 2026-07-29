@@ -6,6 +6,21 @@ import { StateStackCore } from '../core/StateStackCore';
 import { _globalConfig, useResolvedPathname, getDefaultStorage } from '../config';
 import type { StorageAdapter } from '../types';
 
+/** Options for a demand-loader `set`. */
+export interface DemandSetOptions {
+  /**
+   * Force the write even when `v` is "empty" (null/undefined/[]) and a non-empty value is already
+   * cached. Default `false`: for persisted state, an empty value does NOT overwrite an existing
+   * non-empty one — so a demand-loader re-run whose fetch was blocked/failed (e.g. a session-gated
+   * request during an app-lock, or a cold start) can't wipe the hydrated cache. Pass `true` for
+   * intentional resets/clears (e.g. `set(null, { override: true })`).
+   */
+  override?: boolean;
+}
+
+const isEmptyValue = (v: unknown): boolean =>
+  v == null || (Array.isArray(v) && v.length === 0);
+
 export function useDemandState<T>(
   initial: T,
   opts?: {
@@ -24,7 +39,7 @@ export function useDemandState<T>(
   T,
   (
     loader: (
-      helpers: { get: () => T; set: (v: T) => void }
+      helpers: { get: () => T; set: (v: T, opts?: DemandSetOptions) => void }
     ) => void | Promise<void>
   ) => void,
   (v: T | ((prev: T) => T)) => void,
@@ -145,7 +160,17 @@ export function useDemandState<T>(
           const ctx = {
             get: () =>
               core.getStateSync(scope, key, initialRef.current) as T,
-            set: (v: T) => {
+            set: (v: T, opts?: DemandSetOptions) => {
+              // Persisted state: don't let an "empty" load overwrite an existing non-empty value
+              // (unless override) — protects the hydrated cache from a blocked/failed demand re-run.
+              if (persist && !opts?.override && isEmptyValue(v)) {
+                const cur = core.getStateSync(scope, key, initialRef.current) as T;
+                if (!isEmptyValue(cur)) {
+                  core.markDemanded(scope, key);
+                  core.markHydrated(scope, key);
+                  return;
+                }
+              }
               core.setState(scope, key, v, persist, storage);
               if (ttl) core.setTTL(scope, key, ttl);
               core.markDemanded(scope, key);
