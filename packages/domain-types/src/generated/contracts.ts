@@ -6,29 +6,32 @@
  * every reachable type. Regenerate TS + Dart with `npm run gen`.
  */
 export interface AcademixContracts {
-    backendAchievementsData?:       BackendAchievementsData;
-    backendAchievementsModel?:      BackendAchievementsModel;
-    backendBuyPaymentWalletModel?:  BackendBuyPaymentWalletModel;
-    backendDailyPerformance?:       BackendDailyPerformance;
-    backendDailyStreaksModel?:      BackendDailyStreaksModel;
-    backendFriendsModel?:           BackendFriendsModel;
-    backendGiveBackModel?:          BackendGiveBackModel;
-    backendMissionData?:            BackendMissionData;
-    backendMissionModel?:           BackendMissionModel;
-    backendPaymentCompletionData?:  BackendPaymentCompletionData;
-    backendPaymentMethodModel?:     BackendPaymentMethodModel;
-    backendPaymentProfileModel?:    BackendPaymentProfileModel;
-    backendPoolMemberModel?:        BackendPoolMemberModel;
-    backendQuizHistory?:            BackendQuizHistory;
-    backendRedeemCodeModel?:        BackendRedeemCodeModel;
-    backendRewardClaimModel?:       BackendRewardClaimModel;
-    backendRolesActivationData?:    BackendRolesActivationData;
-    backendSellPaymentWalletModel?: BackendSellPaymentWalletModel;
-    backendTransactionModel?:       BackendTransactionModel;
-    backendUserBalanceModel?:       BackendUserBalanceModel;
-    backendUserData?:               BackendUserData;
-    backendUserEngagementModel?:    BackendUserEngagementModel;
-    getUserBalanceResponse?:        GetUserBalanceResponse;
+    backendAchievementsData?:          BackendAchievementsData;
+    backendAchievementsModel?:         BackendAchievementsModel;
+    backendBuyPaymentWalletModel?:     BackendBuyPaymentWalletModel;
+    backendChallengeConfigRoot?:       { [key: string]: BackendChallengeConfig };
+    backendDailyPerformance?:          BackendDailyPerformance;
+    backendDailyStreaksModel?:         BackendDailyStreaksModel;
+    backendFriendsModel?:              BackendFriendsModel;
+    backendGiveBackModel?:             BackendGiveBackModel;
+    backendMissionData?:               BackendMissionData;
+    backendMissionModel?:              BackendMissionModel;
+    backendPaymentCompletionData?:     BackendPaymentCompletionData;
+    backendPaymentMethodModel?:        BackendPaymentMethodModel;
+    backendPaymentProfileModel?:       BackendPaymentProfileModel;
+    backendPoolMemberModel?:           BackendPoolMemberModel;
+    backendPoolQuestion?:              BackendPoolQuestion;
+    backendQuizHistory?:               BackendQuizHistory;
+    backendRedeemCodeModel?:           BackendRedeemCodeModel;
+    backendRewardClaimModel?:          BackendRewardClaimModel;
+    backendRolesActivationData?:       BackendRolesActivationData;
+    backendSellPaymentWalletModel?:    BackendSellPaymentWalletModel;
+    backendTransactionModel?:          BackendTransactionModel;
+    backendUserBalanceModel?:          BackendUserBalanceModel;
+    backendUserData?:                  BackendUserData;
+    backendUserDisplayQuizTopicModel?: BackendUserDisplayQuizTopicModel;
+    backendUserEngagementModel?:       BackendUserEngagementModel;
+    getUserBalanceResponse?:           GetUserBalanceResponse;
 }
 
 /**
@@ -99,6 +102,27 @@ export interface BackendBuyPaymentWalletModel {
     payment_wallet_identity:      string;
     payment_wallet_image?:        null | string;
     sort_created_id:              string;
+}
+
+export interface BackendChallengeConfig {
+    challenge_options:  BackendChallengeOption[];
+    game_mode_checker:  string;
+    game_mode_identity: string;
+}
+
+export interface BackendChallengeOption {
+    challenge_bot_share:          number;
+    challenge_creator_share:      number;
+    challenge_development_charge: number;
+    challenge_identity:           string;
+    challenge_max_participants:   number;
+    challenge_mid_share:          number;
+    challenge_min_participants:   number;
+    challenge_price:              number;
+    challenge_question_count:     number;
+    challenge_reviewer_share:     number;
+    challenge_role_share:         { [key: string]: number };
+    challenge_top_share:          number;
 }
 
 /**
@@ -318,6 +342,47 @@ export interface BackendUserRoleDetails {
 }
 
 /**
+ * authorized_quiz_pool_questions / question-display pool question
+ */
+export interface BackendPoolQuestion {
+    options_data:       BackendOptionModel[];
+    options_selected?:  string[] | null;
+    pools_question_id:  string;
+    question_data:      BackendQuestionModel;
+    question_status?:   null | string;
+    question_time?:     number | null;
+    question_time_data: BackendPoolTimeModel;
+    question_type_data: BackendPoolTypeModel;
+}
+
+export interface BackendOptionModel {
+    options_id:       string;
+    options_identity: string;
+    options_image?:   null | string;
+    options_max?:     number | null;
+    options_min?:     number | null;
+    options_selected: boolean;
+    options_unit?:    null | string;
+}
+
+export interface BackendQuestionModel {
+    questions_id:     string;
+    questions_image?: null | string;
+    questions_text:   string;
+}
+
+export interface BackendPoolTimeModel {
+    question_time_id:    string;
+    question_time_value: number;
+}
+
+export interface BackendPoolTypeModel {
+    question_type_id:             string;
+    question_type_identity:       string;
+    question_type_local_identity: string;
+}
+
+/**
  * fetch_user_quiz_history row
  */
 export interface BackendQuizHistory {
@@ -490,6 +555,77 @@ export interface BackendReferredUserData {
     users_referred_id:     string;
     users_referred_status: string;
     users_username:        string;
+}
+
+/**
+ * fetch_available_quizzes / fetch_public_quizzes / get_active_quiz /
+ * get_public_auth_quiz_pool topic
+ */
+export interface BackendUserDisplayQuizTopicModel {
+    creator_details:       CreatorDetails;
+    creator_is_followed:   boolean;
+    pools_details?:        BackendQuizPool | null;
+    sort_created_id:       string;
+    sort_updated_id:       string;
+    topic_is_personalised: boolean;
+    topics_created_at:     string;
+    topics_description?:   null | string;
+    topics_id:             string;
+    topics_identity:       string;
+    topics_image?:         null | string;
+    topics_sponsorship?:   null | string;
+    topics_updated_at:     string;
+}
+
+export interface CreatorDetails {
+    users_id:       string;
+    users_image?:   null | string;
+    users_names:    string;
+    users_username: string;
+}
+
+export interface BackendQuizPool {
+    challenge_details?:      BackendChallengeModel | null;
+    pools_allow_submission?: boolean | null;
+    pools_auth:              string;
+    pools_code?:             null | string;
+    pools_completed_at?:     null | string;
+    pools_duration?:         number | null;
+    pools_graded_at?:        null | string;
+    pools_id:                string;
+    pools_job?:              null | string;
+    pools_job_end_at?:       null | string;
+    pools_locale:            string;
+    pools_members_count:     number;
+    pools_ranked_at?:        null | string;
+    pools_rewarded_at?:      null | string;
+    pools_starting_at?:      null | string;
+    pools_status:            string;
+    pools_visible:           boolean;
+    question_tracker_count:  number;
+    sort_created_id:         string;
+    sort_updated_id:         string;
+}
+
+export interface BackendChallengeModel {
+    challenge_bot_share:          number;
+    challenge_development_charge: number;
+    challenge_id:                 string;
+    challenge_identity:           string;
+    challenge_max_participants:   number;
+    challenge_mid_share:          number;
+    challenge_min_participants:   number;
+    challenge_price:              number;
+    challenge_question_count:     number;
+    challenge_top_share:          number;
+    challenge_waiting_time?:      number | null;
+    game_mode_details?:           BackendGameModeModel | null;
+}
+
+export interface BackendGameModeModel {
+    game_mode_checker:  string;
+    game_mode_id:       string;
+    game_mode_identity: string;
 }
 
 /**

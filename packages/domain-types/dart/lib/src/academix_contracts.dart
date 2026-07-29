@@ -18,6 +18,7 @@ class AcademixContracts {
     BackendAchievementsData? backendAchievementsData;
     BackendAchievementsModel? backendAchievementsModel;
     BackendBuyPaymentWalletModel? backendBuyPaymentWalletModel;
+    Map<String, BackendChallengeConfig>? backendChallengeConfigRoot;
     BackendDailyPerformance? backendDailyPerformance;
     BackendDailyStreaksModel? backendDailyStreaksModel;
     BackendFriendsModel? backendFriendsModel;
@@ -28,6 +29,7 @@ class AcademixContracts {
     BackendPaymentMethodModel? backendPaymentMethodModel;
     BackendPaymentProfileModel? backendPaymentProfileModel;
     BackendPoolMemberModel? backendPoolMemberModel;
+    BackendPoolQuestion? backendPoolQuestion;
     BackendQuizHistory? backendQuizHistory;
     BackendRedeemCodeModel? backendRedeemCodeModel;
     BackendRewardClaimModel? backendRewardClaimModel;
@@ -36,6 +38,7 @@ class AcademixContracts {
     BackendTransactionModel? backendTransactionModel;
     BackendUserBalanceModel? backendUserBalanceModel;
     BackendUserData? backendUserData;
+    BackendUserDisplayQuizTopicModel? backendUserDisplayQuizTopicModel;
     BackendUserEngagementModel? backendUserEngagementModel;
     GetUserBalanceResponse? getUserBalanceResponse;
 
@@ -43,6 +46,7 @@ class AcademixContracts {
         this.backendAchievementsData,
         this.backendAchievementsModel,
         this.backendBuyPaymentWalletModel,
+        this.backendChallengeConfigRoot,
         this.backendDailyPerformance,
         this.backendDailyStreaksModel,
         this.backendFriendsModel,
@@ -53,6 +57,7 @@ class AcademixContracts {
         this.backendPaymentMethodModel,
         this.backendPaymentProfileModel,
         this.backendPoolMemberModel,
+        this.backendPoolQuestion,
         this.backendQuizHistory,
         this.backendRedeemCodeModel,
         this.backendRewardClaimModel,
@@ -61,6 +66,7 @@ class AcademixContracts {
         this.backendTransactionModel,
         this.backendUserBalanceModel,
         this.backendUserData,
+        this.backendUserDisplayQuizTopicModel,
         this.backendUserEngagementModel,
         this.getUserBalanceResponse,
     });
@@ -69,6 +75,7 @@ class AcademixContracts {
         backendAchievementsData: json["backendAchievementsData"] == null ? null : BackendAchievementsData.fromJson(json["backendAchievementsData"]),
         backendAchievementsModel: json["backendAchievementsModel"] == null ? null : BackendAchievementsModel.fromJson(json["backendAchievementsModel"]),
         backendBuyPaymentWalletModel: json["backendBuyPaymentWalletModel"] == null ? null : BackendBuyPaymentWalletModel.fromJson(json["backendBuyPaymentWalletModel"]),
+        backendChallengeConfigRoot: Map.from(json["backendChallengeConfigRoot"]!).map((k, v) => MapEntry<String, BackendChallengeConfig>(k, BackendChallengeConfig.fromJson(v))),
         backendDailyPerformance: json["backendDailyPerformance"] == null ? null : BackendDailyPerformance.fromJson(json["backendDailyPerformance"]),
         backendDailyStreaksModel: json["backendDailyStreaksModel"] == null ? null : BackendDailyStreaksModel.fromJson(json["backendDailyStreaksModel"]),
         backendFriendsModel: json["backendFriendsModel"] == null ? null : BackendFriendsModel.fromJson(json["backendFriendsModel"]),
@@ -79,6 +86,7 @@ class AcademixContracts {
         backendPaymentMethodModel: json["backendPaymentMethodModel"] == null ? null : BackendPaymentMethodModel.fromJson(json["backendPaymentMethodModel"]),
         backendPaymentProfileModel: json["backendPaymentProfileModel"] == null ? null : BackendPaymentProfileModel.fromJson(json["backendPaymentProfileModel"]),
         backendPoolMemberModel: json["backendPoolMemberModel"] == null ? null : BackendPoolMemberModel.fromJson(json["backendPoolMemberModel"]),
+        backendPoolQuestion: json["backendPoolQuestion"] == null ? null : BackendPoolQuestion.fromJson(json["backendPoolQuestion"]),
         backendQuizHistory: json["backendQuizHistory"] == null ? null : BackendQuizHistory.fromJson(json["backendQuizHistory"]),
         backendRedeemCodeModel: json["backendRedeemCodeModel"] == null ? null : BackendRedeemCodeModel.fromJson(json["backendRedeemCodeModel"]),
         backendRewardClaimModel: json["backendRewardClaimModel"] == null ? null : BackendRewardClaimModel.fromJson(json["backendRewardClaimModel"]),
@@ -87,6 +95,7 @@ class AcademixContracts {
         backendTransactionModel: json["backendTransactionModel"] == null ? null : BackendTransactionModel.fromJson(json["backendTransactionModel"]),
         backendUserBalanceModel: json["backendUserBalanceModel"] == null ? null : BackendUserBalanceModel.fromJson(json["backendUserBalanceModel"]),
         backendUserData: json["backendUserData"] == null ? null : BackendUserData.fromJson(json["backendUserData"]),
+        backendUserDisplayQuizTopicModel: json["backendUserDisplayQuizTopicModel"] == null ? null : BackendUserDisplayQuizTopicModel.fromJson(json["backendUserDisplayQuizTopicModel"]),
         backendUserEngagementModel: json["backendUserEngagementModel"] == null ? null : BackendUserEngagementModel.fromJson(json["backendUserEngagementModel"]),
         getUserBalanceResponse: json["getUserBalanceResponse"] == null ? null : GetUserBalanceResponse.fromJson(json["getUserBalanceResponse"]),
     );
@@ -95,6 +104,7 @@ class AcademixContracts {
         "backendAchievementsData": backendAchievementsData?.toJson(),
         "backendAchievementsModel": backendAchievementsModel?.toJson(),
         "backendBuyPaymentWalletModel": backendBuyPaymentWalletModel?.toJson(),
+        "backendChallengeConfigRoot": Map.from(backendChallengeConfigRoot!).map((k, v) => MapEntry<String, dynamic>(k, v.toJson())),
         "backendDailyPerformance": backendDailyPerformance?.toJson(),
         "backendDailyStreaksModel": backendDailyStreaksModel?.toJson(),
         "backendFriendsModel": backendFriendsModel?.toJson(),
@@ -105,6 +115,7 @@ class AcademixContracts {
         "backendPaymentMethodModel": backendPaymentMethodModel?.toJson(),
         "backendPaymentProfileModel": backendPaymentProfileModel?.toJson(),
         "backendPoolMemberModel": backendPoolMemberModel?.toJson(),
+        "backendPoolQuestion": backendPoolQuestion?.toJson(),
         "backendQuizHistory": backendQuizHistory?.toJson(),
         "backendRedeemCodeModel": backendRedeemCodeModel?.toJson(),
         "backendRewardClaimModel": backendRewardClaimModel?.toJson(),
@@ -113,6 +124,7 @@ class AcademixContracts {
         "backendTransactionModel": backendTransactionModel?.toJson(),
         "backendUserBalanceModel": backendUserBalanceModel?.toJson(),
         "backendUserData": backendUserData?.toJson(),
+        "backendUserDisplayQuizTopicModel": backendUserDisplayQuizTopicModel?.toJson(),
         "backendUserEngagementModel": backendUserEngagementModel?.toJson(),
         "getUserBalanceResponse": getUserBalanceResponse?.toJson(),
     };
@@ -365,6 +377,90 @@ class BackendBuyPaymentWalletModel {
         "payment_wallet_identity": paymentWalletIdentity,
         "payment_wallet_image": paymentWalletImage,
         "sort_created_id": sortCreatedId,
+    };
+}
+
+class BackendChallengeConfig {
+    List<BackendChallengeOption> challengeOptions;
+    String gameModeChecker;
+    String gameModeIdentity;
+
+    BackendChallengeConfig({
+        required this.challengeOptions,
+        required this.gameModeChecker,
+        required this.gameModeIdentity,
+    });
+
+    factory BackendChallengeConfig.fromJson(Map<String, dynamic> json) => BackendChallengeConfig(
+        challengeOptions: List<BackendChallengeOption>.from(json["challenge_options"].map((x) => BackendChallengeOption.fromJson(x))),
+        gameModeChecker: json["game_mode_checker"],
+        gameModeIdentity: json["game_mode_identity"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "challenge_options": List<dynamic>.from(challengeOptions.map((x) => x.toJson())),
+        "game_mode_checker": gameModeChecker,
+        "game_mode_identity": gameModeIdentity,
+    };
+}
+
+class BackendChallengeOption {
+    double challengeBotShare;
+    double challengeCreatorShare;
+    double challengeDevelopmentCharge;
+    String challengeIdentity;
+    double challengeMaxParticipants;
+    double challengeMidShare;
+    double challengeMinParticipants;
+    double challengePrice;
+    double challengeQuestionCount;
+    double challengeReviewerShare;
+    Map<String, double> challengeRoleShare;
+    double challengeTopShare;
+
+    BackendChallengeOption({
+        required this.challengeBotShare,
+        required this.challengeCreatorShare,
+        required this.challengeDevelopmentCharge,
+        required this.challengeIdentity,
+        required this.challengeMaxParticipants,
+        required this.challengeMidShare,
+        required this.challengeMinParticipants,
+        required this.challengePrice,
+        required this.challengeQuestionCount,
+        required this.challengeReviewerShare,
+        required this.challengeRoleShare,
+        required this.challengeTopShare,
+    });
+
+    factory BackendChallengeOption.fromJson(Map<String, dynamic> json) => BackendChallengeOption(
+        challengeBotShare: json["challenge_bot_share"]?.toDouble(),
+        challengeCreatorShare: json["challenge_creator_share"]?.toDouble(),
+        challengeDevelopmentCharge: json["challenge_development_charge"]?.toDouble(),
+        challengeIdentity: json["challenge_identity"],
+        challengeMaxParticipants: json["challenge_max_participants"]?.toDouble(),
+        challengeMidShare: json["challenge_mid_share"]?.toDouble(),
+        challengeMinParticipants: json["challenge_min_participants"]?.toDouble(),
+        challengePrice: json["challenge_price"]?.toDouble(),
+        challengeQuestionCount: json["challenge_question_count"]?.toDouble(),
+        challengeReviewerShare: json["challenge_reviewer_share"]?.toDouble(),
+        challengeRoleShare: Map.from(json["challenge_role_share"]).map((k, v) => MapEntry<String, double>(k, v?.toDouble())),
+        challengeTopShare: json["challenge_top_share"]?.toDouble(),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "challenge_bot_share": challengeBotShare,
+        "challenge_creator_share": challengeCreatorShare,
+        "challenge_development_charge": challengeDevelopmentCharge,
+        "challenge_identity": challengeIdentity,
+        "challenge_max_participants": challengeMaxParticipants,
+        "challenge_mid_share": challengeMidShare,
+        "challenge_min_participants": challengeMinParticipants,
+        "challenge_price": challengePrice,
+        "challenge_question_count": challengeQuestionCount,
+        "challenge_reviewer_share": challengeReviewerShare,
+        "challenge_role_share": Map.from(challengeRoleShare).map((k, v) => MapEntry<String, dynamic>(k, v)),
+        "challenge_top_share": challengeTopShare,
     };
 }
 
@@ -1113,6 +1209,160 @@ class BackendUserRoleDetails {
 }
 
 
+///authorized_quiz_pool_questions / question-display pool question
+class BackendPoolQuestion {
+    List<BackendOptionModel> optionsData;
+    List<String>? optionsSelected;
+    String poolsQuestionId;
+    BackendQuestionModel questionData;
+    String? questionStatus;
+    double? questionTime;
+    BackendPoolTimeModel questionTimeData;
+    BackendPoolTypeModel questionTypeData;
+
+    BackendPoolQuestion({
+        required this.optionsData,
+        this.optionsSelected,
+        required this.poolsQuestionId,
+        required this.questionData,
+        this.questionStatus,
+        this.questionTime,
+        required this.questionTimeData,
+        required this.questionTypeData,
+    });
+
+    factory BackendPoolQuestion.fromJson(Map<String, dynamic> json) => BackendPoolQuestion(
+        optionsData: List<BackendOptionModel>.from(json["options_data"].map((x) => BackendOptionModel.fromJson(x))),
+        optionsSelected: json["options_selected"] == null ? [] : List<String>.from(json["options_selected"]!.map((x) => x)),
+        poolsQuestionId: json["pools_question_id"],
+        questionData: BackendQuestionModel.fromJson(json["question_data"]),
+        questionStatus: json["question_status"],
+        questionTime: json["question_time"]?.toDouble(),
+        questionTimeData: BackendPoolTimeModel.fromJson(json["question_time_data"]),
+        questionTypeData: BackendPoolTypeModel.fromJson(json["question_type_data"]),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "options_data": List<dynamic>.from(optionsData.map((x) => x.toJson())),
+        "options_selected": optionsSelected == null ? [] : List<dynamic>.from(optionsSelected!.map((x) => x)),
+        "pools_question_id": poolsQuestionId,
+        "question_data": questionData.toJson(),
+        "question_status": questionStatus,
+        "question_time": questionTime,
+        "question_time_data": questionTimeData.toJson(),
+        "question_type_data": questionTypeData.toJson(),
+    };
+}
+
+class BackendOptionModel {
+    String optionsId;
+    String optionsIdentity;
+    String? optionsImage;
+    double? optionsMax;
+    double? optionsMin;
+    bool optionsSelected;
+    String? optionsUnit;
+
+    BackendOptionModel({
+        required this.optionsId,
+        required this.optionsIdentity,
+        this.optionsImage,
+        this.optionsMax,
+        this.optionsMin,
+        required this.optionsSelected,
+        this.optionsUnit,
+    });
+
+    factory BackendOptionModel.fromJson(Map<String, dynamic> json) => BackendOptionModel(
+        optionsId: json["options_id"],
+        optionsIdentity: json["options_identity"],
+        optionsImage: json["options_image"],
+        optionsMax: json["options_max"]?.toDouble(),
+        optionsMin: json["options_min"]?.toDouble(),
+        optionsSelected: json["options_selected"],
+        optionsUnit: json["options_unit"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "options_id": optionsId,
+        "options_identity": optionsIdentity,
+        "options_image": optionsImage,
+        "options_max": optionsMax,
+        "options_min": optionsMin,
+        "options_selected": optionsSelected,
+        "options_unit": optionsUnit,
+    };
+}
+
+class BackendQuestionModel {
+    String questionsId;
+    String? questionsImage;
+    String questionsText;
+
+    BackendQuestionModel({
+        required this.questionsId,
+        this.questionsImage,
+        required this.questionsText,
+    });
+
+    factory BackendQuestionModel.fromJson(Map<String, dynamic> json) => BackendQuestionModel(
+        questionsId: json["questions_id"],
+        questionsImage: json["questions_image"],
+        questionsText: json["questions_text"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "questions_id": questionsId,
+        "questions_image": questionsImage,
+        "questions_text": questionsText,
+    };
+}
+
+class BackendPoolTimeModel {
+    String questionTimeId;
+    double questionTimeValue;
+
+    BackendPoolTimeModel({
+        required this.questionTimeId,
+        required this.questionTimeValue,
+    });
+
+    factory BackendPoolTimeModel.fromJson(Map<String, dynamic> json) => BackendPoolTimeModel(
+        questionTimeId: json["question_time_id"],
+        questionTimeValue: json["question_time_value"]?.toDouble(),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "question_time_id": questionTimeId,
+        "question_time_value": questionTimeValue,
+    };
+}
+
+class BackendPoolTypeModel {
+    String questionTypeId;
+    String questionTypeIdentity;
+    String questionTypeLocalIdentity;
+
+    BackendPoolTypeModel({
+        required this.questionTypeId,
+        required this.questionTypeIdentity,
+        required this.questionTypeLocalIdentity,
+    });
+
+    factory BackendPoolTypeModel.fromJson(Map<String, dynamic> json) => BackendPoolTypeModel(
+        questionTypeId: json["question_type_id"],
+        questionTypeIdentity: json["question_type_identity"],
+        questionTypeLocalIdentity: json["question_type_local_identity"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "question_type_id": questionTypeId,
+        "question_type_identity": questionTypeIdentity,
+        "question_type_local_identity": questionTypeLocalIdentity,
+    };
+}
+
+
 ///fetch_user_quiz_history row
 class BackendQuizHistory {
     double challengeQuestionCount;
@@ -1729,6 +1979,277 @@ class BackendReferredUserData {
         "users_referred_id": usersReferredId,
         "users_referred_status": usersReferredStatus,
         "users_username": usersUsername,
+    };
+}
+
+
+///fetch_available_quizzes / fetch_public_quizzes / get_active_quiz /
+///get_public_auth_quiz_pool topic
+class BackendUserDisplayQuizTopicModel {
+    CreatorDetails creatorDetails;
+    bool creatorIsFollowed;
+    BackendQuizPool? poolsDetails;
+    String sortCreatedId;
+    String sortUpdatedId;
+    bool topicIsPersonalised;
+    String topicsCreatedAt;
+    String? topicsDescription;
+    String topicsId;
+    String topicsIdentity;
+    String? topicsImage;
+    String? topicsSponsorship;
+    String topicsUpdatedAt;
+
+    BackendUserDisplayQuizTopicModel({
+        required this.creatorDetails,
+        required this.creatorIsFollowed,
+        this.poolsDetails,
+        required this.sortCreatedId,
+        required this.sortUpdatedId,
+        required this.topicIsPersonalised,
+        required this.topicsCreatedAt,
+        this.topicsDescription,
+        required this.topicsId,
+        required this.topicsIdentity,
+        this.topicsImage,
+        this.topicsSponsorship,
+        required this.topicsUpdatedAt,
+    });
+
+    factory BackendUserDisplayQuizTopicModel.fromJson(Map<String, dynamic> json) => BackendUserDisplayQuizTopicModel(
+        creatorDetails: CreatorDetails.fromJson(json["creator_details"]),
+        creatorIsFollowed: json["creator_is_followed"],
+        poolsDetails: json["pools_details"] == null ? null : BackendQuizPool.fromJson(json["pools_details"]),
+        sortCreatedId: json["sort_created_id"],
+        sortUpdatedId: json["sort_updated_id"],
+        topicIsPersonalised: json["topic_is_personalised"],
+        topicsCreatedAt: json["topics_created_at"],
+        topicsDescription: json["topics_description"],
+        topicsId: json["topics_id"],
+        topicsIdentity: json["topics_identity"],
+        topicsImage: json["topics_image"],
+        topicsSponsorship: json["topics_sponsorship"],
+        topicsUpdatedAt: json["topics_updated_at"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "creator_details": creatorDetails.toJson(),
+        "creator_is_followed": creatorIsFollowed,
+        "pools_details": poolsDetails?.toJson(),
+        "sort_created_id": sortCreatedId,
+        "sort_updated_id": sortUpdatedId,
+        "topic_is_personalised": topicIsPersonalised,
+        "topics_created_at": topicsCreatedAt,
+        "topics_description": topicsDescription,
+        "topics_id": topicsId,
+        "topics_identity": topicsIdentity,
+        "topics_image": topicsImage,
+        "topics_sponsorship": topicsSponsorship,
+        "topics_updated_at": topicsUpdatedAt,
+    };
+}
+
+class CreatorDetails {
+    String usersId;
+    String? usersImage;
+    String usersNames;
+    String usersUsername;
+
+    CreatorDetails({
+        required this.usersId,
+        this.usersImage,
+        required this.usersNames,
+        required this.usersUsername,
+    });
+
+    factory CreatorDetails.fromJson(Map<String, dynamic> json) => CreatorDetails(
+        usersId: json["users_id"],
+        usersImage: json["users_image"],
+        usersNames: json["users_names"],
+        usersUsername: json["users_username"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "users_id": usersId,
+        "users_image": usersImage,
+        "users_names": usersNames,
+        "users_username": usersUsername,
+    };
+}
+
+class BackendQuizPool {
+    BackendChallengeModel? challengeDetails;
+    bool? poolsAllowSubmission;
+    String poolsAuth;
+    String? poolsCode;
+    String? poolsCompletedAt;
+    double? poolsDuration;
+    String? poolsGradedAt;
+    String poolsId;
+    String? poolsJob;
+    String? poolsJobEndAt;
+    String poolsLocale;
+    double poolsMembersCount;
+    String? poolsRankedAt;
+    String? poolsRewardedAt;
+    String? poolsStartingAt;
+    String poolsStatus;
+    bool poolsVisible;
+    double questionTrackerCount;
+    String sortCreatedId;
+    String sortUpdatedId;
+
+    BackendQuizPool({
+        this.challengeDetails,
+        this.poolsAllowSubmission,
+        required this.poolsAuth,
+        this.poolsCode,
+        this.poolsCompletedAt,
+        this.poolsDuration,
+        this.poolsGradedAt,
+        required this.poolsId,
+        this.poolsJob,
+        this.poolsJobEndAt,
+        required this.poolsLocale,
+        required this.poolsMembersCount,
+        this.poolsRankedAt,
+        this.poolsRewardedAt,
+        this.poolsStartingAt,
+        required this.poolsStatus,
+        required this.poolsVisible,
+        required this.questionTrackerCount,
+        required this.sortCreatedId,
+        required this.sortUpdatedId,
+    });
+
+    factory BackendQuizPool.fromJson(Map<String, dynamic> json) => BackendQuizPool(
+        challengeDetails: json["challenge_details"] == null ? null : BackendChallengeModel.fromJson(json["challenge_details"]),
+        poolsAllowSubmission: json["pools_allow_submission"],
+        poolsAuth: json["pools_auth"],
+        poolsCode: json["pools_code"],
+        poolsCompletedAt: json["pools_completed_at"],
+        poolsDuration: json["pools_duration"]?.toDouble(),
+        poolsGradedAt: json["pools_graded_at"],
+        poolsId: json["pools_id"],
+        poolsJob: json["pools_job"],
+        poolsJobEndAt: json["pools_job_end_at"],
+        poolsLocale: json["pools_locale"],
+        poolsMembersCount: json["pools_members_count"]?.toDouble(),
+        poolsRankedAt: json["pools_ranked_at"],
+        poolsRewardedAt: json["pools_rewarded_at"],
+        poolsStartingAt: json["pools_starting_at"],
+        poolsStatus: json["pools_status"],
+        poolsVisible: json["pools_visible"],
+        questionTrackerCount: json["question_tracker_count"]?.toDouble(),
+        sortCreatedId: json["sort_created_id"],
+        sortUpdatedId: json["sort_updated_id"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "challenge_details": challengeDetails?.toJson(),
+        "pools_allow_submission": poolsAllowSubmission,
+        "pools_auth": poolsAuth,
+        "pools_code": poolsCode,
+        "pools_completed_at": poolsCompletedAt,
+        "pools_duration": poolsDuration,
+        "pools_graded_at": poolsGradedAt,
+        "pools_id": poolsId,
+        "pools_job": poolsJob,
+        "pools_job_end_at": poolsJobEndAt,
+        "pools_locale": poolsLocale,
+        "pools_members_count": poolsMembersCount,
+        "pools_ranked_at": poolsRankedAt,
+        "pools_rewarded_at": poolsRewardedAt,
+        "pools_starting_at": poolsStartingAt,
+        "pools_status": poolsStatus,
+        "pools_visible": poolsVisible,
+        "question_tracker_count": questionTrackerCount,
+        "sort_created_id": sortCreatedId,
+        "sort_updated_id": sortUpdatedId,
+    };
+}
+
+class BackendChallengeModel {
+    double challengeBotShare;
+    double challengeDevelopmentCharge;
+    String challengeId;
+    String challengeIdentity;
+    double challengeMaxParticipants;
+    double challengeMidShare;
+    double challengeMinParticipants;
+    double challengePrice;
+    double challengeQuestionCount;
+    double challengeTopShare;
+    double? challengeWaitingTime;
+    BackendGameModeModel? gameModeDetails;
+
+    BackendChallengeModel({
+        required this.challengeBotShare,
+        required this.challengeDevelopmentCharge,
+        required this.challengeId,
+        required this.challengeIdentity,
+        required this.challengeMaxParticipants,
+        required this.challengeMidShare,
+        required this.challengeMinParticipants,
+        required this.challengePrice,
+        required this.challengeQuestionCount,
+        required this.challengeTopShare,
+        this.challengeWaitingTime,
+        this.gameModeDetails,
+    });
+
+    factory BackendChallengeModel.fromJson(Map<String, dynamic> json) => BackendChallengeModel(
+        challengeBotShare: json["challenge_bot_share"]?.toDouble(),
+        challengeDevelopmentCharge: json["challenge_development_charge"]?.toDouble(),
+        challengeId: json["challenge_id"],
+        challengeIdentity: json["challenge_identity"],
+        challengeMaxParticipants: json["challenge_max_participants"]?.toDouble(),
+        challengeMidShare: json["challenge_mid_share"]?.toDouble(),
+        challengeMinParticipants: json["challenge_min_participants"]?.toDouble(),
+        challengePrice: json["challenge_price"]?.toDouble(),
+        challengeQuestionCount: json["challenge_question_count"]?.toDouble(),
+        challengeTopShare: json["challenge_top_share"]?.toDouble(),
+        challengeWaitingTime: json["challenge_waiting_time"]?.toDouble(),
+        gameModeDetails: json["game_mode_details"] == null ? null : BackendGameModeModel.fromJson(json["game_mode_details"]),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "challenge_bot_share": challengeBotShare,
+        "challenge_development_charge": challengeDevelopmentCharge,
+        "challenge_id": challengeId,
+        "challenge_identity": challengeIdentity,
+        "challenge_max_participants": challengeMaxParticipants,
+        "challenge_mid_share": challengeMidShare,
+        "challenge_min_participants": challengeMinParticipants,
+        "challenge_price": challengePrice,
+        "challenge_question_count": challengeQuestionCount,
+        "challenge_top_share": challengeTopShare,
+        "challenge_waiting_time": challengeWaitingTime,
+        "game_mode_details": gameModeDetails?.toJson(),
+    };
+}
+
+class BackendGameModeModel {
+    String gameModeChecker;
+    String gameModeId;
+    String gameModeIdentity;
+
+    BackendGameModeModel({
+        required this.gameModeChecker,
+        required this.gameModeId,
+        required this.gameModeIdentity,
+    });
+
+    factory BackendGameModeModel.fromJson(Map<String, dynamic> json) => BackendGameModeModel(
+        gameModeChecker: json["game_mode_checker"],
+        gameModeId: json["game_mode_id"],
+        gameModeIdentity: json["game_mode_identity"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "game_mode_checker": gameModeChecker,
+        "game_mode_id": gameModeId,
+        "game_mode_identity": gameModeIdentity,
     };
 }
 

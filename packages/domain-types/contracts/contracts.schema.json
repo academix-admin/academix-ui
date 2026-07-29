@@ -27,7 +27,10 @@
     "backendBuyPaymentWalletModel": { "$ref": "#/definitions/BackendBuyPaymentWalletModel" },
     "backendSellPaymentWalletModel": { "$ref": "#/definitions/BackendSellPaymentWalletModel" },
     "backendPoolMemberModel": { "$ref": "#/definitions/BackendPoolMemberModel" },
-    "backendUserData": { "$ref": "#/definitions/BackendUserData" }
+    "backendUserData": { "$ref": "#/definitions/BackendUserData" },
+    "backendPoolQuestion": { "$ref": "#/definitions/BackendPoolQuestion" },
+    "backendChallengeConfigRoot": { "$ref": "#/definitions/BackendChallengeConfigRoot" },
+    "backendUserDisplayQuizTopicModel": { "$ref": "#/definitions/BackendUserDisplayQuizTopicModel" }
   },
   "definitions": {
     "GetUserBalanceResponse": {
@@ -623,6 +626,177 @@
         "users_names": { "type": "string" },
         "users_username": { "type": "string" },
         "users_image": { "type": ["string", "null"] }
+      }
+    },
+
+    "BackendPoolQuestion": {
+      "type": "object", "additionalProperties": false,
+      "description": "authorized_quiz_pool_questions / question-display pool question",
+      "required": ["pools_question_id", "question_time_data", "question_type_data", "question_data", "options_data"],
+      "properties": {
+        "pools_question_id": { "type": "string" },
+        "question_time": { "type": ["number", "null"] },
+        "question_status": { "type": ["string", "null"] },
+        "options_selected": { "oneOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "null" }] },
+        "question_time_data": { "$ref": "#/definitions/BackendPoolTimeModel" },
+        "question_type_data": { "$ref": "#/definitions/BackendPoolTypeModel" },
+        "question_data": { "$ref": "#/definitions/BackendQuestionModel" },
+        "options_data": { "type": "array", "items": { "$ref": "#/definitions/BackendOptionModel" } }
+      }
+    },
+    "BackendOptionModel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["options_id", "options_selected", "options_identity"],
+      "properties": {
+        "options_id": { "type": "string" },
+        "options_image": { "type": ["string", "null"] },
+        "options_max": { "type": ["number", "null"] },
+        "options_min": { "type": ["number", "null"] },
+        "options_unit": { "type": ["string", "null"] },
+        "options_selected": { "type": "boolean" },
+        "options_identity": { "type": "string" }
+      }
+    },
+    "BackendQuestionModel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["questions_id", "questions_text"],
+      "properties": {
+        "questions_id": { "type": "string" },
+        "questions_image": { "type": ["string", "null"] },
+        "questions_text": { "type": "string" }
+      }
+    },
+    "BackendPoolTimeModel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["question_time_id", "question_time_value"],
+      "properties": {
+        "question_time_id": { "type": "string" },
+        "question_time_value": { "type": "number" }
+      }
+    },
+    "BackendPoolTypeModel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["question_type_id", "question_type_identity", "question_type_local_identity"],
+      "properties": {
+        "question_type_id": { "type": "string" },
+        "question_type_identity": { "type": "string" },
+        "question_type_local_identity": { "type": "string" }
+      }
+    },
+
+    "BackendChallengeConfigRoot": {
+      "type": "object",
+      "description": "fetch_quiz_modes — map of game_mode_checker -> BackendChallengeConfig (was model BackendRoot)",
+      "additionalProperties": { "$ref": "#/definitions/BackendChallengeConfig" }
+    },
+    "BackendChallengeConfig": {
+      "type": "object", "additionalProperties": false,
+      "required": ["challenge_options", "game_mode_checker", "game_mode_identity"],
+      "properties": {
+        "challenge_options": { "type": "array", "items": { "$ref": "#/definitions/BackendChallengeOption" } },
+        "game_mode_checker": { "type": "string" },
+        "game_mode_identity": { "type": "string" }
+      }
+    },
+    "BackendChallengeOption": {
+      "type": "object", "additionalProperties": false,
+      "required": ["challenge_price", "challenge_identity", "challenge_bot_share", "challenge_mid_share", "challenge_top_share", "challenge_role_share", "challenge_creator_share", "challenge_question_count", "challenge_reviewer_share", "challenge_max_participants", "challenge_min_participants", "challenge_development_charge"],
+      "properties": {
+        "challenge_price": { "type": "number" },
+        "challenge_identity": { "type": "string" },
+        "challenge_bot_share": { "type": "number" },
+        "challenge_mid_share": { "type": "number" },
+        "challenge_top_share": { "type": "number" },
+        "challenge_role_share": { "type": "object", "additionalProperties": { "type": "number" } },
+        "challenge_creator_share": { "type": "number" },
+        "challenge_question_count": { "type": "number" },
+        "challenge_reviewer_share": { "type": "number" },
+        "challenge_max_participants": { "type": "number" },
+        "challenge_min_participants": { "type": "number" },
+        "challenge_development_charge": { "type": "number" }
+      }
+    },
+
+    "BackendUserDisplayQuizTopicModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_available_quizzes / fetch_public_quizzes / get_active_quiz / get_public_auth_quiz_pool topic",
+      "required": ["sort_created_id", "sort_updated_id", "topics_id", "topics_identity", "topics_created_at", "topics_updated_at", "creator_details", "creator_is_followed", "topic_is_personalised"],
+      "properties": {
+        "sort_created_id": { "type": "string" },
+        "sort_updated_id": { "type": "string" },
+        "topics_id": { "type": "string" },
+        "topics_identity": { "type": "string" },
+        "topics_created_at": { "type": "string" },
+        "topics_updated_at": { "type": "string" },
+        "topics_image": { "type": ["string", "null"] },
+        "topics_description": { "type": ["string", "null"] },
+        "creator_details": {
+          "type": "object", "additionalProperties": false,
+          "required": ["users_id", "users_names", "users_username"],
+          "properties": {
+            "users_id": { "type": "string" },
+            "users_image": { "type": ["string", "null"] },
+            "users_names": { "type": "string" },
+            "users_username": { "type": "string" }
+          }
+        },
+        "pools_details": { "oneOf": [{ "$ref": "#/definitions/BackendQuizPool" }, { "type": "null" }] },
+        "topics_sponsorship": { "type": ["string", "null"] },
+        "creator_is_followed": { "type": "boolean" },
+        "topic_is_personalised": { "type": "boolean" }
+      }
+    },
+    "BackendQuizPool": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sort_created_id", "sort_updated_id", "pools_id", "pools_locale", "pools_visible", "pools_status", "pools_auth", "pools_members_count", "question_tracker_count"],
+      "properties": {
+        "sort_created_id": { "type": "string" },
+        "sort_updated_id": { "type": "string" },
+        "pools_id": { "type": "string" },
+        "pools_locale": { "type": "string" },
+        "pools_visible": { "type": "boolean" },
+        "pools_allow_submission": { "type": ["boolean", "null"] },
+        "pools_status": { "type": "string" },
+        "pools_auth": { "type": "string" },
+        "pools_code": { "type": ["string", "null"] },
+        "pools_job": { "type": ["string", "null"] },
+        "pools_duration": { "type": ["number", "null"] },
+        "challenge_details": { "oneOf": [{ "$ref": "#/definitions/BackendChallengeModel" }, { "type": "null" }] },
+        "pools_starting_at": { "type": ["string", "null"] },
+        "pools_job_end_at": { "type": ["string", "null"] },
+        "pools_graded_at": { "type": ["string", "null"] },
+        "pools_ranked_at": { "type": ["string", "null"] },
+        "pools_rewarded_at": { "type": ["string", "null"] },
+        "pools_completed_at": { "type": ["string", "null"] },
+        "pools_members_count": { "type": "number" },
+        "question_tracker_count": { "type": "number" }
+      }
+    },
+    "BackendChallengeModel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["challenge_id", "challenge_development_charge", "challenge_price", "challenge_top_share", "challenge_mid_share", "challenge_bot_share", "challenge_min_participants", "challenge_max_participants", "challenge_identity", "challenge_question_count"],
+      "properties": {
+        "challenge_id": { "type": "string" },
+        "challenge_development_charge": { "type": "number" },
+        "challenge_price": { "type": "number" },
+        "challenge_top_share": { "type": "number" },
+        "challenge_mid_share": { "type": "number" },
+        "challenge_bot_share": { "type": "number" },
+        "challenge_waiting_time": { "type": ["number", "null"] },
+        "challenge_min_participants": { "type": "number" },
+        "challenge_max_participants": { "type": "number" },
+        "challenge_identity": { "type": "string" },
+        "challenge_question_count": { "type": "number" },
+        "game_mode_details": { "oneOf": [{ "$ref": "#/definitions/BackendGameModeModel" }, { "type": "null" }] }
+      }
+    },
+    "BackendGameModeModel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["game_mode_id", "game_mode_identity", "game_mode_checker"],
+      "properties": {
+        "game_mode_id": { "type": "string" },
+        "game_mode_identity": { "type": "string" },
+        "game_mode_checker": { "type": "string" }
       }
     }
   }
