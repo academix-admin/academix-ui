@@ -10,7 +10,18 @@
     "backendTransactionModel": { "$ref": "#/definitions/BackendTransactionModel" },
     "backendUserEngagementModel": { "$ref": "#/definitions/BackendUserEngagementModel" },
     "backendDailyPerformance": { "$ref": "#/definitions/BackendDailyPerformance" },
-    "backendDailyStreaksModel": { "$ref": "#/definitions/BackendDailyStreaksModel" }
+    "backendDailyStreaksModel": { "$ref": "#/definitions/BackendDailyStreaksModel" },
+    "backendAchievementsModel": { "$ref": "#/definitions/BackendAchievementsModel" },
+    "backendAchievementsData": { "$ref": "#/definitions/BackendAchievementsData" },
+    "backendMissionModel": { "$ref": "#/definitions/BackendMissionModel" },
+    "backendMissionData": { "$ref": "#/definitions/BackendMissionData" },
+    "backendRewardClaimModel": { "$ref": "#/definitions/BackendRewardClaimModel" },
+    "backendPaymentCompletionData": { "$ref": "#/definitions/BackendPaymentCompletionData" },
+    "backendFriendsModel": { "$ref": "#/definitions/BackendFriendsModel" },
+    "backendQuizHistory": { "$ref": "#/definitions/BackendQuizHistory" },
+    "backendRolesActivationData": { "$ref": "#/definitions/BackendRolesActivationData" },
+    "backendRedeemCodeModel": { "$ref": "#/definitions/BackendRedeemCodeModel" },
+    "backendGiveBackModel": { "$ref": "#/definitions/BackendGiveBackModel" }
   },
   "definitions": {
     "GetUserBalanceResponse": {
@@ -184,6 +195,240 @@
         "redeem_code_id": { "type": ["string", "null"] },
         "redeem_code_value": { "type": ["string", "null"] },
         "redeem_code_expires": { "type": ["string", "null"] }
+      }
+    },
+
+    "BackendAchievementsModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_user_achievements / claim_user_achievements achievement row",
+      "required": ["achievements_id", "achievements_type", "sort_created_id", "achievements_requirement", "achievements_title", "achievements_description"],
+      "properties": {
+        "achievements_id": { "type": "string" },
+        "achievements_type": { "type": "string" },
+        "reward_details": { "oneOf": [{ "$ref": "#/definitions/BackendRewardDetails" }, { "type": "null" }] },
+        "sort_created_id": { "type": "number" },
+        "achievements_requirement": {
+          "type": "object", "additionalProperties": false,
+          "required": ["count"], "properties": { "count": { "type": "number" } }
+        },
+        "achievements_title": { "type": "string" },
+        "achievements_image": { "type": ["string", "null"] },
+        "achievements_progress_details": { "oneOf": [{ "$ref": "#/definitions/BackendAchievementsProgressDetails" }, { "type": "null" }] },
+        "achievements_description": { "type": "string" }
+      }
+    },
+    "BackendRewardDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reward_id", "reward_type", "reward_limit", "reward_value", "reward_instruction"],
+      "properties": {
+        "reward_id": { "type": "string" },
+        "reward_type": { "type": "string" },
+        "reward_limit": { "type": "number" },
+        "reward_value": { "type": "number" },
+        "reward_instruction": { "type": "string" }
+      }
+    },
+    "BackendAchievementsProgressDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["achievements_progress_count", "achievements_progress_required", "achievements_progress_rewarded", "achievements_progress_completed"],
+      "properties": {
+        "achievements_progress_id": { "type": ["string", "null"] },
+        "achievements_progress_count": { "type": "number" },
+        "achievements_progress_required": { "type": "number" },
+        "achievements_progress_rewarded": { "type": "boolean" },
+        "achievements_progress_completed": { "type": "boolean" },
+        "achievements_progress_created_at": { "type": ["string", "null"] },
+        "achievements_progress_updated_at": { "type": ["string", "null"] },
+        "redeem_code_details": { "oneOf": [{ "$ref": "#/definitions/BackendRewardRedeemCodeModel" }, { "type": "null" }] }
+      }
+    },
+    "BackendRewardClaimModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "claim_user_achievements / claim_user_mission reward_claim_details",
+      "required": ["reward_claim_amount"],
+      "properties": {
+        "reward_claim_amount": { "type": "number" },
+        "reward_claim_redeem_code": { "oneOf": [{ "$ref": "#/definitions/BackendRewardRedeemCodeModel" }, { "type": "null" }] }
+      }
+    },
+    "BackendAchievementsData": {
+      "type": "object", "additionalProperties": false,
+      "description": "get_user_achievements_count",
+      "required": ["achievements_count", "achievements_finished", "achievements_completed", "achievements_not_rewarded"],
+      "properties": {
+        "achievements_count": { "type": "number" },
+        "achievements_finished": { "type": "number" },
+        "achievements_completed": { "type": "number" },
+        "achievements_not_rewarded": { "type": "number" }
+      }
+    },
+
+    "BackendMissionModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_user_missions / claim_user_mission mission row",
+      "required": ["mission_id", "mission_type", "sort_created_id", "mission_requirement", "mission_title", "mission_description"],
+      "properties": {
+        "mission_id": { "type": "string" },
+        "mission_type": { "type": "string" },
+        "reward_details": { "oneOf": [{ "$ref": "#/definitions/BackendRewardDetails" }, { "type": "null" }] },
+        "sort_created_id": { "type": "number" },
+        "mission_requirement": {
+          "type": "object", "additionalProperties": false,
+          "required": ["count"], "properties": { "count": { "type": "number" } }
+        },
+        "mission_title": { "type": "string" },
+        "mission_image": { "type": ["string", "null"] },
+        "mission_progress_details": { "oneOf": [{ "$ref": "#/definitions/BackendMissionProgressDetails" }, { "type": "null" }] },
+        "mission_description": { "type": "string" }
+      }
+    },
+    "BackendMissionProgressDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mission_progress_count", "mission_progress_required", "mission_progress_rewarded", "mission_progress_completed"],
+      "properties": {
+        "mission_progress_id": { "type": ["string", "null"] },
+        "mission_progress_count": { "type": "number" },
+        "mission_progress_required": { "type": "number" },
+        "mission_progress_rewarded": { "type": "boolean" },
+        "mission_progress_completed": { "type": "boolean" },
+        "mission_progress_created_at": { "type": ["string", "null"] },
+        "mission_progress_updated_at": { "type": ["string", "null"] },
+        "redeem_code_details": { "oneOf": [{ "$ref": "#/definitions/BackendRewardRedeemCodeModel" }, { "type": "null" }] }
+      }
+    },
+    "BackendMissionData": {
+      "type": "object", "additionalProperties": false,
+      "description": "get_user_missions_count",
+      "required": ["mission_count", "mission_finished", "mission_completed", "mission_not_rewarded"],
+      "properties": {
+        "mission_count": { "type": "number" },
+        "mission_finished": { "type": "number" },
+        "mission_completed": { "type": "number" },
+        "mission_not_rewarded": { "type": "number" }
+      }
+    },
+
+    "BackendPaymentCompletionData": {
+      "type": "object", "additionalProperties": false,
+      "description": "make_payment completion payload (top-up/withdraw instructions)",
+      "properties": {
+        "link": { "type": ["string", "null"] },
+        "code": { "type": ["string", "null"] },
+        "bank": { "type": ["string", "null"] },
+        "account": { "type": ["string", "null"] },
+        "amount": { "type": ["number", "null"] },
+        "reference": { "type": ["string", "null"] },
+        "note": { "type": ["string", "null"] },
+        "expire": { "type": ["string", "null"] }
+      }
+    },
+
+    "BackendFriendsModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_friends row",
+      "required": ["users_id", "users_names", "users_username", "sort_created_id", "users_created_at", "users_referred_status"],
+      "properties": {
+        "users_id": { "type": "string" },
+        "users_names": { "type": "string" },
+        "users_username": { "type": "string" },
+        "users_image": { "type": ["string", "null"] },
+        "sort_created_id": { "type": "string" },
+        "users_created_at": { "type": "string" },
+        "users_referred_status": { "type": "string" }
+      }
+    },
+
+    "BackendQuizHistory": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_user_quiz_history row",
+      "required": ["pools_id", "pools_duration", "sort_created_id", "topics_identity", "pools_members_rank", "pools_members_points", "challenge_question_count", "pools_members_created_at", "pools_members_paid_amount", "pools_completed_question_tracker_time", "pools_completed_question_tracker_size"],
+      "properties": {
+        "pools_id": { "type": "string" },
+        "pools_duration": { "type": "number" },
+        "sort_created_id": { "type": "string" },
+        "topics_identity": { "type": "string" },
+        "topics_image": { "type": ["string", "null"] },
+        "pools_members_rank": { "type": "number" },
+        "pools_members_points": { "type": "number" },
+        "challenge_question_count": { "type": "number" },
+        "pools_members_created_at": { "type": "string" },
+        "pools_members_paid_amount": { "type": "number" },
+        "pools_completed_question_tracker_time": { "type": "number" },
+        "pools_completed_question_tracker_size": { "type": "number" }
+      }
+    },
+
+    "BackendRolesActivationData": {
+      "type": "object", "additionalProperties": false,
+      "description": "create_or_get_academix_profile / roles activation",
+      "required": ["roles_activation_amount", "roles_activation_activated"],
+      "properties": {
+        "roles_activation_amount": { "type": "number" },
+        "roles_activation_activated": { "type": "boolean" },
+        "transaction_id": { "type": ["string", "null"] },
+        "roles_activation_is_fresh": { "type": "boolean" }
+      }
+    },
+
+    "BackendRedeemCodeModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "get_users_redeem_code / get_code_data redeem code",
+      "required": ["redeem_code_id", "redeem_code_amount", "redeem_code_value", "sort_created_id", "redeem_rule_top", "redeem_rule_mid", "redeem_rule_bot", "redeem_rule_rank1", "redeem_rule_rank2", "redeem_rule_rank3"],
+      "properties": {
+        "redeem_code_id": { "type": "string" },
+        "redeem_code_amount": { "type": "number" },
+        "redeem_code_value": { "type": "string" },
+        "sort_created_id": { "type": "string" },
+        "redeem_code_expires": { "type": ["string", "null"] },
+        "redeem_rule_top": { "type": "boolean" },
+        "redeem_rule_mid": { "type": "boolean" },
+        "redeem_rule_bot": { "type": "boolean" },
+        "redeem_rule_rank1": { "type": "boolean" },
+        "redeem_rule_rank2": { "type": "boolean" },
+        "redeem_rule_rank3": { "type": "boolean" }
+      }
+    },
+
+    "BackendGiveBackModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "get_give_back_code / claim_giveback_code",
+      "required": ["giveback_detail"],
+      "properties": {
+        "giveback_detail": { "$ref": "#/definitions/BackendGiveBackDetail" },
+        "giveback_collection_details": { "oneOf": [{ "$ref": "#/definitions/BackendGiveBackCollectionDetails" }, { "type": "null" }] }
+      }
+    },
+    "BackendGiveBackDetail": {
+      "type": "object", "additionalProperties": false,
+      "required": ["giveback_id", "giveback_code", "giveback_unit_amount", "giveback_total_usage", "giveback_total_amount", "remaining_slots", "claimed_count", "sort_created_id", "redeem_rule_top", "redeem_rule_mid", "redeem_rule_bot", "redeem_rule_rank1", "redeem_rule_rank2", "redeem_rule_rank3"],
+      "properties": {
+        "giveback_id": { "type": "string" },
+        "giveback_code": { "type": "string" },
+        "giveback_unit_amount": { "type": "number" },
+        "giveback_total_usage": { "type": "number" },
+        "giveback_total_amount": { "type": "number" },
+        "giveback_identifier": { "type": ["string", "null"] },
+        "remaining_slots": { "type": "number" },
+        "claimed_count": { "type": "number" },
+        "sort_created_id": { "type": "string" },
+        "redeem_rule_top": { "type": "boolean" },
+        "redeem_rule_mid": { "type": "boolean" },
+        "redeem_rule_bot": { "type": "boolean" },
+        "redeem_rule_rank1": { "type": "boolean" },
+        "redeem_rule_rank2": { "type": "boolean" },
+        "redeem_rule_rank3": { "type": "boolean" }
+      }
+    },
+    "BackendGiveBackCollectionDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["has_claimed", "is_spent", "remaining_slots", "can_claim", "has_password"],
+      "properties": {
+        "has_claimed": { "type": "boolean" },
+        "redeem_code_value": { "type": ["string", "null"] },
+        "is_spent": { "type": "boolean" },
+        "remaining_slots": { "type": "number" },
+        "can_claim": { "type": "boolean" },
+        "has_password": { "type": "boolean" }
       }
     }
   }

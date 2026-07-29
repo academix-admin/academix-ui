@@ -6,12 +6,77 @@
  * every reachable type. Regenerate TS + Dart with `npm run gen`.
  */
 export interface AcademixContracts {
-    backendDailyPerformance?:    BackendDailyPerformance;
-    backendDailyStreaksModel?:   BackendDailyStreaksModel;
-    backendTransactionModel?:    BackendTransactionModel;
-    backendUserBalanceModel?:    BackendUserBalanceModel;
-    backendUserEngagementModel?: BackendUserEngagementModel;
-    getUserBalanceResponse?:     GetUserBalanceResponse;
+    backendAchievementsData?:      BackendAchievementsData;
+    backendAchievementsModel?:     BackendAchievementsModel;
+    backendDailyPerformance?:      BackendDailyPerformance;
+    backendDailyStreaksModel?:     BackendDailyStreaksModel;
+    backendFriendsModel?:          BackendFriendsModel;
+    backendGiveBackModel?:         BackendGiveBackModel;
+    backendMissionData?:           BackendMissionData;
+    backendMissionModel?:          BackendMissionModel;
+    backendPaymentCompletionData?: BackendPaymentCompletionData;
+    backendQuizHistory?:           BackendQuizHistory;
+    backendRedeemCodeModel?:       BackendRedeemCodeModel;
+    backendRewardClaimModel?:      BackendRewardClaimModel;
+    backendRolesActivationData?:   BackendRolesActivationData;
+    backendTransactionModel?:      BackendTransactionModel;
+    backendUserBalanceModel?:      BackendUserBalanceModel;
+    backendUserEngagementModel?:   BackendUserEngagementModel;
+    getUserBalanceResponse?:       GetUserBalanceResponse;
+}
+
+/**
+ * get_user_achievements_count
+ */
+export interface BackendAchievementsData {
+    achievements_completed:    number;
+    achievements_count:        number;
+    achievements_finished:     number;
+    achievements_not_rewarded: number;
+}
+
+/**
+ * fetch_user_achievements / claim_user_achievements achievement row
+ */
+export interface BackendAchievementsModel {
+    achievements_description:       string;
+    achievements_id:                string;
+    achievements_image?:            null | string;
+    achievements_progress_details?: BackendAchievementsProgressDetails | null;
+    achievements_requirement:       AchievementsRequirement;
+    achievements_title:             string;
+    achievements_type:              string;
+    reward_details?:                BackendRewardDetails | null;
+    sort_created_id:                number;
+}
+
+export interface BackendAchievementsProgressDetails {
+    achievements_progress_completed:   boolean;
+    achievements_progress_count:       number;
+    achievements_progress_created_at?: null | string;
+    achievements_progress_id?:         null | string;
+    achievements_progress_required:    number;
+    achievements_progress_rewarded:    boolean;
+    achievements_progress_updated_at?: null | string;
+    redeem_code_details?:              BackendRewardRedeemCodeModel | null;
+}
+
+export interface BackendRewardRedeemCodeModel {
+    redeem_code_expires?: null | string;
+    redeem_code_id?:      null | string;
+    redeem_code_value?:   null | string;
+}
+
+export interface AchievementsRequirement {
+    count: number;
+}
+
+export interface BackendRewardDetails {
+    reward_id:          string;
+    reward_instruction: string;
+    reward_limit:       number;
+    reward_type:        string;
+    reward_value:       number;
 }
 
 /**
@@ -37,10 +102,159 @@ export interface BackendDailyStreaksModel {
     redeem_code_details?:      BackendRewardRedeemCodeModel | null;
 }
 
-export interface BackendRewardRedeemCodeModel {
+/**
+ * fetch_friends row
+ */
+export interface BackendFriendsModel {
+    sort_created_id:       string;
+    users_created_at:      string;
+    users_id:              string;
+    users_image?:          null | string;
+    users_names:           string;
+    users_referred_status: string;
+    users_username:        string;
+}
+
+/**
+ * get_give_back_code / claim_giveback_code
+ */
+export interface BackendGiveBackModel {
+    giveback_collection_details?: BackendGiveBackCollectionDetails | null;
+    giveback_detail:              BackendGiveBackDetail;
+}
+
+export interface BackendGiveBackCollectionDetails {
+    can_claim:          boolean;
+    has_claimed:        boolean;
+    has_password:       boolean;
+    is_spent:           boolean;
+    redeem_code_value?: null | string;
+    remaining_slots:    number;
+}
+
+export interface BackendGiveBackDetail {
+    claimed_count:         number;
+    giveback_code:         string;
+    giveback_id:           string;
+    giveback_identifier?:  null | string;
+    giveback_total_amount: number;
+    giveback_total_usage:  number;
+    giveback_unit_amount:  number;
+    redeem_rule_bot:       boolean;
+    redeem_rule_mid:       boolean;
+    redeem_rule_rank1:     boolean;
+    redeem_rule_rank2:     boolean;
+    redeem_rule_rank3:     boolean;
+    redeem_rule_top:       boolean;
+    remaining_slots:       number;
+    sort_created_id:       string;
+}
+
+/**
+ * get_user_missions_count
+ */
+export interface BackendMissionData {
+    mission_completed:    number;
+    mission_count:        number;
+    mission_finished:     number;
+    mission_not_rewarded: number;
+}
+
+/**
+ * fetch_user_missions / claim_user_mission mission row
+ */
+export interface BackendMissionModel {
+    mission_description:       string;
+    mission_id:                string;
+    mission_image?:            null | string;
+    mission_progress_details?: BackendMissionProgressDetails | null;
+    mission_requirement:       MissionRequirement;
+    mission_title:             string;
+    mission_type:              string;
+    reward_details?:           BackendRewardDetails | null;
+    sort_created_id:           number;
+}
+
+export interface BackendMissionProgressDetails {
+    mission_progress_completed:   boolean;
+    mission_progress_count:       number;
+    mission_progress_created_at?: null | string;
+    mission_progress_id?:         null | string;
+    mission_progress_required:    number;
+    mission_progress_rewarded:    boolean;
+    mission_progress_updated_at?: null | string;
+    redeem_code_details?:         BackendRewardRedeemCodeModel | null;
+}
+
+export interface MissionRequirement {
+    count: number;
+}
+
+/**
+ * make_payment completion payload (top-up/withdraw instructions)
+ */
+export interface BackendPaymentCompletionData {
+    account?:   null | string;
+    amount?:    number | null;
+    bank?:      null | string;
+    code?:      null | string;
+    expire?:    null | string;
+    link?:      null | string;
+    note?:      null | string;
+    reference?: null | string;
+}
+
+/**
+ * fetch_user_quiz_history row
+ */
+export interface BackendQuizHistory {
+    challenge_question_count:              number;
+    pools_completed_question_tracker_size: number;
+    pools_completed_question_tracker_time: number;
+    pools_duration:                        number;
+    pools_id:                              string;
+    pools_members_created_at:              string;
+    pools_members_paid_amount:             number;
+    pools_members_points:                  number;
+    pools_members_rank:                    number;
+    sort_created_id:                       string;
+    topics_identity:                       string;
+    topics_image?:                         null | string;
+}
+
+/**
+ * get_users_redeem_code / get_code_data redeem code
+ */
+export interface BackendRedeemCodeModel {
+    redeem_code_amount:   number;
     redeem_code_expires?: null | string;
-    redeem_code_id?:      null | string;
-    redeem_code_value?:   null | string;
+    redeem_code_id:       string;
+    redeem_code_value:    string;
+    redeem_rule_bot:      boolean;
+    redeem_rule_mid:      boolean;
+    redeem_rule_rank1:    boolean;
+    redeem_rule_rank2:    boolean;
+    redeem_rule_rank3:    boolean;
+    redeem_rule_top:      boolean;
+    sort_created_id:      string;
+}
+
+/**
+ * claim_user_achievements / claim_user_mission reward_claim_details
+ */
+export interface BackendRewardClaimModel {
+    reward_claim_amount:       number;
+    reward_claim_redeem_code?: BackendRewardRedeemCodeModel | null;
+}
+
+/**
+ * create_or_get_academix_profile / roles activation
+ */
+export interface BackendRolesActivationData {
+    roles_activation_activated: boolean;
+    roles_activation_amount:    number;
+    roles_activation_is_fresh?: boolean;
+    transaction_id?:            null | string;
 }
 
 /**
