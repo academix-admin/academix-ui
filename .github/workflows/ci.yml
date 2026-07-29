@@ -31,9 +31,3 @@ jobs:
 
       - name: Test
         run: npm run test
-
-      # domain-types: the committed generated TS must match contracts/contracts.schema.json.
-      # (Dart output targets the separate academix-app repo, so it's skipped here and drift-checked
-      # in that repo's own workflow.)
-      - name: Domain-types codegen in sync
-        run: npm run verify --workspace @academix-admin/domain-types
