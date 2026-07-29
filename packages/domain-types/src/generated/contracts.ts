@@ -6,23 +6,29 @@
  * every reachable type. Regenerate TS + Dart with `npm run gen`.
  */
 export interface AcademixContracts {
-    backendAchievementsData?:      BackendAchievementsData;
-    backendAchievementsModel?:     BackendAchievementsModel;
-    backendDailyPerformance?:      BackendDailyPerformance;
-    backendDailyStreaksModel?:     BackendDailyStreaksModel;
-    backendFriendsModel?:          BackendFriendsModel;
-    backendGiveBackModel?:         BackendGiveBackModel;
-    backendMissionData?:           BackendMissionData;
-    backendMissionModel?:          BackendMissionModel;
-    backendPaymentCompletionData?: BackendPaymentCompletionData;
-    backendQuizHistory?:           BackendQuizHistory;
-    backendRedeemCodeModel?:       BackendRedeemCodeModel;
-    backendRewardClaimModel?:      BackendRewardClaimModel;
-    backendRolesActivationData?:   BackendRolesActivationData;
-    backendTransactionModel?:      BackendTransactionModel;
-    backendUserBalanceModel?:      BackendUserBalanceModel;
-    backendUserEngagementModel?:   BackendUserEngagementModel;
-    getUserBalanceResponse?:       GetUserBalanceResponse;
+    backendAchievementsData?:       BackendAchievementsData;
+    backendAchievementsModel?:      BackendAchievementsModel;
+    backendBuyPaymentWalletModel?:  BackendBuyPaymentWalletModel;
+    backendDailyPerformance?:       BackendDailyPerformance;
+    backendDailyStreaksModel?:      BackendDailyStreaksModel;
+    backendFriendsModel?:           BackendFriendsModel;
+    backendGiveBackModel?:          BackendGiveBackModel;
+    backendMissionData?:            BackendMissionData;
+    backendMissionModel?:           BackendMissionModel;
+    backendPaymentCompletionData?:  BackendPaymentCompletionData;
+    backendPaymentMethodModel?:     BackendPaymentMethodModel;
+    backendPaymentProfileModel?:    BackendPaymentProfileModel;
+    backendPoolMemberModel?:        BackendPoolMemberModel;
+    backendQuizHistory?:            BackendQuizHistory;
+    backendRedeemCodeModel?:        BackendRedeemCodeModel;
+    backendRewardClaimModel?:       BackendRewardClaimModel;
+    backendRolesActivationData?:    BackendRolesActivationData;
+    backendSellPaymentWalletModel?: BackendSellPaymentWalletModel;
+    backendTransactionModel?:       BackendTransactionModel;
+    backendUserBalanceModel?:       BackendUserBalanceModel;
+    backendUserData?:               BackendUserData;
+    backendUserEngagementModel?:    BackendUserEngagementModel;
+    getUserBalanceResponse?:        GetUserBalanceResponse;
 }
 
 /**
@@ -77,6 +83,22 @@ export interface BackendRewardDetails {
     reward_limit:       number;
     reward_type:        string;
     reward_value:       number;
+}
+
+/**
+ * fetch_top_up_wallets / fetch_user_top_up_wallet row
+ */
+export interface BackendBuyPaymentWalletModel {
+    payment_wallet_buy_fee:       number;
+    payment_wallet_buy_fee_flat:  number;
+    payment_wallet_buy_min:       number;
+    payment_wallet_buy_rate:      number;
+    payment_wallet_buy_rate_type: string;
+    payment_wallet_currency:      string;
+    payment_wallet_id:            string;
+    payment_wallet_identity:      string;
+    payment_wallet_image?:        null | string;
+    sort_created_id:              string;
 }
 
 /**
@@ -205,6 +227,97 @@ export interface BackendPaymentCompletionData {
 }
 
 /**
+ * fetch_top_up_methods / fetch_withdraw_methods row
+ */
+export interface BackendPaymentMethodModel {
+    country_id:                   string;
+    country_identity:             string;
+    country_phone_code:           string;
+    country_phone_digit:          number;
+    payment_method_buy_active:    boolean;
+    payment_method_buy_multiple:  boolean;
+    payment_method_checker:       string;
+    payment_method_id:            string;
+    payment_method_identity:      string;
+    payment_method_image?:        null | string;
+    payment_method_network:       BackendPaymentNetworkModel[];
+    payment_method_sell_active:   boolean;
+    payment_method_sell_multiple: boolean;
+    payment_wallet_id:            string;
+    sort_created_id:              string;
+}
+
+export interface BackendPaymentNetworkModel {
+    active:   boolean;
+    identity: string;
+    image?:   null | string;
+}
+
+/**
+ * fetch_top_up_profiles / fetch_withdraw_profiles row
+ */
+export interface BackendPaymentProfileModel {
+    payment_details?:   BackendPaymentDetails | null;
+    payment_method_id:  string;
+    payment_profile_id: string;
+    sort_created_id:    string;
+    users_id:           string;
+}
+
+/**
+ * payment profile detail fields (all optional/nullable)
+ */
+export interface BackendPaymentDetails {
+    account_number?:  null | string;
+    bank_name?:       null | string;
+    country?:         null | string;
+    direct_debit?:    boolean | null;
+    e_naira?:         boolean | null;
+    email?:           null | string;
+    fullname?:        null | string;
+    network?:         null | string;
+    opay?:            boolean | null;
+    phone?:           null | string;
+    private_account?: boolean | null;
+}
+
+/**
+ * fetch_pool_members row
+ */
+export interface BackendPoolMemberModel {
+    challenge_question_count:              number;
+    pools_completed_question_tracker_size: number;
+    pools_completed_question_tracker_time: number;
+    pools_id:                              string;
+    pools_members_created_at:              string;
+    pools_members_id:                      string;
+    pools_members_is_user:                 boolean;
+    pools_members_paid_amount?:            number | null;
+    pools_members_points:                  number;
+    pools_members_price:                   number;
+    pools_members_rank:                    number;
+    sort_created_id:                       string;
+    users_details:                         BackendPoolUserDetails;
+}
+
+/**
+ * pool-member users_details (distinct from the transaction BackendUserDetails)
+ */
+export interface BackendPoolUserDetails {
+    roles_details:  BackendUserRoleDetails;
+    users_id:       string;
+    users_image?:   null | string;
+    users_names:    string;
+    users_username: string;
+}
+
+export interface BackendUserRoleDetails {
+    roles_id:       string;
+    roles_identity: string;
+    roles_level:    number;
+}
+
+/**
  * fetch_user_quiz_history row
  */
 export interface BackendQuizHistory {
@@ -258,6 +371,22 @@ export interface BackendRolesActivationData {
 }
 
 /**
+ * fetch_withdraw_wallets / fetch_user_withdraw_wallets row
+ */
+export interface BackendSellPaymentWalletModel {
+    payment_wallet_currency:       string;
+    payment_wallet_id:             string;
+    payment_wallet_identity:       string;
+    payment_wallet_image?:         null | string;
+    payment_wallet_sell_fee:       number;
+    payment_wallet_sell_fee_flat:  number;
+    payment_wallet_sell_min:       number;
+    payment_wallet_sell_rate:      number;
+    payment_wallet_sell_rate_type: string;
+    sort_created_id:               string;
+}
+
+/**
  * fetch_user_transactions / fetch_user_transaction_by_id transaction row
  */
 export interface BackendTransactionModel {
@@ -303,29 +432,64 @@ export interface BackendUserDetails {
 }
 
 /**
- * payment profile detail fields (all optional/nullable)
- */
-export interface BackendPaymentDetails {
-    account_number?:  null | string;
-    bank_name?:       null | string;
-    country?:         null | string;
-    direct_debit?:    boolean | null;
-    e_naira?:         boolean | null;
-    email?:           null | string;
-    fullname?:        null | string;
-    network?:         null | string;
-    opay?:            boolean | null;
-    phone?:           null | string;
-    private_account?: boolean | null;
-}
-
-/**
  * public.get_user_balance -> user_balance_details
  */
 export interface BackendUserBalanceModel {
     users_balance_amount:     number;
     users_balance_updated_at: string;
     users_id:                 string;
+}
+
+/**
+ * get_user_record — the signed-in user profile
+ */
+export interface BackendUserData {
+    country_id:              string;
+    country_table?:          BackendCountryData | null;
+    language_id:             string;
+    language_table?:         BackendLanguageData | null;
+    roles_table?:            BackendRoleData | null;
+    transaction_id?:         null | string;
+    users_created_at:        string;
+    users_dob:               string;
+    users_email:             string;
+    users_id:                string;
+    users_image?:            null | string;
+    users_names:             string;
+    users_phone?:            null | string;
+    users_referred_details?: BackendReferredUserData | null;
+    users_referred_id?:      null | string;
+    users_roles_access?:     any;
+    users_sex:               string;
+    users_username:          string;
+    users_verified:          boolean;
+}
+
+export interface BackendCountryData {
+    country_id:           string;
+    country_identity:     string;
+    country_image:        string;
+    country_two_iso_code: string;
+}
+
+export interface BackendLanguageData {
+    language_code:     string;
+    language_id:       string;
+    language_identity: string;
+}
+
+export interface BackendRoleData {
+    roles_checker: string;
+    roles_id:      string;
+    roles_level:   number;
+}
+
+export interface BackendReferredUserData {
+    users_image?:          null | string;
+    users_names:           string;
+    users_referred_id:     string;
+    users_referred_status: string;
+    users_username:        string;
 }
 
 /**

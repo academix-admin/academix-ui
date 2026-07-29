@@ -21,7 +21,13 @@
     "backendQuizHistory": { "$ref": "#/definitions/BackendQuizHistory" },
     "backendRolesActivationData": { "$ref": "#/definitions/BackendRolesActivationData" },
     "backendRedeemCodeModel": { "$ref": "#/definitions/BackendRedeemCodeModel" },
-    "backendGiveBackModel": { "$ref": "#/definitions/BackendGiveBackModel" }
+    "backendGiveBackModel": { "$ref": "#/definitions/BackendGiveBackModel" },
+    "backendPaymentMethodModel": { "$ref": "#/definitions/BackendPaymentMethodModel" },
+    "backendPaymentProfileModel": { "$ref": "#/definitions/BackendPaymentProfileModel" },
+    "backendBuyPaymentWalletModel": { "$ref": "#/definitions/BackendBuyPaymentWalletModel" },
+    "backendSellPaymentWalletModel": { "$ref": "#/definitions/BackendSellPaymentWalletModel" },
+    "backendPoolMemberModel": { "$ref": "#/definitions/BackendPoolMemberModel" },
+    "backendUserData": { "$ref": "#/definitions/BackendUserData" }
   },
   "definitions": {
     "GetUserBalanceResponse": {
@@ -429,6 +435,194 @@
         "remaining_slots": { "type": "number" },
         "can_claim": { "type": "boolean" },
         "has_password": { "type": "boolean" }
+      }
+    },
+
+    "BackendPaymentMethodModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_top_up_methods / fetch_withdraw_methods row",
+      "required": ["sort_created_id", "payment_method_id", "payment_method_identity", "payment_method_checker", "payment_method_network", "country_id", "country_identity", "country_phone_code", "country_phone_digit", "payment_method_sell_multiple", "payment_method_buy_multiple", "payment_method_sell_active", "payment_method_buy_active", "payment_wallet_id"],
+      "properties": {
+        "sort_created_id": { "type": "string" },
+        "payment_method_id": { "type": "string" },
+        "payment_method_identity": { "type": "string" },
+        "payment_method_image": { "type": ["string", "null"] },
+        "payment_method_checker": { "type": "string" },
+        "payment_method_network": { "type": "array", "items": { "$ref": "#/definitions/BackendPaymentNetworkModel" } },
+        "country_id": { "type": "string" },
+        "country_identity": { "type": "string" },
+        "country_phone_code": { "type": "string" },
+        "country_phone_digit": { "type": "number" },
+        "payment_method_sell_multiple": { "type": "boolean" },
+        "payment_method_buy_multiple": { "type": "boolean" },
+        "payment_method_sell_active": { "type": "boolean" },
+        "payment_method_buy_active": { "type": "boolean" },
+        "payment_wallet_id": { "type": "string" }
+      }
+    },
+    "BackendPaymentNetworkModel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["identity", "active"],
+      "properties": {
+        "identity": { "type": "string" },
+        "image": { "type": ["string", "null"] },
+        "active": { "type": "boolean" }
+      }
+    },
+
+    "BackendPaymentProfileModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_top_up_profiles / fetch_withdraw_profiles row",
+      "required": ["payment_profile_id", "payment_method_id", "sort_created_id", "users_id"],
+      "properties": {
+        "payment_profile_id": { "type": "string" },
+        "payment_method_id": { "type": "string" },
+        "sort_created_id": { "type": "string" },
+        "users_id": { "type": "string" },
+        "payment_details": { "oneOf": [{ "$ref": "#/definitions/BackendPaymentDetails" }, { "type": "null" }] }
+      }
+    },
+
+    "BackendBuyPaymentWalletModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_top_up_wallets / fetch_user_top_up_wallet row",
+      "required": ["sort_created_id", "payment_wallet_id", "payment_wallet_buy_fee", "payment_wallet_buy_fee_flat", "payment_wallet_buy_min", "payment_wallet_buy_rate", "payment_wallet_currency", "payment_wallet_identity", "payment_wallet_buy_rate_type"],
+      "properties": {
+        "sort_created_id": { "type": "string" },
+        "payment_wallet_id": { "type": "string" },
+        "payment_wallet_image": { "type": ["string", "null"] },
+        "payment_wallet_buy_fee": { "type": "number" },
+        "payment_wallet_buy_fee_flat": { "type": "number" },
+        "payment_wallet_buy_min": { "type": "number" },
+        "payment_wallet_buy_rate": { "type": "number" },
+        "payment_wallet_currency": { "type": "string" },
+        "payment_wallet_identity": { "type": "string" },
+        "payment_wallet_buy_rate_type": { "type": "string" }
+      }
+    },
+    "BackendSellPaymentWalletModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_withdraw_wallets / fetch_user_withdraw_wallets row",
+      "required": ["sort_created_id", "payment_wallet_id", "payment_wallet_sell_fee", "payment_wallet_sell_fee_flat", "payment_wallet_sell_min", "payment_wallet_sell_rate", "payment_wallet_currency", "payment_wallet_identity", "payment_wallet_sell_rate_type"],
+      "properties": {
+        "sort_created_id": { "type": "string" },
+        "payment_wallet_id": { "type": "string" },
+        "payment_wallet_image": { "type": ["string", "null"] },
+        "payment_wallet_sell_fee": { "type": "number" },
+        "payment_wallet_sell_fee_flat": { "type": "number" },
+        "payment_wallet_sell_min": { "type": "number" },
+        "payment_wallet_sell_rate": { "type": "number" },
+        "payment_wallet_currency": { "type": "string" },
+        "payment_wallet_identity": { "type": "string" },
+        "payment_wallet_sell_rate_type": { "type": "string" }
+      }
+    },
+
+    "BackendPoolMemberModel": {
+      "type": "object", "additionalProperties": false,
+      "description": "fetch_pool_members row",
+      "required": ["pools_members_id", "sort_created_id", "pools_id", "users_details", "pools_members_rank", "pools_members_points", "pools_members_price", "pools_members_is_user", "pools_members_created_at", "pools_completed_question_tracker_size", "pools_completed_question_tracker_time", "challenge_question_count"],
+      "properties": {
+        "pools_members_id": { "type": "string" },
+        "sort_created_id": { "type": "string" },
+        "pools_id": { "type": "string" },
+        "users_details": { "$ref": "#/definitions/BackendPoolUserDetails" },
+        "pools_members_rank": { "type": "number" },
+        "pools_members_points": { "type": "number" },
+        "pools_members_price": { "type": "number" },
+        "pools_members_is_user": { "type": "boolean" },
+        "pools_members_created_at": { "type": "string" },
+        "pools_members_paid_amount": { "type": ["number", "null"] },
+        "pools_completed_question_tracker_size": { "type": "number" },
+        "pools_completed_question_tracker_time": { "type": "number" },
+        "challenge_question_count": { "type": "number" }
+      }
+    },
+    "BackendPoolUserDetails": {
+      "type": "object", "additionalProperties": false,
+      "description": "pool-member users_details (distinct from the transaction BackendUserDetails)",
+      "required": ["users_id", "users_names", "users_username", "roles_details"],
+      "properties": {
+        "users_id": { "type": "string" },
+        "users_image": { "type": ["string", "null"] },
+        "users_names": { "type": "string" },
+        "users_username": { "type": "string" },
+        "roles_details": { "$ref": "#/definitions/BackendUserRoleDetails" }
+      }
+    },
+    "BackendUserRoleDetails": {
+      "type": "object", "additionalProperties": false,
+      "required": ["roles_id", "roles_level", "roles_identity"],
+      "properties": {
+        "roles_id": { "type": "string" },
+        "roles_level": { "type": "number" },
+        "roles_identity": { "type": "string" }
+      }
+    },
+
+    "BackendUserData": {
+      "type": "object", "additionalProperties": false,
+      "description": "get_user_record — the signed-in user profile",
+      "required": ["users_id", "users_username", "users_names", "users_email", "users_dob", "users_sex", "users_verified", "country_id", "language_id", "users_created_at"],
+      "properties": {
+        "users_id": { "type": "string" },
+        "users_username": { "type": "string" },
+        "users_names": { "type": "string" },
+        "users_email": { "type": "string" },
+        "users_phone": { "type": ["string", "null"] },
+        "users_dob": { "type": "string" },
+        "users_sex": { "type": "string" },
+        "users_image": { "type": ["string", "null"] },
+        "users_referred_id": { "type": ["string", "null"] },
+        "users_verified": { "type": "boolean" },
+        "country_id": { "type": "string" },
+        "language_id": { "type": "string" },
+        "users_created_at": { "type": "string" },
+        "transaction_id": { "type": ["string", "null"] },
+        "users_roles_access": {},
+        "roles_table": { "oneOf": [{ "$ref": "#/definitions/BackendRoleData" }, { "type": "null" }] },
+        "language_table": { "oneOf": [{ "$ref": "#/definitions/BackendLanguageData" }, { "type": "null" }] },
+        "country_table": { "oneOf": [{ "$ref": "#/definitions/BackendCountryData" }, { "type": "null" }] },
+        "users_referred_details": { "oneOf": [{ "$ref": "#/definitions/BackendReferredUserData" }, { "type": "null" }] }
+      }
+    },
+    "BackendRoleData": {
+      "type": "object", "additionalProperties": false,
+      "required": ["roles_id", "roles_level", "roles_checker"],
+      "properties": {
+        "roles_id": { "type": "string" },
+        "roles_level": { "type": "number" },
+        "roles_checker": { "type": "string" }
+      }
+    },
+    "BackendLanguageData": {
+      "type": "object", "additionalProperties": false,
+      "required": ["language_id", "language_identity", "language_code"],
+      "properties": {
+        "language_id": { "type": "string" },
+        "language_identity": { "type": "string" },
+        "language_code": { "type": "string" }
+      }
+    },
+    "BackendCountryData": {
+      "type": "object", "additionalProperties": false,
+      "required": ["country_id", "country_identity", "country_image", "country_two_iso_code"],
+      "properties": {
+        "country_id": { "type": "string" },
+        "country_identity": { "type": "string" },
+        "country_image": { "type": "string" },
+        "country_two_iso_code": { "type": "string" }
+      }
+    },
+    "BackendReferredUserData": {
+      "type": "object", "additionalProperties": false,
+      "required": ["users_referred_id", "users_referred_status", "users_names", "users_username"],
+      "properties": {
+        "users_referred_id": { "type": "string" },
+        "users_referred_status": { "type": "string" },
+        "users_names": { "type": "string" },
+        "users_username": { "type": "string" },
+        "users_image": { "type": ["string", "null"] }
       }
     }
   }

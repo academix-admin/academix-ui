@@ -17,6 +17,7 @@ String academixContractsToJson(AcademixContracts data) => json.encode(data.toJso
 class AcademixContracts {
     BackendAchievementsData? backendAchievementsData;
     BackendAchievementsModel? backendAchievementsModel;
+    BackendBuyPaymentWalletModel? backendBuyPaymentWalletModel;
     BackendDailyPerformance? backendDailyPerformance;
     BackendDailyStreaksModel? backendDailyStreaksModel;
     BackendFriendsModel? backendFriendsModel;
@@ -24,18 +25,24 @@ class AcademixContracts {
     BackendMissionData? backendMissionData;
     BackendMissionModel? backendMissionModel;
     BackendPaymentCompletionData? backendPaymentCompletionData;
+    BackendPaymentMethodModel? backendPaymentMethodModel;
+    BackendPaymentProfileModel? backendPaymentProfileModel;
+    BackendPoolMemberModel? backendPoolMemberModel;
     BackendQuizHistory? backendQuizHistory;
     BackendRedeemCodeModel? backendRedeemCodeModel;
     BackendRewardClaimModel? backendRewardClaimModel;
     BackendRolesActivationData? backendRolesActivationData;
+    BackendSellPaymentWalletModel? backendSellPaymentWalletModel;
     BackendTransactionModel? backendTransactionModel;
     BackendUserBalanceModel? backendUserBalanceModel;
+    BackendUserData? backendUserData;
     BackendUserEngagementModel? backendUserEngagementModel;
     GetUserBalanceResponse? getUserBalanceResponse;
 
     AcademixContracts({
         this.backendAchievementsData,
         this.backendAchievementsModel,
+        this.backendBuyPaymentWalletModel,
         this.backendDailyPerformance,
         this.backendDailyStreaksModel,
         this.backendFriendsModel,
@@ -43,12 +50,17 @@ class AcademixContracts {
         this.backendMissionData,
         this.backendMissionModel,
         this.backendPaymentCompletionData,
+        this.backendPaymentMethodModel,
+        this.backendPaymentProfileModel,
+        this.backendPoolMemberModel,
         this.backendQuizHistory,
         this.backendRedeemCodeModel,
         this.backendRewardClaimModel,
         this.backendRolesActivationData,
+        this.backendSellPaymentWalletModel,
         this.backendTransactionModel,
         this.backendUserBalanceModel,
+        this.backendUserData,
         this.backendUserEngagementModel,
         this.getUserBalanceResponse,
     });
@@ -56,6 +68,7 @@ class AcademixContracts {
     factory AcademixContracts.fromJson(Map<String, dynamic> json) => AcademixContracts(
         backendAchievementsData: json["backendAchievementsData"] == null ? null : BackendAchievementsData.fromJson(json["backendAchievementsData"]),
         backendAchievementsModel: json["backendAchievementsModel"] == null ? null : BackendAchievementsModel.fromJson(json["backendAchievementsModel"]),
+        backendBuyPaymentWalletModel: json["backendBuyPaymentWalletModel"] == null ? null : BackendBuyPaymentWalletModel.fromJson(json["backendBuyPaymentWalletModel"]),
         backendDailyPerformance: json["backendDailyPerformance"] == null ? null : BackendDailyPerformance.fromJson(json["backendDailyPerformance"]),
         backendDailyStreaksModel: json["backendDailyStreaksModel"] == null ? null : BackendDailyStreaksModel.fromJson(json["backendDailyStreaksModel"]),
         backendFriendsModel: json["backendFriendsModel"] == null ? null : BackendFriendsModel.fromJson(json["backendFriendsModel"]),
@@ -63,12 +76,17 @@ class AcademixContracts {
         backendMissionData: json["backendMissionData"] == null ? null : BackendMissionData.fromJson(json["backendMissionData"]),
         backendMissionModel: json["backendMissionModel"] == null ? null : BackendMissionModel.fromJson(json["backendMissionModel"]),
         backendPaymentCompletionData: json["backendPaymentCompletionData"] == null ? null : BackendPaymentCompletionData.fromJson(json["backendPaymentCompletionData"]),
+        backendPaymentMethodModel: json["backendPaymentMethodModel"] == null ? null : BackendPaymentMethodModel.fromJson(json["backendPaymentMethodModel"]),
+        backendPaymentProfileModel: json["backendPaymentProfileModel"] == null ? null : BackendPaymentProfileModel.fromJson(json["backendPaymentProfileModel"]),
+        backendPoolMemberModel: json["backendPoolMemberModel"] == null ? null : BackendPoolMemberModel.fromJson(json["backendPoolMemberModel"]),
         backendQuizHistory: json["backendQuizHistory"] == null ? null : BackendQuizHistory.fromJson(json["backendQuizHistory"]),
         backendRedeemCodeModel: json["backendRedeemCodeModel"] == null ? null : BackendRedeemCodeModel.fromJson(json["backendRedeemCodeModel"]),
         backendRewardClaimModel: json["backendRewardClaimModel"] == null ? null : BackendRewardClaimModel.fromJson(json["backendRewardClaimModel"]),
         backendRolesActivationData: json["backendRolesActivationData"] == null ? null : BackendRolesActivationData.fromJson(json["backendRolesActivationData"]),
+        backendSellPaymentWalletModel: json["backendSellPaymentWalletModel"] == null ? null : BackendSellPaymentWalletModel.fromJson(json["backendSellPaymentWalletModel"]),
         backendTransactionModel: json["backendTransactionModel"] == null ? null : BackendTransactionModel.fromJson(json["backendTransactionModel"]),
         backendUserBalanceModel: json["backendUserBalanceModel"] == null ? null : BackendUserBalanceModel.fromJson(json["backendUserBalanceModel"]),
+        backendUserData: json["backendUserData"] == null ? null : BackendUserData.fromJson(json["backendUserData"]),
         backendUserEngagementModel: json["backendUserEngagementModel"] == null ? null : BackendUserEngagementModel.fromJson(json["backendUserEngagementModel"]),
         getUserBalanceResponse: json["getUserBalanceResponse"] == null ? null : GetUserBalanceResponse.fromJson(json["getUserBalanceResponse"]),
     );
@@ -76,6 +94,7 @@ class AcademixContracts {
     Map<String, dynamic> toJson() => {
         "backendAchievementsData": backendAchievementsData?.toJson(),
         "backendAchievementsModel": backendAchievementsModel?.toJson(),
+        "backendBuyPaymentWalletModel": backendBuyPaymentWalletModel?.toJson(),
         "backendDailyPerformance": backendDailyPerformance?.toJson(),
         "backendDailyStreaksModel": backendDailyStreaksModel?.toJson(),
         "backendFriendsModel": backendFriendsModel?.toJson(),
@@ -83,12 +102,17 @@ class AcademixContracts {
         "backendMissionData": backendMissionData?.toJson(),
         "backendMissionModel": backendMissionModel?.toJson(),
         "backendPaymentCompletionData": backendPaymentCompletionData?.toJson(),
+        "backendPaymentMethodModel": backendPaymentMethodModel?.toJson(),
+        "backendPaymentProfileModel": backendPaymentProfileModel?.toJson(),
+        "backendPoolMemberModel": backendPoolMemberModel?.toJson(),
         "backendQuizHistory": backendQuizHistory?.toJson(),
         "backendRedeemCodeModel": backendRedeemCodeModel?.toJson(),
         "backendRewardClaimModel": backendRewardClaimModel?.toJson(),
         "backendRolesActivationData": backendRolesActivationData?.toJson(),
+        "backendSellPaymentWalletModel": backendSellPaymentWalletModel?.toJson(),
         "backendTransactionModel": backendTransactionModel?.toJson(),
         "backendUserBalanceModel": backendUserBalanceModel?.toJson(),
+        "backendUserData": backendUserData?.toJson(),
         "backendUserEngagementModel": backendUserEngagementModel?.toJson(),
         "getUserBalanceResponse": getUserBalanceResponse?.toJson(),
     };
@@ -287,6 +311,60 @@ class BackendRewardDetails {
         "reward_limit": rewardLimit,
         "reward_type": rewardType,
         "reward_value": rewardValue,
+    };
+}
+
+
+///fetch_top_up_wallets / fetch_user_top_up_wallet row
+class BackendBuyPaymentWalletModel {
+    double paymentWalletBuyFee;
+    double paymentWalletBuyFeeFlat;
+    double paymentWalletBuyMin;
+    double paymentWalletBuyRate;
+    String paymentWalletBuyRateType;
+    String paymentWalletCurrency;
+    String paymentWalletId;
+    String paymentWalletIdentity;
+    String? paymentWalletImage;
+    String sortCreatedId;
+
+    BackendBuyPaymentWalletModel({
+        required this.paymentWalletBuyFee,
+        required this.paymentWalletBuyFeeFlat,
+        required this.paymentWalletBuyMin,
+        required this.paymentWalletBuyRate,
+        required this.paymentWalletBuyRateType,
+        required this.paymentWalletCurrency,
+        required this.paymentWalletId,
+        required this.paymentWalletIdentity,
+        this.paymentWalletImage,
+        required this.sortCreatedId,
+    });
+
+    factory BackendBuyPaymentWalletModel.fromJson(Map<String, dynamic> json) => BackendBuyPaymentWalletModel(
+        paymentWalletBuyFee: json["payment_wallet_buy_fee"]?.toDouble(),
+        paymentWalletBuyFeeFlat: json["payment_wallet_buy_fee_flat"]?.toDouble(),
+        paymentWalletBuyMin: json["payment_wallet_buy_min"]?.toDouble(),
+        paymentWalletBuyRate: json["payment_wallet_buy_rate"]?.toDouble(),
+        paymentWalletBuyRateType: json["payment_wallet_buy_rate_type"],
+        paymentWalletCurrency: json["payment_wallet_currency"],
+        paymentWalletId: json["payment_wallet_id"],
+        paymentWalletIdentity: json["payment_wallet_identity"],
+        paymentWalletImage: json["payment_wallet_image"],
+        sortCreatedId: json["sort_created_id"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "payment_wallet_buy_fee": paymentWalletBuyFee,
+        "payment_wallet_buy_fee_flat": paymentWalletBuyFeeFlat,
+        "payment_wallet_buy_min": paymentWalletBuyMin,
+        "payment_wallet_buy_rate": paymentWalletBuyRate,
+        "payment_wallet_buy_rate_type": paymentWalletBuyRateType,
+        "payment_wallet_currency": paymentWalletCurrency,
+        "payment_wallet_id": paymentWalletId,
+        "payment_wallet_identity": paymentWalletIdentity,
+        "payment_wallet_image": paymentWalletImage,
+        "sort_created_id": sortCreatedId,
     };
 }
 
@@ -721,6 +799,320 @@ class BackendPaymentCompletionData {
 }
 
 
+///fetch_top_up_methods / fetch_withdraw_methods row
+class BackendPaymentMethodModel {
+    String countryId;
+    String countryIdentity;
+    String countryPhoneCode;
+    double countryPhoneDigit;
+    bool paymentMethodBuyActive;
+    bool paymentMethodBuyMultiple;
+    String paymentMethodChecker;
+    String paymentMethodId;
+    String paymentMethodIdentity;
+    String? paymentMethodImage;
+    List<BackendPaymentNetworkModel> paymentMethodNetwork;
+    bool paymentMethodSellActive;
+    bool paymentMethodSellMultiple;
+    String paymentWalletId;
+    String sortCreatedId;
+
+    BackendPaymentMethodModel({
+        required this.countryId,
+        required this.countryIdentity,
+        required this.countryPhoneCode,
+        required this.countryPhoneDigit,
+        required this.paymentMethodBuyActive,
+        required this.paymentMethodBuyMultiple,
+        required this.paymentMethodChecker,
+        required this.paymentMethodId,
+        required this.paymentMethodIdentity,
+        this.paymentMethodImage,
+        required this.paymentMethodNetwork,
+        required this.paymentMethodSellActive,
+        required this.paymentMethodSellMultiple,
+        required this.paymentWalletId,
+        required this.sortCreatedId,
+    });
+
+    factory BackendPaymentMethodModel.fromJson(Map<String, dynamic> json) => BackendPaymentMethodModel(
+        countryId: json["country_id"],
+        countryIdentity: json["country_identity"],
+        countryPhoneCode: json["country_phone_code"],
+        countryPhoneDigit: json["country_phone_digit"]?.toDouble(),
+        paymentMethodBuyActive: json["payment_method_buy_active"],
+        paymentMethodBuyMultiple: json["payment_method_buy_multiple"],
+        paymentMethodChecker: json["payment_method_checker"],
+        paymentMethodId: json["payment_method_id"],
+        paymentMethodIdentity: json["payment_method_identity"],
+        paymentMethodImage: json["payment_method_image"],
+        paymentMethodNetwork: List<BackendPaymentNetworkModel>.from(json["payment_method_network"].map((x) => BackendPaymentNetworkModel.fromJson(x))),
+        paymentMethodSellActive: json["payment_method_sell_active"],
+        paymentMethodSellMultiple: json["payment_method_sell_multiple"],
+        paymentWalletId: json["payment_wallet_id"],
+        sortCreatedId: json["sort_created_id"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "country_id": countryId,
+        "country_identity": countryIdentity,
+        "country_phone_code": countryPhoneCode,
+        "country_phone_digit": countryPhoneDigit,
+        "payment_method_buy_active": paymentMethodBuyActive,
+        "payment_method_buy_multiple": paymentMethodBuyMultiple,
+        "payment_method_checker": paymentMethodChecker,
+        "payment_method_id": paymentMethodId,
+        "payment_method_identity": paymentMethodIdentity,
+        "payment_method_image": paymentMethodImage,
+        "payment_method_network": List<dynamic>.from(paymentMethodNetwork.map((x) => x.toJson())),
+        "payment_method_sell_active": paymentMethodSellActive,
+        "payment_method_sell_multiple": paymentMethodSellMultiple,
+        "payment_wallet_id": paymentWalletId,
+        "sort_created_id": sortCreatedId,
+    };
+}
+
+class BackendPaymentNetworkModel {
+    bool active;
+    String identity;
+    String? image;
+
+    BackendPaymentNetworkModel({
+        required this.active,
+        required this.identity,
+        this.image,
+    });
+
+    factory BackendPaymentNetworkModel.fromJson(Map<String, dynamic> json) => BackendPaymentNetworkModel(
+        active: json["active"],
+        identity: json["identity"],
+        image: json["image"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "active": active,
+        "identity": identity,
+        "image": image,
+    };
+}
+
+
+///fetch_top_up_profiles / fetch_withdraw_profiles row
+class BackendPaymentProfileModel {
+    BackendPaymentDetails? paymentDetails;
+    String paymentMethodId;
+    String paymentProfileId;
+    String sortCreatedId;
+    String usersId;
+
+    BackendPaymentProfileModel({
+        this.paymentDetails,
+        required this.paymentMethodId,
+        required this.paymentProfileId,
+        required this.sortCreatedId,
+        required this.usersId,
+    });
+
+    factory BackendPaymentProfileModel.fromJson(Map<String, dynamic> json) => BackendPaymentProfileModel(
+        paymentDetails: json["payment_details"] == null ? null : BackendPaymentDetails.fromJson(json["payment_details"]),
+        paymentMethodId: json["payment_method_id"],
+        paymentProfileId: json["payment_profile_id"],
+        sortCreatedId: json["sort_created_id"],
+        usersId: json["users_id"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "payment_details": paymentDetails?.toJson(),
+        "payment_method_id": paymentMethodId,
+        "payment_profile_id": paymentProfileId,
+        "sort_created_id": sortCreatedId,
+        "users_id": usersId,
+    };
+}
+
+
+///payment profile detail fields (all optional/nullable)
+class BackendPaymentDetails {
+    String? accountNumber;
+    String? bankName;
+    String? country;
+    bool? directDebit;
+    bool? eNaira;
+    String? email;
+    String? fullname;
+    String? network;
+    bool? opay;
+    String? phone;
+    bool? privateAccount;
+
+    BackendPaymentDetails({
+        this.accountNumber,
+        this.bankName,
+        this.country,
+        this.directDebit,
+        this.eNaira,
+        this.email,
+        this.fullname,
+        this.network,
+        this.opay,
+        this.phone,
+        this.privateAccount,
+    });
+
+    factory BackendPaymentDetails.fromJson(Map<String, dynamic> json) => BackendPaymentDetails(
+        accountNumber: json["account_number"],
+        bankName: json["bank_name"],
+        country: json["country"],
+        directDebit: json["direct_debit"],
+        eNaira: json["e_naira"],
+        email: json["email"],
+        fullname: json["fullname"],
+        network: json["network"],
+        opay: json["opay"],
+        phone: json["phone"],
+        privateAccount: json["private_account"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "account_number": accountNumber,
+        "bank_name": bankName,
+        "country": country,
+        "direct_debit": directDebit,
+        "e_naira": eNaira,
+        "email": email,
+        "fullname": fullname,
+        "network": network,
+        "opay": opay,
+        "phone": phone,
+        "private_account": privateAccount,
+    };
+}
+
+
+///fetch_pool_members row
+class BackendPoolMemberModel {
+    double challengeQuestionCount;
+    double poolsCompletedQuestionTrackerSize;
+    double poolsCompletedQuestionTrackerTime;
+    String poolsId;
+    String poolsMembersCreatedAt;
+    String poolsMembersId;
+    bool poolsMembersIsUser;
+    double? poolsMembersPaidAmount;
+    double poolsMembersPoints;
+    double poolsMembersPrice;
+    double poolsMembersRank;
+    String sortCreatedId;
+    BackendPoolUserDetails usersDetails;
+
+    BackendPoolMemberModel({
+        required this.challengeQuestionCount,
+        required this.poolsCompletedQuestionTrackerSize,
+        required this.poolsCompletedQuestionTrackerTime,
+        required this.poolsId,
+        required this.poolsMembersCreatedAt,
+        required this.poolsMembersId,
+        required this.poolsMembersIsUser,
+        this.poolsMembersPaidAmount,
+        required this.poolsMembersPoints,
+        required this.poolsMembersPrice,
+        required this.poolsMembersRank,
+        required this.sortCreatedId,
+        required this.usersDetails,
+    });
+
+    factory BackendPoolMemberModel.fromJson(Map<String, dynamic> json) => BackendPoolMemberModel(
+        challengeQuestionCount: json["challenge_question_count"]?.toDouble(),
+        poolsCompletedQuestionTrackerSize: json["pools_completed_question_tracker_size"]?.toDouble(),
+        poolsCompletedQuestionTrackerTime: json["pools_completed_question_tracker_time"]?.toDouble(),
+        poolsId: json["pools_id"],
+        poolsMembersCreatedAt: json["pools_members_created_at"],
+        poolsMembersId: json["pools_members_id"],
+        poolsMembersIsUser: json["pools_members_is_user"],
+        poolsMembersPaidAmount: json["pools_members_paid_amount"]?.toDouble(),
+        poolsMembersPoints: json["pools_members_points"]?.toDouble(),
+        poolsMembersPrice: json["pools_members_price"]?.toDouble(),
+        poolsMembersRank: json["pools_members_rank"]?.toDouble(),
+        sortCreatedId: json["sort_created_id"],
+        usersDetails: BackendPoolUserDetails.fromJson(json["users_details"]),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "challenge_question_count": challengeQuestionCount,
+        "pools_completed_question_tracker_size": poolsCompletedQuestionTrackerSize,
+        "pools_completed_question_tracker_time": poolsCompletedQuestionTrackerTime,
+        "pools_id": poolsId,
+        "pools_members_created_at": poolsMembersCreatedAt,
+        "pools_members_id": poolsMembersId,
+        "pools_members_is_user": poolsMembersIsUser,
+        "pools_members_paid_amount": poolsMembersPaidAmount,
+        "pools_members_points": poolsMembersPoints,
+        "pools_members_price": poolsMembersPrice,
+        "pools_members_rank": poolsMembersRank,
+        "sort_created_id": sortCreatedId,
+        "users_details": usersDetails.toJson(),
+    };
+}
+
+
+///pool-member users_details (distinct from the transaction BackendUserDetails)
+class BackendPoolUserDetails {
+    BackendUserRoleDetails rolesDetails;
+    String usersId;
+    String? usersImage;
+    String usersNames;
+    String usersUsername;
+
+    BackendPoolUserDetails({
+        required this.rolesDetails,
+        required this.usersId,
+        this.usersImage,
+        required this.usersNames,
+        required this.usersUsername,
+    });
+
+    factory BackendPoolUserDetails.fromJson(Map<String, dynamic> json) => BackendPoolUserDetails(
+        rolesDetails: BackendUserRoleDetails.fromJson(json["roles_details"]),
+        usersId: json["users_id"],
+        usersImage: json["users_image"],
+        usersNames: json["users_names"],
+        usersUsername: json["users_username"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "roles_details": rolesDetails.toJson(),
+        "users_id": usersId,
+        "users_image": usersImage,
+        "users_names": usersNames,
+        "users_username": usersUsername,
+    };
+}
+
+class BackendUserRoleDetails {
+    String rolesId;
+    String rolesIdentity;
+    double rolesLevel;
+
+    BackendUserRoleDetails({
+        required this.rolesId,
+        required this.rolesIdentity,
+        required this.rolesLevel,
+    });
+
+    factory BackendUserRoleDetails.fromJson(Map<String, dynamic> json) => BackendUserRoleDetails(
+        rolesId: json["roles_id"],
+        rolesIdentity: json["roles_identity"],
+        rolesLevel: json["roles_level"]?.toDouble(),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "roles_id": rolesId,
+        "roles_identity": rolesIdentity,
+        "roles_level": rolesLevel,
+    };
+}
+
+
 ///fetch_user_quiz_history row
 class BackendQuizHistory {
     double challengeQuestionCount;
@@ -889,6 +1281,60 @@ class BackendRolesActivationData {
         "roles_activation_amount": rolesActivationAmount,
         "roles_activation_is_fresh": rolesActivationIsFresh,
         "transaction_id": transactionId,
+    };
+}
+
+
+///fetch_withdraw_wallets / fetch_user_withdraw_wallets row
+class BackendSellPaymentWalletModel {
+    String paymentWalletCurrency;
+    String paymentWalletId;
+    String paymentWalletIdentity;
+    String? paymentWalletImage;
+    double paymentWalletSellFee;
+    double paymentWalletSellFeeFlat;
+    double paymentWalletSellMin;
+    double paymentWalletSellRate;
+    String paymentWalletSellRateType;
+    String sortCreatedId;
+
+    BackendSellPaymentWalletModel({
+        required this.paymentWalletCurrency,
+        required this.paymentWalletId,
+        required this.paymentWalletIdentity,
+        this.paymentWalletImage,
+        required this.paymentWalletSellFee,
+        required this.paymentWalletSellFeeFlat,
+        required this.paymentWalletSellMin,
+        required this.paymentWalletSellRate,
+        required this.paymentWalletSellRateType,
+        required this.sortCreatedId,
+    });
+
+    factory BackendSellPaymentWalletModel.fromJson(Map<String, dynamic> json) => BackendSellPaymentWalletModel(
+        paymentWalletCurrency: json["payment_wallet_currency"],
+        paymentWalletId: json["payment_wallet_id"],
+        paymentWalletIdentity: json["payment_wallet_identity"],
+        paymentWalletImage: json["payment_wallet_image"],
+        paymentWalletSellFee: json["payment_wallet_sell_fee"]?.toDouble(),
+        paymentWalletSellFeeFlat: json["payment_wallet_sell_fee_flat"]?.toDouble(),
+        paymentWalletSellMin: json["payment_wallet_sell_min"]?.toDouble(),
+        paymentWalletSellRate: json["payment_wallet_sell_rate"]?.toDouble(),
+        paymentWalletSellRateType: json["payment_wallet_sell_rate_type"],
+        sortCreatedId: json["sort_created_id"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "payment_wallet_currency": paymentWalletCurrency,
+        "payment_wallet_id": paymentWalletId,
+        "payment_wallet_identity": paymentWalletIdentity,
+        "payment_wallet_image": paymentWalletImage,
+        "payment_wallet_sell_fee": paymentWalletSellFee,
+        "payment_wallet_sell_fee_flat": paymentWalletSellFeeFlat,
+        "payment_wallet_sell_min": paymentWalletSellMin,
+        "payment_wallet_sell_rate": paymentWalletSellRate,
+        "payment_wallet_sell_rate_type": paymentWalletSellRateType,
+        "sort_created_id": sortCreatedId,
     };
 }
 
@@ -1063,64 +1509,6 @@ class BackendUserDetails {
 }
 
 
-///payment profile detail fields (all optional/nullable)
-class BackendPaymentDetails {
-    String? accountNumber;
-    String? bankName;
-    String? country;
-    bool? directDebit;
-    bool? eNaira;
-    String? email;
-    String? fullname;
-    String? network;
-    bool? opay;
-    String? phone;
-    bool? privateAccount;
-
-    BackendPaymentDetails({
-        this.accountNumber,
-        this.bankName,
-        this.country,
-        this.directDebit,
-        this.eNaira,
-        this.email,
-        this.fullname,
-        this.network,
-        this.opay,
-        this.phone,
-        this.privateAccount,
-    });
-
-    factory BackendPaymentDetails.fromJson(Map<String, dynamic> json) => BackendPaymentDetails(
-        accountNumber: json["account_number"],
-        bankName: json["bank_name"],
-        country: json["country"],
-        directDebit: json["direct_debit"],
-        eNaira: json["e_naira"],
-        email: json["email"],
-        fullname: json["fullname"],
-        network: json["network"],
-        opay: json["opay"],
-        phone: json["phone"],
-        privateAccount: json["private_account"],
-    );
-
-    Map<String, dynamic> toJson() => {
-        "account_number": accountNumber,
-        "bank_name": bankName,
-        "country": country,
-        "direct_debit": directDebit,
-        "e_naira": eNaira,
-        "email": email,
-        "fullname": fullname,
-        "network": network,
-        "opay": opay,
-        "phone": phone,
-        "private_account": privateAccount,
-    };
-}
-
-
 ///public.get_user_balance -> user_balance_details
 class BackendUserBalanceModel {
     double usersBalanceAmount;
@@ -1143,6 +1531,204 @@ class BackendUserBalanceModel {
         "users_balance_amount": usersBalanceAmount,
         "users_balance_updated_at": usersBalanceUpdatedAt,
         "users_id": usersId,
+    };
+}
+
+
+///get_user_record — the signed-in user profile
+class BackendUserData {
+    String countryId;
+    BackendCountryData? countryTable;
+    String languageId;
+    BackendLanguageData? languageTable;
+    BackendRoleData? rolesTable;
+    String? transactionId;
+    String usersCreatedAt;
+    String usersDob;
+    String usersEmail;
+    String usersId;
+    String? usersImage;
+    String usersNames;
+    String? usersPhone;
+    BackendReferredUserData? usersReferredDetails;
+    String? usersReferredId;
+    dynamic usersRolesAccess;
+    String usersSex;
+    String usersUsername;
+    bool usersVerified;
+
+    BackendUserData({
+        required this.countryId,
+        this.countryTable,
+        required this.languageId,
+        this.languageTable,
+        this.rolesTable,
+        this.transactionId,
+        required this.usersCreatedAt,
+        required this.usersDob,
+        required this.usersEmail,
+        required this.usersId,
+        this.usersImage,
+        required this.usersNames,
+        this.usersPhone,
+        this.usersReferredDetails,
+        this.usersReferredId,
+        this.usersRolesAccess,
+        required this.usersSex,
+        required this.usersUsername,
+        required this.usersVerified,
+    });
+
+    factory BackendUserData.fromJson(Map<String, dynamic> json) => BackendUserData(
+        countryId: json["country_id"],
+        countryTable: json["country_table"] == null ? null : BackendCountryData.fromJson(json["country_table"]),
+        languageId: json["language_id"],
+        languageTable: json["language_table"] == null ? null : BackendLanguageData.fromJson(json["language_table"]),
+        rolesTable: json["roles_table"] == null ? null : BackendRoleData.fromJson(json["roles_table"]),
+        transactionId: json["transaction_id"],
+        usersCreatedAt: json["users_created_at"],
+        usersDob: json["users_dob"],
+        usersEmail: json["users_email"],
+        usersId: json["users_id"],
+        usersImage: json["users_image"],
+        usersNames: json["users_names"],
+        usersPhone: json["users_phone"],
+        usersReferredDetails: json["users_referred_details"] == null ? null : BackendReferredUserData.fromJson(json["users_referred_details"]),
+        usersReferredId: json["users_referred_id"],
+        usersRolesAccess: json["users_roles_access"],
+        usersSex: json["users_sex"],
+        usersUsername: json["users_username"],
+        usersVerified: json["users_verified"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "country_id": countryId,
+        "country_table": countryTable?.toJson(),
+        "language_id": languageId,
+        "language_table": languageTable?.toJson(),
+        "roles_table": rolesTable?.toJson(),
+        "transaction_id": transactionId,
+        "users_created_at": usersCreatedAt,
+        "users_dob": usersDob,
+        "users_email": usersEmail,
+        "users_id": usersId,
+        "users_image": usersImage,
+        "users_names": usersNames,
+        "users_phone": usersPhone,
+        "users_referred_details": usersReferredDetails?.toJson(),
+        "users_referred_id": usersReferredId,
+        "users_roles_access": usersRolesAccess,
+        "users_sex": usersSex,
+        "users_username": usersUsername,
+        "users_verified": usersVerified,
+    };
+}
+
+class BackendCountryData {
+    String countryId;
+    String countryIdentity;
+    String countryImage;
+    String countryTwoIsoCode;
+
+    BackendCountryData({
+        required this.countryId,
+        required this.countryIdentity,
+        required this.countryImage,
+        required this.countryTwoIsoCode,
+    });
+
+    factory BackendCountryData.fromJson(Map<String, dynamic> json) => BackendCountryData(
+        countryId: json["country_id"],
+        countryIdentity: json["country_identity"],
+        countryImage: json["country_image"],
+        countryTwoIsoCode: json["country_two_iso_code"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "country_id": countryId,
+        "country_identity": countryIdentity,
+        "country_image": countryImage,
+        "country_two_iso_code": countryTwoIsoCode,
+    };
+}
+
+class BackendLanguageData {
+    String languageCode;
+    String languageId;
+    String languageIdentity;
+
+    BackendLanguageData({
+        required this.languageCode,
+        required this.languageId,
+        required this.languageIdentity,
+    });
+
+    factory BackendLanguageData.fromJson(Map<String, dynamic> json) => BackendLanguageData(
+        languageCode: json["language_code"],
+        languageId: json["language_id"],
+        languageIdentity: json["language_identity"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "language_code": languageCode,
+        "language_id": languageId,
+        "language_identity": languageIdentity,
+    };
+}
+
+class BackendRoleData {
+    String rolesChecker;
+    String rolesId;
+    double rolesLevel;
+
+    BackendRoleData({
+        required this.rolesChecker,
+        required this.rolesId,
+        required this.rolesLevel,
+    });
+
+    factory BackendRoleData.fromJson(Map<String, dynamic> json) => BackendRoleData(
+        rolesChecker: json["roles_checker"],
+        rolesId: json["roles_id"],
+        rolesLevel: json["roles_level"]?.toDouble(),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "roles_checker": rolesChecker,
+        "roles_id": rolesId,
+        "roles_level": rolesLevel,
+    };
+}
+
+class BackendReferredUserData {
+    String? usersImage;
+    String usersNames;
+    String usersReferredId;
+    String usersReferredStatus;
+    String usersUsername;
+
+    BackendReferredUserData({
+        this.usersImage,
+        required this.usersNames,
+        required this.usersReferredId,
+        required this.usersReferredStatus,
+        required this.usersUsername,
+    });
+
+    factory BackendReferredUserData.fromJson(Map<String, dynamic> json) => BackendReferredUserData(
+        usersImage: json["users_image"],
+        usersNames: json["users_names"],
+        usersReferredId: json["users_referred_id"],
+        usersReferredStatus: json["users_referred_status"],
+        usersUsername: json["users_username"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "users_image": usersImage,
+        "users_names": usersNames,
+        "users_referred_id": usersReferredId,
+        "users_referred_status": usersReferredStatus,
+        "users_username": usersUsername,
     };
 }
 
