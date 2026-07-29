@@ -19,8 +19,10 @@ export { indexedDBAdapter } from './storage/indexeddb';
 export { browserStorageAdapter } from './storage/browser';
 
 export { createStateStack } from './hooks/createStateStack';
-export { useDemandState } from './hooks/useDemandState';
+export { useDemandState, isEmptyValue } from './hooks/useDemandState';
 export type { DemandSetOptions } from './hooks/useDemandState';
+export { useDemandResource } from './hooks/useDemandResource';
+export type { DemandResource, DemandResourceOptions, DemandStatus } from './hooks/useDemandResource';
 export { useAtom } from './hooks/useAtom';
 export { useComputed, useToggle, useList } from './hooks/local-hooks';
 

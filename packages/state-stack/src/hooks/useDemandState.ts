@@ -28,7 +28,7 @@ export interface DemandSetOptions {
  * Primitives (number/string/boolean — including 0, '', false) are treated as REAL values, never
  * empty. Anything this misjudges for a given shape can be forced with `set(v, { override: true })`.
  */
-const isEmptyValue = (v: unknown): boolean => {
+export const isEmptyValue = (v: unknown): boolean => {
   if (v == null) return true;
   if (Array.isArray(v)) return v.length === 0;
   if (v instanceof Map || v instanceof Set) return v.size === 0;
@@ -49,6 +49,13 @@ export function useDemandState<T>(
     deps?: React.DependencyList;
     clearOnZeroSubscribers?: boolean;
     scope?: string;
+    /**
+     * Whether a fresh mount re-runs the demand loader. Default `true` (revalidate on every mount —
+     * the historical behaviour). Set `false` for "load once" caching: after the first load, a remount
+     * (navigation back, PWA cold start, app-lock) reuses the persisted value and does NOT re-run the
+     * loader. `deps` changes and TTL expiry still force a reload regardless of this flag.
+     */
+    revalidateOnMount?: boolean;
   }
 ): [
   T,
@@ -92,6 +99,7 @@ export function useDemandState<T>(
   const clearOnBack = opts?.clearOnBack ?? false;
   const deps = opts?.deps ?? [];
   const clearOnZeroSubscribers = opts?.clearOnZeroSubscribers ?? false;
+  const revalidateOnMount = opts?.revalidateOnMount ?? true;
 
   const core = StateStackCore.instance;
   const initialRef = useRef(initial);
@@ -160,8 +168,19 @@ export function useDemandState<T>(
     };
   }, [scope, clearOnZeroSubscribers]);
 
+  // Reset the demand flag when `deps` change so the loader re-runs with fresh inputs. On MOUNT we
+  // reset only when revalidateOnMount is true (the default); when false, a remount reuses the cached
+  // value (the singleton demand flag survives unmount) instead of re-running the loader.
+  const firstDepsRunRef = useRef(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { core.resetDemand(scope, key); }, deps);
+  useEffect(() => {
+    if (firstDepsRunRef.current) {
+      firstDepsRunRef.current = false;
+      if (revalidateOnMount) core.resetDemand(scope, key);
+      return;
+    }
+    core.resetDemand(scope, key);
+  }, deps);
 
   const demand = useCallback(
     (
