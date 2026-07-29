@@ -18,8 +18,23 @@ export interface DemandSetOptions {
   override?: boolean;
 }
 
-const isEmptyValue = (v: unknown): boolean =>
-  v == null || (Array.isArray(v) && v.length === 0);
+/**
+ * Whether `v` counts as "nothing loaded" for the persisted-cache guard. Covers the shapes a
+ * demand loader typically returns on a blocked/failed fetch, across data types:
+ *   • null / undefined
+ *   • empty array []                       (lists)
+ *   • empty Map / Set (size 0)             (keyed / unique collections)
+ *   • plain object / class instance with no own enumerable keys  ({}), e.g. an empty Record
+ * Primitives (number/string/boolean — including 0, '', false) are treated as REAL values, never
+ * empty. Anything this misjudges for a given shape can be forced with `set(v, { override: true })`.
+ */
+const isEmptyValue = (v: unknown): boolean => {
+  if (v == null) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (v instanceof Map || v instanceof Set) return v.size === 0;
+  if (typeof v === 'object') return Object.keys(v as object).length === 0;
+  return false;
+};
 
 export function useDemandState<T>(
   initial: T,
