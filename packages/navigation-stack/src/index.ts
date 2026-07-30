@@ -52,6 +52,10 @@ export {
 export { NavigationErrorBoundary, GroupNavigationStack } from './components';
 export { default, default as NavigationStack } from './components';
 
+// Imperative helper to pop a stack (by id) to its root from outside the React tree — used by
+// NavigationBar for the "re-tap the active tab to return to its root" gesture.
+export { popStackToRoot } from './core/registry';
+
 // Keyboard-safe page layout primitives (Flutter-style). Opt-in + non-breaking:
 // pages that don't use these render exactly as before.
 export { ColumnBody, RowBody, Scaffold } from './bodies';

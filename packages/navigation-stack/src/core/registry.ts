@@ -33,3 +33,24 @@ export function getRegistry(): Map<string, RegistryEntry> {
   }
   return new Map<string, RegistryEntry>();
 }
+
+/**
+ * Imperatively pop a registered stack to its root, from anywhere — even outside the React tree
+ * (e.g. a NavigationBar rendered as a sibling of the stacks). Powers the native "tap the already-active
+ * tab to return to that tab's root page" gesture. Looks the stack up by id in the shared live registry,
+ * so callers must share this module's singleton (import from the SAME installed navigation-stack).
+ *
+ * Safe: resolves `false` (no-op) if the id isn't registered or the stack has no popToRoot, and never
+ * throws. `stackId` is the NavigationStack's `id` (which, for a tab bar, matches the tab/nav item id).
+ */
+export function popStackToRoot(stackId: string): Promise<boolean> {
+  try {
+    const api = getRegistry().get(stackId)?.api;
+    if (!api?.popToRoot) return Promise.resolve(false);
+    return Promise.resolve(api.popToRoot())
+      .then((r) => r !== false)
+      .catch(() => false);
+  } catch {
+    return Promise.resolve(false);
+  }
+}

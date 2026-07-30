@@ -136,23 +136,29 @@ const WheelColumn = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = React.useState(false);
 
-  // Initial scroll on mount
-  React.useEffect(() => {
-    if (containerRef.current && !mounted) {
-      containerRef.current.scrollTop = selectedIndex * itemExtent;
+  // Initial scroll on mount — center the selected item. useLayoutEffect (before paint) + a rAF
+  // re-apply guards against the column not being fully laid out yet on some devices, which left the
+  // wheel off-centre. Index is clamped so an out-of-range selectedIndex can't scroll past the list.
+  React.useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (el && !mounted) {
+      const idx = Math.max(0, Math.min(options.length - 1, selectedIndex));
+      el.scrollTop = idx * itemExtent;
+      requestAnimationFrame(() => { el.scrollTop = idx * itemExtent; });
       setMounted(true);
     }
-  }, [selectedIndex, itemExtent]);
+  }, [selectedIndex, itemExtent, options.length, mounted]);
 
   // Sync scroll position when selectedIndex changes
   React.useEffect(() => {
     if (containerRef.current && mounted) {
+      const idx = Math.max(0, Math.min(options.length - 1, selectedIndex));
       containerRef.current.scrollTo({
-        top: selectedIndex * itemExtent,
+        top: idx * itemExtent,
         behavior: "smooth",
       });
     }
-  }, [selectedIndex, itemExtent, mounted]);
+  }, [selectedIndex, itemExtent, mounted, options.length]);
 
   // Snap on scroll end
   React.useEffect(() => {
@@ -273,10 +279,15 @@ const CustomScrollDatePicker : React.FC<CustomScrollDatePickerProps> =  ({
     return minYear;
   }, [minDate, minYear]);
   
-  const initDate = useMemo(
-    () => (defaultDate ? (startFromDate || today) : new Date(effectiveMinYear, 0, 1)),
-    [defaultDate, startFromDate, effectiveMinYear]
-  );
+  const initDate = useMemo(() => {
+    // Clamp the starting date into [minDate, maxDate]. Otherwise a default of `today` on a DOB picker
+    // (whose maxDate is years in the past) computes a yearIndex past the end of the filtered `years`
+    // array — the wheel then lands on a garbage year (e.g. 1947/1904) and the reported date is wrong.
+    let d = defaultDate ? (startFromDate || today) : new Date(effectiveMinYear, 0, 1);
+    if (maxDate && d > maxDate) d = new Date(maxDate);
+    if (minDate && d < minDate) d = new Date(minDate);
+    return d;
+  }, [defaultDate, startFromDate, effectiveMinYear, maxDate, minDate, today]);
 
   const years = useMemo(() => {
     const allYears = Array.from({ length: effectiveMaxYear - effectiveMinYear + 1 }, (_, i) => effectiveMinYear + i);

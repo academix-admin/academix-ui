@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import NavigationStack, {
   useNav,
   useIsTop,
@@ -8,6 +8,7 @@ import NavigationStack, {
   usePageLifecycle,
   useLocation,
   useOverlayEntry,
+  popStackToRoot,
 } from '../src/index';
 
 function renderStack(navLink: Record<string, React.ComponentType<any>>, entry: string) {
@@ -315,5 +316,37 @@ describe('NavigationStack — cross-page dependency injection', () => {
     renderStack({ provider: Provider, reader: Reader }, 'provider');
     fireEvent.click(screen.getByText('go'));
     await waitFor(() => expect(screen.getByText('answer:42')).toBeInTheDocument());
+  });
+});
+
+describe('popStackToRoot (imperative reselect->root)', () => {
+  function Root() {
+    const nav = useNav();
+    return <button onClick={() => nav.push('deep')}>go-deep</button>;
+  }
+  function Deep() {
+    return <div>deep-page</div>;
+  }
+
+  it('pops a registered stack back to its root when called by id', async () => {
+    render(
+      <NavigationStack id="reselect-stack" navLink={{ root: Root, deep: Deep }} entry="root" transition="none" />,
+    );
+    // Navigate deep.
+    fireEvent.click(screen.getByText('go-deep'));
+    await waitFor(() => expect(screen.getByText('deep-page')).toBeInTheDocument());
+
+    // Imperatively pop to root from outside the tree (what NavigationBar's onReselect does).
+    let result: boolean | undefined;
+    await act(async () => { result = await popStackToRoot('reselect-stack'); });
+    expect(result).toBe(true);
+
+    // The deep page is gone — we're back at the root.
+    await waitFor(() => expect(screen.queryByText('deep-page')).not.toBeInTheDocument());
+    expect(screen.getByText('go-deep')).toBeInTheDocument();
+  });
+
+  it('is a safe no-op (resolves false) for an unknown stack id', async () => {
+    await expect(popStackToRoot('no-such-stack')).resolves.toBe(false);
   });
 });

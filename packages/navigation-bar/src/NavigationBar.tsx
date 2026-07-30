@@ -26,6 +26,14 @@ export interface NavigationBarProps {
   activeId?: string;
   onChange?: (id: string, item: NavItem) => void;
 
+  /**
+   * Fired when the already-active tab is tapped again (a "reselect"), after `onChange`. This is the
+   * bar's extension point for the native "tap the active tab to return to its root" gesture — the bar
+   * stays navigation-agnostic and doesn't reach into any stack itself. Wire it to your router of choice,
+   * e.g. with @academix-admin/navigation-stack: `onReselect={(id) => popStackToRoot(id)}`.
+   */
+  onReselect?: (id: string, item: NavItem) => void;
+
   /** Scroll Handler Injection */
   onScroll?: (callback: (event: NavigationBarScrollEvent) => void) => void;
 
@@ -152,6 +160,7 @@ export default function NavigationBar({
   navKeys,
   activeId,
   onChange,
+  onReselect,
   onScroll,
 
   /** Colors */
@@ -350,8 +359,11 @@ export default function NavigationBar({
 
 
   const handleClick = (item: NavItem) => {
+    const isReselect = active === item.id;
     if (!controlled) setInternalActive(item.id);
     onChange?.(item.id, item);
+    // Re-tap of the active tab → emit reselect so the consumer can return it to its stack's root.
+    if (isReselect) onReselect?.(item.id, item);
   };
 
   const currentHeight =
