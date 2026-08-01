@@ -313,7 +313,15 @@ export function useInfiniteScrollObserver(
   const setRef = useCallback(
     (node: Element | null) => {
       nodeRef.current = node;
-      connect();
+      if (!node) {
+        observerRef.current?.disconnect();
+        return;
+      }
+      // Defer to a microtask: a callback ref fires during commit child-first, so an ANCESTOR scroll
+      // container passed as `root: () => ref.current` isn't attached yet. After commit (microtask) it is.
+      queueMicrotask(() => {
+        if (nodeRef.current === node) connect();
+      });
     },
     [connect],
   );
