@@ -18,7 +18,23 @@ export type {
   NavStackAPI,
 } from './types';
 
-export { scrollBroadcaster, useScrollBroadcast, useUnifiedScrollRestoration } from './scroll';
+export {
+  scrollBroadcaster,
+  useScrollBroadcast,
+  useUnifiedScrollRestoration,
+  useScrollEvents,
+  useInfiniteScroll,
+  useInfiniteScrollObserver,
+  usePullToRefresh,
+} from './scroll';
+export type {
+  UseScrollEventsHandlers,
+  UseScrollEventsOptions,
+  UseInfiniteScrollOptions,
+  UseInfiniteScrollObserverOptions,
+  UsePullToRefreshOptions,
+  PullToRefreshState,
+} from './scroll';
 export { useSwipeBack } from './gestures/swipe-back';
 
 export {

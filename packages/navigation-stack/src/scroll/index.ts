@@ -1,5 +1,6 @@
 import type { ScrollBroadcastEvent, ScrollListener, NavStackAPI, RenderRecord, StackEntry } from '../types';
 import type { GroupNavigationContextType } from '../core/contexts';
+import { CurrentPageContext } from '../core/contexts';
 import { getRegistry } from '../core/registry';
 // Scroll broadcast + unified scroll restoration.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
@@ -137,6 +138,303 @@ export const useScrollBroadcast = (callback: (event: ScrollBroadcastEvent) => vo
     return scrollBroadcaster.subscribe(callback);
   }, [callback]);
 };
+
+
+// ==================== Reusable scroll primitives ====================
+// Built on the ScrollBroadcaster (which already tracks every page's scroll container). All are opt-in and
+// additive. They latch edge events (fire once per ENTRY into the edge zone, re-arm with hysteresis after
+// leaving) so callbacks — especially infinite-scroll loadMore — are STABLE and never loop while the edge
+// stays in view.
+
+export interface UseScrollEventsHandlers {
+  /** Fires on every scroll of the target page's container. */
+  onScrollChange?: (event: ScrollBroadcastEvent) => void;
+  /** Fires ONCE when scrolling into `bottomThreshold` px of the bottom; re-arms after leaving the zone. */
+  onBottomReached?: (event: ScrollBroadcastEvent) => void;
+  /** Fires ONCE when scrolling into `topThreshold` px of the top; re-arms after leaving the zone. */
+  onTopReached?: (event: ScrollBroadcastEvent) => void;
+}
+
+export interface UseScrollEventsOptions {
+  /** Target page uid. Defaults to the current page (CurrentPageContext) — i.e. the page you're rendered in. */
+  uid?: string | null;
+  /** Distance (px) from the bottom that counts as "reached". Default 300. */
+  bottomThreshold?: number;
+  /** Distance (px) from the top that counts as "reached". Default 0. */
+  topThreshold?: number;
+  /** Turn all callbacks off without unmounting. Default true. */
+  enabled?: boolean;
+}
+
+const REARM_HYSTERESIS = 24; // px past the threshold before re-arming, so a jittery scroll can't double-fire.
+
+/**
+ * Subscribe to a page's scroll: `onScrollChange` (continuous) + latched `onBottomReached` / `onTopReached`.
+ * Reusable anywhere inside a NavigationStack (Scaffold / ColumnBody / RowBody all broadcast their scroll).
+ */
+export function useScrollEvents(handlers: UseScrollEventsHandlers, options: UseScrollEventsOptions = {}): void {
+  const ctxUid = useContext(CurrentPageContext);
+  const uid = options.uid !== undefined ? options.uid : ctxUid;
+  const enabled = options.enabled ?? true;
+  const bottomThreshold = options.bottomThreshold ?? 300;
+  const topThreshold = options.topThreshold ?? 0;
+
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
+  const armedRef = useRef({ bottom: true, top: true });
+
+  const listener = useCallback(
+    (event: ScrollBroadcastEvent) => {
+      if (!enabled) return;
+      if (uid && event.uid !== uid) return;
+
+      const h = handlersRef.current;
+      h.onScrollChange?.(event);
+
+      const distToBottom = event.scrollHeight - (event.scrollPosition + event.clientHeight);
+      if (distToBottom <= bottomThreshold) {
+        if (armedRef.current.bottom) {
+          armedRef.current.bottom = false;
+          h.onBottomReached?.(event);
+        }
+      } else if (distToBottom > bottomThreshold + REARM_HYSTERESIS) {
+        armedRef.current.bottom = true;
+      }
+
+      const distToTop = event.scrollPosition;
+      if (distToTop <= topThreshold) {
+        if (armedRef.current.top) {
+          armedRef.current.top = false;
+          h.onTopReached?.(event);
+        }
+      } else if (distToTop > topThreshold + REARM_HYSTERESIS) {
+        armedRef.current.top = true;
+      }
+    },
+    [uid, enabled, bottomThreshold, topThreshold],
+  );
+
+  useScrollBroadcast(listener);
+}
+
+export interface UseInfiniteScrollOptions {
+  /** Called when the bottom edge is reached and it's allowed to load (guarded by hasMore + loading). */
+  onLoadMore: () => void;
+  /** Set false when the last page returned no new rows — stops any further loads (kills the loadMore loop). */
+  hasMore?: boolean;
+  /** Your in-flight flag — while true, no new load fires. */
+  loading?: boolean;
+  /** Distance (px) from the bottom that triggers a load (prefetch margin). Default 300. */
+  threshold?: number;
+  /** Target page uid. Defaults to the current page. */
+  uid?: string | null;
+  /** Turn it off without unmounting. Default true. */
+  enabled?: boolean;
+}
+
+/**
+ * Stable infinite scroll on top of `useScrollEvents`. Because the bottom event is LATCHED and guarded by
+ * `hasMore` + `loading`, `onLoadMore` fires at most once per approach to the bottom and never loops when the
+ * result is unchanged/exhausted. No sentinel element needed — it reads the page's real scroll container.
+ */
+export function useInfiniteScroll(options: UseInfiniteScrollOptions): void {
+  const optsRef = useRef(options);
+  optsRef.current = options;
+
+  useScrollEvents(
+    {
+      onBottomReached: () => {
+        const o = optsRef.current;
+        if (o.enabled === false) return;
+        if (o.hasMore === false) return;
+        if (o.loading) return;
+        o.onLoadMore();
+      },
+    },
+    { uid: options.uid, bottomThreshold: options.threshold ?? 300, enabled: options.enabled },
+  );
+}
+
+export interface UseInfiniteScrollObserverOptions {
+  /** Called when the sentinel enters view and it's allowed to load (guarded by hasMore + loading). */
+  onLoadMore: () => void;
+  /** Set false when the last page returned no new rows — stops further loads (kills the loadMore loop). */
+  hasMore?: boolean;
+  /** Your in-flight flag — while true, no new load fires. */
+  loading?: boolean;
+  /** Prefetch margin around the root (px or a CSS margin string). Default '320px'. */
+  rootMargin?: string;
+  /**
+   * The scroll container to observe within. Default: the viewport. For a container that mounts after this
+   * hook (a ref that starts null), pass a getter `() => scrollRef.current` — it's read when the sentinel
+   * attaches. Works for vertical page lists AND horizontal carousels.
+   */
+  root?: Element | null | (() => Element | null);
+  /** Turn it off without unmounting. Default true. */
+  enabled?: boolean;
+}
+
+/**
+ * Stable IntersectionObserver infinite scroll — a drop-in for the common `loaderRef + IntersectionObserver
+ * in a useEffect` pattern, but WITHOUT its loop bug. The usual bug: the effect re-runs whenever `loadMore`
+ * (or state it closes over) changes, so the observer is torn down and re-created; if the sentinel is still
+ * in view, the fresh observer fires immediately → another load → repeat. Here the observer is created ONCE
+ * when the sentinel attaches and reads `onLoadMore`/`hasMore`/`loading` from a live ref, so it only fires on
+ * a real intersection change and stops when `hasMore` is false.
+ *
+ * Returns a callback ref — attach it to your sentinel element: `<div ref={useInfiniteScrollObserver(...)} />`.
+ */
+export function useInfiniteScrollObserver(
+  options: UseInfiniteScrollObserverOptions,
+): (node: Element | null) => void {
+  const optsRef = useRef(options);
+  optsRef.current = options;
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const nodeRef = useRef<Element | null>(null);
+
+  const connect = useCallback(() => {
+    observerRef.current?.disconnect();
+    const node = nodeRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const o = optsRef.current;
+    const root = typeof o.root === 'function' ? o.root() : o.root ?? null;
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        const s = optsRef.current;
+        if (s.enabled === false || s.hasMore === false || s.loading) return;
+        s.onLoadMore();
+      },
+      { root, rootMargin: o.rootMargin ?? '320px', threshold: 0 },
+    );
+    observerRef.current.observe(node);
+  }, []);
+
+  const setRef = useCallback(
+    (node: Element | null) => {
+      nodeRef.current = node;
+      connect();
+    },
+    [connect],
+  );
+
+  useEffect(() => () => observerRef.current?.disconnect(), []);
+
+  return setRef;
+}
+
+export interface UsePullToRefreshOptions {
+  /** Called when the user pulls past `threshold` at the top. May be async; `refreshing` is true until it settles. */
+  onRefresh: () => void | Promise<void>;
+  /** Target page uid. Defaults to the current page. */
+  uid?: string | null;
+  /** Turn it off. Default true. */
+  enabled?: boolean;
+  /** Pull distance (px) required to trigger a refresh. Default 72. */
+  threshold?: number;
+  /** Max reported pull distance. Default 120. */
+  maxPull?: number;
+  /** Pull resistance factor (0-1). Default 0.5. */
+  resistance?: number;
+}
+
+export interface PullToRefreshState {
+  refreshing: boolean;
+  /** Current pull distance (px), for rendering an indicator. 0 when idle. */
+  pullDistance: number;
+}
+
+/**
+ * Swipe-down-to-refresh for a page's scroll container (touch). Returns `{ refreshing, pullDistance }` so the
+ * caller can render an indicator. Passive listeners — it never blocks native scrolling; it only acts when the
+ * container is already at the top.
+ */
+export function usePullToRefresh(options: UsePullToRefreshOptions): PullToRefreshState {
+  const ctxUid = useContext(CurrentPageContext);
+  const uid = options.uid !== undefined ? options.uid : ctxUid;
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+
+  const optsRef = useRef(options);
+  optsRef.current = options;
+  const pullRef = useRef(0);
+  pullRef.current = pullDistance;
+  const refreshingRef = useRef(false);
+
+  useEffect(() => {
+    if (!uid) return;
+    if (optsRef.current.enabled === false) return;
+    if (typeof document === 'undefined') return;
+
+    let container: HTMLElement | null = null;
+    let startY = 0;
+    let pulling = false;
+    let raf = 0;
+    let tries = 0;
+
+    const onStart = (e: TouchEvent) => {
+      if (refreshingRef.current || !container) return;
+      if (container.scrollTop <= 0) {
+        startY = e.touches[0].clientY;
+        pulling = true;
+      }
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!pulling || refreshingRef.current) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy <= 0) {
+        pulling = false;
+        setPullDistance(0);
+        return;
+      }
+      const o = optsRef.current;
+      setPullDistance(Math.min(dy * (o.resistance ?? 0.5), o.maxPull ?? 120));
+    };
+    const onEnd = async () => {
+      if (!pulling) return;
+      pulling = false;
+      const o = optsRef.current;
+      if (pullRef.current >= (o.threshold ?? 72)) {
+        refreshingRef.current = true;
+        setRefreshing(true);
+        try {
+          await o.onRefresh();
+        } finally {
+          refreshingRef.current = false;
+          setRefreshing(false);
+        }
+      }
+      setPullDistance(0);
+    };
+
+    const bind = () => {
+      container = scrollBroadcaster.getRegisteredContainer(uid) ?? null;
+      if (!container) {
+        if (tries++ < 60) raf = requestAnimationFrame(bind);
+        return;
+      }
+      container.addEventListener('touchstart', onStart, { passive: true });
+      container.addEventListener('touchmove', onMove, { passive: true });
+      container.addEventListener('touchend', onEnd, { passive: true });
+      container.addEventListener('touchcancel', onEnd, { passive: true });
+    };
+    bind();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      if (container) {
+        container.removeEventListener('touchstart', onStart);
+        container.removeEventListener('touchmove', onMove);
+        container.removeEventListener('touchend', onEnd);
+        container.removeEventListener('touchcancel', onEnd);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
+  return { refreshing, pullDistance };
+}
 
 
 export const globalScrollData = {
