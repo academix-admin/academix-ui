@@ -1347,6 +1347,12 @@ type SearchViewerProps<T = any, C = any> = {
   onResult?: (results: SearchResult<T>[]) => void;
   onRemoveDuplicateBy?: (item: T) => any;
   debounceMs?: number;
+  /** Don't call `queryData` until the trimmed query is at least this long. Default 0 (search always,
+   *  including the empty query). Set e.g. 1–2 to avoid empty/one-char server round-trips. */
+  minQueryLength?: number;
+  /** Run the initial query as soon as the sheet opens (even with no `onInitialData`) so a server-only
+   *  viewer shows results immediately instead of a blank sheet. Default false. */
+  searchOnOpen?: boolean;
 };
 
 type EachViewerProps<T = any, C = any> = {
@@ -1359,6 +1365,8 @@ type EachViewerProps<T = any, C = any> = {
   ) => Promise<QueryResult<T, C>>;
   onRemoveDuplicateBy?: (item: T) => any;
   debounceMs?: number;
+  /** Don't call `queryData` until the trimmed query is at least this long. Default 0. */
+  minQueryLength?: number;
   children: (result: EachViewerResult<T>) => React.ReactNode;
 };
 
@@ -1536,9 +1544,12 @@ type SearchExecutorOptions<T, C> = {
   setResults: React.Dispatch<React.SetStateAction<SearchResult<T>[]>>;
   setCursor: React.Dispatch<React.SetStateAction<C | undefined>>;
   setInternalSearchState: React.Dispatch<React.SetStateAction<SearchState>>;
+  /** Don't hit the server until the (trimmed) query is at least this long. Default 0 (always). */
+  minQueryLength?: number;
 };
 
 function createExecuteSearch<T, C>(opts: SearchExecutorOptions<T, C>) {
+  const minQueryLength = opts.minQueryLength ?? 0;
   return async (value: string) => {
     const {
       onInitialDataRef,
@@ -1552,17 +1563,19 @@ function createExecuteSearch<T, C>(opts: SearchExecutorOptions<T, C>) {
     } = opts;
 
     let localResults: SearchResult<T>[] = [];
-    let remoteResults: SearchResult<T>[] = [];
-
     if (onInitialDataRef.current) {
       const filtered = onInitialDataRef.current(value);
       localResults = filtered.map((data) => ({ isOnline: false, data }));
     }
+    const localDedup = removeDuplicates(localResults);
+    const belowMin = value.trim().length < minQueryLength;
 
-    if (queryDataRef.current) {
+    // Server search — but only when a queryData exists AND the query is long enough. Below the min length
+    // we stay local-only (no wasted/erroring empty-query requests).
+    if (queryDataRef.current && !belowMin) {
       const cached = cacheRef.current.get(value);
       if (cached) {
-        remoteResults = cached.data.map((data) => ({ isOnline: true, data }));
+        const remoteResults = cached.data.map((data) => ({ isOnline: true, data }));
         const deduplicated = removeDuplicates([...localResults, ...remoteResults]);
         setResults(deduplicated);
         setCursor(cached.cursor);
@@ -1574,6 +1587,10 @@ function createExecuteSearch<T, C>(opts: SearchExecutorOptions<T, C>) {
         searchAbortRef.current.abort("New search initiated");
       }
       searchAbortRef.current = new AbortController();
+
+      // INSTANT local paint: show local matches immediately while the server request is in flight, so the
+      // list never lingers on the PREVIOUS query's results during the debounce + network wait.
+      setResults(localDedup);
       setInternalSearchState("loading");
       setCursor(undefined);
 
@@ -1588,19 +1605,28 @@ function createExecuteSearch<T, C>(opts: SearchExecutorOptions<T, C>) {
           if (firstKey !== undefined) cacheRef.current.delete(firstKey);
         }
 
-        remoteResults = result.data.map((data) => ({ isOnline: true, data }));
+        const remoteResults = result.data.map((data) => ({ isOnline: true, data }));
         const deduplicated = removeDuplicates([...localResults, ...remoteResults]);
         setResults(deduplicated);
         setCursor(result.cursor);
         setInternalSearchState(deduplicated.length > 0 ? "data" : "empty");
       } catch (error: any) {
         if (error.name === "AbortError") return;
-        setInternalSearchState("error");
+        // Robustness: a failed server request shouldn't blank out matches we already have locally.
+        if (localDedup.length > 0) {
+          setResults(localDedup);
+          setInternalSearchState("data");
+        } else {
+          setInternalSearchState("error");
+        }
       }
     } else {
-      const deduplicated = removeDuplicates(localResults);
-      setResults(deduplicated);
-      setInternalSearchState(deduplicated.length > 0 ? "data" : "empty");
+      // Local-only (or below the min query length). An EMPTY query returns to the initial view rather than
+      // flashing "no results".
+      setResults(localDedup);
+      setInternalSearchState(
+        localDedup.length > 0 ? "data" : value.trim().length > 0 ? "empty" : "initial"
+      );
     }
   };
 }
@@ -1826,6 +1852,8 @@ function SearchViewer<T = any, C = any>({
   onResult,
   onRemoveDuplicateBy,
   debounceMs = 300,
+  minQueryLength = 0,
+  searchOnOpen = false,
 }: SearchViewerProps<T, C>) {
   const [id] = useState(
     () => providedId || `search-${Math.random().toString(36).substring(2, 11)}`
@@ -1882,8 +1910,9 @@ function SearchViewer<T = any, C = any>({
       setResults,
       setCursor,
       setInternalSearchState,
+      minQueryLength,
     }),
-    [removeDuplicates]
+    [removeDuplicates, minQueryLength]
   );
 
   const {
@@ -1910,12 +1939,15 @@ function SearchViewer<T = any, C = any>({
     onResultRef.current?.(results);
   }, [results]);
 
+  // Re-run when the sheet opens, the query changes, or the caller signals local data changed
+  // (localDataDeps). Runs for local viewers (onInitialData) and, when searchOnOpen is set, also for
+  // server-only viewers so they load immediately instead of showing a blank sheet.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (isOpen && onInitialDataRef.current) {
+    if (isOpen && (onInitialDataRef.current || searchOnOpen)) {
       executeSearch(searchValue);
     }
-  }, [isOpen, searchValue, executeSearch, ...(localDataDeps ?? [])]);
+  }, [isOpen, searchValue, executeSearch, searchOnOpen, ...(localDataDeps ?? [])]);
 
   const handleScroll = useCallback(
     async (e: React.UIEvent<HTMLDivElement>) => {
@@ -2069,6 +2101,7 @@ function EachViewer<T = any, C = any>({
   queryData,
   onRemoveDuplicateBy,
   debounceMs = 300,
+  minQueryLength = 0,
   children,
 }: EachViewerProps<T, C>) {
   const searchText = React.useContext(SearchTextContext);
@@ -2117,8 +2150,9 @@ function EachViewer<T = any, C = any>({
       setResults,
       setCursor,
       setInternalSearchState: setSearchState,
+      minQueryLength,
     }),
-    [removeDuplicates]
+    [removeDuplicates, minQueryLength]
   );
 
   const handleScroll = useCallback(async () => {
