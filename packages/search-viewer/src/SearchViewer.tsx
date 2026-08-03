@@ -1568,7 +1568,10 @@ function createExecuteSearch<T, C>(opts: SearchExecutorOptions<T, C>) {
       localResults = filtered.map((data) => ({ isOnline: false, data }));
     }
     const localDedup = removeDuplicates(localResults);
-    const belowMin = value.trim().length < minQueryLength;
+    // "Below min" only applies to NON-EMPTY short queries (e.g. a single char). The EMPTY query is the
+    // default browse view — it must still hit the server so it gets a first page + cursor and can paginate
+    // as the user scrolls. Skipping the server here left the no-text list with no cursor (no pagination).
+    const belowMin = value.trim().length > 0 && value.trim().length < minQueryLength;
 
     // Server search — but only when a queryData exists AND the query is long enough. Below the min length
     // we stay local-only (no wasted/erroring empty-query requests).
@@ -1925,6 +1928,10 @@ function SearchViewer<T = any, C = any>({
     handleClear,
   } = useSearchInput(isOpen, searchProp, debounceMs, executeSearch);
 
+  // Latest query, read by the open/localDataDeps effect below without making `searchValue` a dependency.
+  const searchValueRef = useRef(searchValue);
+  searchValueRef.current = searchValue;
+
   useEffect(() => {
     if (!isOpen) {
       setResults([]);
@@ -1939,15 +1946,21 @@ function SearchViewer<T = any, C = any>({
     onResultRef.current?.(results);
   }, [results]);
 
-  // Re-run when the sheet opens, the query changes, or the caller signals local data changed
-  // (localDataDeps). Runs for local viewers (onInitialData) and, when searchOnOpen is set, also for
-  // server-only viewers so they load immediately instead of showing a blank sheet.
+  // Re-run when the sheet OPENS or the caller signals local data changed (localDataDeps). Runs for local
+  // viewers (onInitialData) and, when searchOnOpen is set, also for server-only viewers so they load
+  // immediately instead of showing a blank sheet.
+  //
+  // `searchValue` is deliberately NOT a dependency: text-change searches are driven solely by the
+  // DEBOUNCED input handler (useSearchInput → executeSearch). Listing it here re-ran an extra,
+  // un-debounced executeSearch on every keystroke — the same query "loaded again" and the two requests
+  // raced/aborted each other, which also stomped the pagination cursor. We read the latest query from a
+  // ref so open + localDataDeps re-runs still use the current text.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen && (onInitialDataRef.current || searchOnOpen)) {
-      executeSearch(searchValue);
+      executeSearch(searchValueRef.current);
     }
-  }, [isOpen, searchValue, executeSearch, searchOnOpen, ...(localDataDeps ?? [])]);
+  }, [isOpen, executeSearch, searchOnOpen, ...(localDataDeps ?? [])]);
 
   const handleScroll = useCallback(
     async (e: React.UIEvent<HTMLDivElement>) => {
