@@ -2023,7 +2023,10 @@ function SearchViewer<T = any, C = any>({
           if (!entries[0]?.isIntersecting || !canLoadRef.current) return;
           loadMoreRef.current();
         },
-        { root: contentRef.current ?? null, rootMargin: "0px 0px 320px 0px", threshold: 0 }
+        // root:null (viewport) — IntersectionObserver honours clipping by whatever
+        // ancestor actually scrolls (the sheet element or .search-viewer-content),
+        // so this fires near the list end regardless of which one is the scroller.
+        { root: null, rootMargin: "0px 0px 320px 0px", threshold: 0 }
       );
       observerRef.current.observe(node);
     });
