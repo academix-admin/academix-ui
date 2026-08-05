@@ -1,7 +1,7 @@
 {
   "name": "@academix-admin/search-viewer",
-  "version": "0.1.2",
-  "description": "Headless-friendly search & selection UI for React — debounced controller, single/multi select, and sheet-based pickers.",
+  "version": "0.1.3",
+  "description": "Headless-friendly search & selection UI for React \u00e2\u20ac\u201d debounced controller, single/multi select, and sheet-based pickers.",
   "keywords": [
     "react",
     "search",

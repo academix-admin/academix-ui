@@ -1962,34 +1962,73 @@ function SearchViewer<T = any, C = any>({
     }
   }, [isOpen, executeSearch, searchOnOpen, ...(localDataDeps ?? [])]);
 
+  // Fetch the next page from `cursor`. Shared by the scroll handler and the
+  // bottom-sentinel IntersectionObserver so pagination fires regardless of which
+  // element actually scrolls (the sheet's own scroller vs .search-viewer-content).
+  const loadMore = useCallback(async () => {
+    if (isPaginating.current || !queryDataRef.current || !cursor) return;
+
+    isPaginating.current = true;
+    setInternalSearchState("loading");
+    paginationAbortRef.current?.abort("New pagination request");
+    paginationAbortRef.current = new AbortController();
+
+    try {
+      const signal = paginationAbortRef.current.signal;
+      const result = await queryDataRef.current(cursor, searchValue, signal);
+      if (signal.aborted) return;
+      const newResults = result.data.map((data) => ({ isOnline: true, data }));
+      setResults((prev) => removeDuplicates([...prev, ...newResults]));
+      setCursor(result.cursor);
+      setInternalSearchState("data");
+    } catch (error: any) {
+      if (error.name === "AbortError") return;
+      setInternalSearchState("error");
+    } finally {
+      setTimeout(() => { isPaginating.current = false; }, 500);
+    }
+  }, [cursor, searchValue, removeDuplicates]);
+
   const handleScroll = useCallback(
-    async (e: React.UIEvent<HTMLDivElement>) => {
-      if (isPaginating.current || !queryDataRef.current || !cursor) return;
+    (e: React.UIEvent<HTMLDivElement>) => {
       const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
       if (scrollHeight - scrollTop > clientHeight * 1.2) return;
-
-      isPaginating.current = true;
-      setInternalSearchState("loading");
-      paginationAbortRef.current?.abort("New pagination request");
-      paginationAbortRef.current = new AbortController();
-
-      try {
-        const signal = paginationAbortRef.current.signal;
-        const result = await queryDataRef.current(cursor, searchValue, signal);
-        if (signal.aborted) return;
-        const newResults = result.data.map((data) => ({ isOnline: true, data }));
-        setResults((prev) => removeDuplicates([...prev, ...newResults]));
-        setCursor(result.cursor);
-        setInternalSearchState("data");
-      } catch (error: any) {
-        if (error.name === "AbortError") return;
-        setInternalSearchState("error");
-      } finally {
-        setTimeout(() => { isPaginating.current = false; }, 500);
-      }
+      loadMore();
     },
-    [cursor, searchValue, removeDuplicates]
+    [loadMore]
   );
+
+  // Primary pagination trigger: a bottom sentinel + IntersectionObserver, so it
+  // fires near the list end even when onScroll doesn't reach .search-viewer-content
+  // (the sheet's own element may be the scroller). Modelled on navigation-stack's
+  // useInfiniteScrollObserver: the observer is created ONCE when the sentinel
+  // attaches and reads loadMore/hasMore/loading from live refs, so it never loops
+  // (re-creating an observer while the sentinel is still in view would re-fire).
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  const canLoadRef = useRef(false);
+  canLoadRef.current = !!queryDataRef.current && !!cursor && searchState !== "loading";
+
+  const observerRef = useRef<IntersectionObserver | undefined>(undefined);
+  const attachSentinel = useCallback((node: HTMLDivElement | null) => {
+    observerRef.current?.disconnect();
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    // Defer: a callback ref fires child-first during commit, so the ancestor
+    // scroll container (contentRef) isn't attached yet. It is after a microtask.
+    queueMicrotask(() => {
+      observerRef.current?.disconnect();
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (!entries[0]?.isIntersecting || !canLoadRef.current) return;
+          loadMoreRef.current();
+        },
+        { root: contentRef.current ?? null, rootMargin: "0px 0px 320px 0px", threshold: 0 }
+      );
+      observerRef.current.observe(node);
+    });
+  }, []);
+  useEffect(() => () => observerRef.current?.disconnect(), []);
 
   if (!isOpen && unmountOnClose) return null;
 
@@ -1998,6 +2037,16 @@ function SearchViewer<T = any, C = any>({
       return (
         <>
           {children}
+          {/* Bottom sentinel — when it scrolls into view (300px early) the next
+              page is fetched; the spinner below then shows the in-flight load. */}
+          {cursor && (
+            <div
+              ref={attachSentinel}
+              className="search-viewer-sentinel"
+              aria-hidden="true"
+              style={{ height: 1, width: "100%" }}
+            />
+          )}
           {searchState === "loading" && (
             <div
               className="search-viewer-loading"
@@ -2090,6 +2139,7 @@ function SearchViewer<T = any, C = any>({
         </Sheet.Header>
         <Sheet.Content>
           <div
+            ref={contentRef}
             className={`search-viewer-content ${childrenDirection}`}
             onScroll={queryDataRef.current ? handleScroll : undefined}
             style={{
