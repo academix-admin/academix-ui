@@ -82,6 +82,37 @@ For a purely local list, provide `onInitialData` instead of `queryData`:
 </SearchViewer>
 ```
 
+## Composable sections: `Row` / `Column`
+
+For sectioned results (e.g. one horizontally-scrolling shelf per topic/category), compose
+`Row`s inside a `Column` as `SearchViewer`'s `children`. Today's flat `children` usage is,
+unchanged, an implicit `Column` with no `Row`s — `Column`'s default layout is identical to
+that existing vertical flow.
+
+```tsx
+<SearchViewer isOpen={isOpen} onClose={search.close} searchProp={{ text: 'Search', textColor: '#111' }}>
+  <Column>
+    <h3>Trending</h3>
+    <Row queryData={fetchTrending} onRemoveDuplicateBy={(f) => f.id}>
+      {({ results }) => results.map((r) => <FriendCard key={r.data.id} friend={r.data} />)}
+    </Row>
+
+    <h3>Nearby</h3>
+    <Row queryData={fetchNearby} onRemoveDuplicateBy={(f) => f.id}>
+      {({ results }) => results.map((r) => <FriendCard key={r.data.id} friend={r.data} />)}
+    </Row>
+  </Column>
+</SearchViewer>
+```
+
+Each `Row` is independently paginating (triggers `queryData` for its next page as it's
+scrolled horizontally near its end) and reads the live search text automatically — no
+`containerRef` or manual wiring needed. `Column` collects every `Row`'s state and reports
+one cumulative state up to `SearchViewer`, so `loadingProp` / `noResultProp` / `errorProp`
+react automatically: no result from ANY row → the outer no-result view; any row still
+loading (and none have data yet) → the outer loading view; and so on. `Column`s can also
+nest inside each other — an inner `Column` reports up exactly like a `Row` would.
+
 ## `useSearchController(initialState?)`
 
 Returns a tuple `[searchId, operations, isOpen, searchState]`:
