@@ -1,6 +1,31 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Sheet } from "@academix-admin/modal-sheet";
 
+// ==================== Aggregation (Row/Column) ====================
+// Independent from @academix-admin/search-viewer's equivalent (Library Charter: packages stay
+// mutually independent) — same shape, duplicated intentionally rather than shared.
+
+type AggregateReporter = {
+  report: (id: string, state: SelectionState) => void;
+  unreport: (id: string) => void;
+};
+
+/** A `Row` reports its own `state` into the nearest `Column` through this. */
+const RowAggregateContext = React.createContext<AggregateReporter | null>(null);
+
+/** `Column` reports its own aggregated state up through this — `SelectionViewer` provides it and
+ *  merges whatever's reported into its own selectionState resolution, with zero extra wiring. */
+const SelectionViewerAggregateContext = React.createContext<AggregateReporter | null>(null);
+
+function computeAggregateState(states: SelectionState[]): SelectionState {
+  if (states.length === 0) return "initial";
+  if (states.some((s) => s === "data")) return "data";
+  if (states.some((s) => s === "loading")) return "loading";
+  if (states.every((s) => s === "empty")) return "empty";
+  if (states.some((s) => s === "error")) return "error";
+  return "initial";
+}
+
 // ==================== Types ====================
 type Padding = {
   l: string;
@@ -320,7 +345,7 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
   zIndex = 1000,
   maxHeight = "90dvh",
   minHeight = "65dvh",
-  selectionState = "initial",
+  selectionState: selectionStateProp = "initial",
   closeThreshold = 0.2,
 }) => {
   const [id] = useState(() => providedId || `selection-${Math.random().toString(36).substring(2, 11)}`);
@@ -335,6 +360,37 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
   const headerRef = useRef<HTMLDivElement>(null);
 
   useInjectStyles(id);
+
+  // Descendant sections (a Column, or anything else) can report a cumulative state up through this —
+  // starts empty, so a plain SelectionViewer with no Row/Column children behaves exactly as before.
+  const [reportedStates, setReportedStates] = useState<Map<string, SelectionState>>(new Map());
+  const reportAggregate = useCallback((reporterId: string, state: SelectionState) => {
+    setReportedStates((prev) => {
+      const next = new Map(prev);
+      next.set(reporterId, state);
+      return next;
+    });
+  }, []);
+  const unreportAggregate = useCallback((reporterId: string) => {
+    setReportedStates((prev) => {
+      if (!prev.has(reporterId)) return prev;
+      const next = new Map(prev);
+      next.delete(reporterId);
+      return next;
+    });
+  }, []);
+  const aggregateReporterValue = useMemo(
+    () => ({ report: reportAggregate, unreport: unreportAggregate }),
+    [reportAggregate, unreportAggregate]
+  );
+  const reportedAggregate =
+    reportedStates.size > 0 ? computeAggregateState(Array.from(reportedStates.values())) : null;
+  const isComposed = reportedAggregate !== null;
+
+  // Precedence: an explicit `selectionState` prop always wins (matches today's exact behaviour for
+  // any consumer not using Row/Column) -> then a reported Column aggregate, if one exists -> "initial".
+  const selectionState =
+    selectionStateProp !== "initial" ? selectionStateProp : reportedAggregate ?? "initial";
 
   // Track keyboard height
   useEffect(() => {
@@ -433,6 +489,7 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
   if (!isOpen && unmountOnClose) return null;
 
   return (
+    <SelectionViewerAggregateContext.Provider value={aggregateReporterValue}>
     <Sheet
       ref={sheetRef}
       isOpen={isOpen}
@@ -669,6 +726,44 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
                     {loadingProp?.view}
                   </div>
                 )}
+                {/* Composed mode: a Column/Row descendant reports its own state, which can only ever be
+                    "empty"/"error" here since the child count > 0 branch is unconditional on a literal
+                    <Column> being present. Layer the outer view alongside the (visually empty) children
+                    rather than replacing them — a Column/Row must stay mounted to keep reporting. */}
+                {isComposed && selectionState === "empty" && (
+                  <div
+                    className="selection-viewer-no-results"
+                    style={{
+                      padding: noResultProp?.padding
+                        ? `${noResultProp.padding.t} ${noResultProp.padding.r} ${noResultProp.padding.b} ${noResultProp.padding.l}`
+                        : "16px",
+                      ...noResultProp?.style
+                    }}
+                  >
+                    {noResultProp?.view || (
+                      <div className="selection-viewer-default-no-results">
+                        {noResultProp?.text || "No results found"}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {isComposed && selectionState === "error" && (
+                  <div
+                    className="selection-viewer-error"
+                    style={{
+                      padding: errorProp?.padding
+                        ? `${errorProp.padding.t} ${errorProp.padding.r} ${errorProp.padding.b} ${errorProp.padding.l}`
+                        : "16px",
+                      ...errorProp?.style
+                    }}
+                  >
+                    {errorProp?.view || (
+                      <div className="selection-viewer-default-error">
+                        {errorProp?.text || "No results found"}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (selectionState === "empty" || (React.Children.count(children) <= 0 && (selectionState != "loading" && selectionState != "error"))) ? (
               <div
@@ -720,6 +815,7 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
       </Sheet.Container>
       <Sheet.Backdrop onTap={backDrop ? onClose : undefined} />
     </Sheet>
+    </SelectionViewerAggregateContext.Provider>
   );
 };
 
@@ -751,7 +847,7 @@ const useSelectionController = (initialSelectionState?: SelectionState): [
   return [selectionId, operations, isOpen, selectionState];
 };
 
-export { SelectionViewer, useSelectionController };
+export { SelectionViewer, useSelectionController, RowAggregateContext, SelectionViewerAggregateContext, computeAggregateState };
 export type {
   SelectionViewerProps,
   SelectionState,
@@ -764,5 +860,6 @@ export type {
   LayoutProps,
   Padding,
   SnapPoint,
+  AggregateReporter,
 };
 export default SelectionViewer;

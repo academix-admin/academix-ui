@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/selection-viewer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Imperative React selection sheet — search + pick from a list — with a controller hook, built on @academix-admin/modal-sheet.",
   "keywords": [
     "react",

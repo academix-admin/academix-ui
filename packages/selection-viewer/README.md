@@ -62,9 +62,40 @@ scroll container is within 20% of a viewport-height of its end):
 `noResultProp` / `errorProp` renders in place of `children`. You own fetching/filtering entirely;
 the component only renders what you hand it via `children` and this state.
 
-Exports: `SelectionViewer` (default), `useSelectionController`, plus every prop/type
-(`SelectionViewerProps`, `SelectionState`, `TitleProps`, `SearchProps`, `LoadingProps`,
-`NoResultProps`, `ErrorProps`, `CancelButtonProps`, `LayoutProps`, `Padding`, `SnapPoint`).
+## Composable sections: `Row` / `Column`
+
+For sectioned lists (e.g. one horizontally-scrolling shelf per category), compose `Row`s inside a
+`Column` as `SelectionViewer`'s `children`. Today's flat `children` usage is, unchanged, an
+implicit `Column` with no `Row`s.
+
+```tsx
+<SelectionViewer isOpen={isOpen} onClose={ops.close} titleProp={{ text: 'Select wallet', textColor: '#000' }}>
+  <Column>
+    <h3>Recently used</h3>
+    <Row state={recentState} onPaginate={loadMoreRecent}>
+      {recentWallets.map((w) => <WalletItem key={w.id} wallet={w} onClick={() => pick(w)} />)}
+    </Row>
+
+    <h3>All wallets</h3>
+    <Row state={allState} onPaginate={loadMoreAll}>
+      {allWallets.map((w) => <WalletItem key={w.id} wallet={w} onClick={() => pick(w)} />)}
+    </Row>
+  </Column>
+</SelectionViewer>
+```
+
+Unlike `@academix-admin/search-viewer`'s `Row`, this one owns no query/fetch engine —
+`SelectionViewer` never had one either, so you fetch/filter yourself and tell each `Row` its own
+`state` (same idea as passing `selectionState` to `SelectionViewer` today, just per-section). `Row`
+triggers `onPaginate` when scrolled horizontally near its end. `Column` collects every `Row`'s
+state and reports one cumulative state up to `SelectionViewer`, so `loadingProp` / `noResultProp` /
+`errorProp` react automatically — no result from ANY row → the outer no-result view; any row still
+loading (and none have data yet) → the outer loading view; and so on. `Column`s can nest.
+
+Exports: `SelectionViewer` (default), `useSelectionController`, `Row`, `Column`, plus every
+prop/type (`SelectionViewerProps`, `SelectionState`, `TitleProps`, `SearchProps`, `LoadingProps`,
+`NoResultProps`, `ErrorProps`, `CancelButtonProps`, `LayoutProps`, `Padding`, `SnapPoint`,
+`RowProps`, `ColumnProps`).
 
 ## License
 

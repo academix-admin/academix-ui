@@ -10,7 +10,7 @@ under the `@academix-admin` scope.
 | [`@academix-admin/scroll-date-picker`](./packages/scroll-date-picker) | iOS-style wheel/scroll date picker with magnifier, quick-date shortcuts and theming. Zero deps beyond React. |
 | [`@academix-admin/modal-sheet`](./packages/modal-sheet) | Gesture-driven bottom sheet built on Motion — snap detents, keyboard avoidance, compound `Sheet.*` API. |
 | [`@academix-admin/search-viewer`](./packages/search-viewer) | Debounced search & selection UI — local + async cursor-paginated sources, loading/empty/error states, plus composable `Row`/`Column` sections with automatic state aggregation. |
-| [`@academix-admin/selection-viewer`](./packages/selection-viewer) | Imperative selection sheet — search + pick from a list, scroll-triggered pagination (built on `@academix-admin/modal-sheet`). |
+| [`@academix-admin/selection-viewer`](./packages/selection-viewer) | Imperative selection sheet — search + pick from a list, scroll-triggered pagination, plus composable `Row`/`Column` sections with automatic state aggregation (built on `@academix-admin/modal-sheet`). |
 | [`@academix-admin/navigation-bar`](./packages/navigation-bar) | Configurable nav/tab bar — normal, floating and auto-hide-on-scroll modes. |
 | [`@academix-admin/sidebar`](./packages/sidebar) | Flexible, collapsible sidebar / side navigation with nested items. |
 | [`@academix-admin/dialog-viewer`](./packages/dialog-viewer) | Imperative alert / confirm / destructive dialogs via a controller hook. |
