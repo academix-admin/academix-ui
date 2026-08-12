@@ -21,6 +21,15 @@ interface CancelButtonProps {
 interface BottomViewerProps {
   id?: string;
   isOpen: boolean;
+  /**
+   * DOM element to portal the sheet into. Defaults to `document.body`.
+   *
+   * Exists so a host that owns its own overlay layer can keep the sheet inside that layer instead
+   * of at the document root — e.g. a navigation library's group-level overlay host, which stays
+   * mounted across tab switches. This component knows nothing about any such host; it just takes
+   * an element and passes it to the underlying sheet.
+   */
+  mountPoint?: Element;
   backDrop?: boolean;
   onClose: () => void;
   cancelButton?: CancelButtonProps;
@@ -132,6 +141,7 @@ const useInjectStyles = (id: string) => {
 const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
   id: providedId,
   isOpen,
+  mountPoint,
   backDrop = true,
   onClose,
   cancelButton,
@@ -259,6 +269,7 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
       ref={sheetRef}
       isOpen={isOpen}
       onClose={onClose}
+      mountPoint={mountPoint}
       detent="content"
       ease="easeOut"
       duration={0.25}

@@ -6,6 +6,15 @@ import { createPortal } from 'react-dom';
 interface SideDrawerProps {
   id?: string;
   isOpen: boolean;
+  /**
+   * DOM element to portal the drawer into. Defaults to `document.body`.
+   *
+   * Exists so a host that owns its own overlay layer can keep the drawer inside that layer rather
+   * than at the document root — e.g. a navigation library's group-level overlay host, which stays
+   * mounted across tab switches. This component knows nothing about any such host; it takes an
+   * element and portals into it.
+   */
+  mountPoint?: Element;
   onClose: () => void;
   children: React.ReactNode;
   position?: 'left' | 'right';
@@ -163,10 +172,12 @@ export default function SideDrawer({
   style,
   preventScroll = true,
   width,
+  mountPoint,
 }: SideDrawerProps) {
   const [id] = useState(() => providedId || `sidedrawer-${Math.random().toString(36).substr(2, 9)}`);
   const drawerRef = useRef<HTMLDivElement>(null);
-  const portalRoot = typeof window !== 'undefined' ? document.body : null;
+  // mountPoint lets a host keep the drawer inside its own overlay layer; body is the default.
+  const portalRoot = mountPoint ?? (typeof window !== 'undefined' ? document.body : null);
   const [isMounted, setIsMounted] = React.useState(false);
 
   // Inject styles with width configuration
