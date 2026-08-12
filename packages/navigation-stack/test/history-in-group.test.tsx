@@ -22,17 +22,19 @@ function Inner() {
       navLink={{ a: A, b: B }}
       entry="a"
       syncHistory
+      persist
     />
   );
 }
 
 function Grouped() {
   const stacks = new Map<string, React.ReactElement>([['quiz', <Inner key="q" />]]);
-  return <GroupNavigationStack id="maingroup" navStack={stacks} current="quiz" />;
+  return <GroupNavigationStack id="maingroup" navStack={stacks} current="quiz" persist />;
 }
 
 describe('history push inside a GroupNavigationStack (real academix-web shape)', () => {
   beforeEach(() => {
+    sessionStorage.clear();
     window.history.replaceState({}, '', '/main');
   });
   afterEach(() => {
@@ -71,5 +73,53 @@ describe('history push inside a GroupNavigationStack (real academix-web shape)',
     });
 
     expect(new URL(window.location.href).searchParams.get('nav')).toContain('b');
+  });
+  // KNOWN BUG, pre-existing — it.fails asserts this currently fails and will turn RED the day it
+  // starts passing, so the fix cannot land unnoticed.
+  //
+  // Reported live as "swipe from B back to A, then B returns". Reproduced here: after pop,
+  // api.length() is correctly 1 (the STACK popped) but B's element is still in the DOM, so this is
+  // a render/cleanup problem, not a navigation one.
+  //
+  // NOT caused by 0.7.0: re-running this with historyPush={false} — i.e. the old replaceState-only
+  // behaviour — fails identically. It needs `persist`, which is why the earlier group test missed
+  // it. Both academix-web's group and its stacks set persist.
+  it.fails('POP does not resurrect the popped page (persist must not win over the pop)', async () => {
+    render(<Grouped />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+
+    const api = getRegistry().get('quiz')?.api;
+    await act(async () => {
+      await api!.push('b');
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getByText('PAGE B')).toBeTruthy();
+
+    // What swipe-back does.
+    await act(async () => {
+      await api!.pop();
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    expect(api!.length(), 'stack should be back to one entry').toBe(1);
+    expect(screen.queryByText('PAGE B'), 'B must not come back').toBeNull();
+    expect(screen.getByText('PAGE A')).toBeTruthy();
+  });
+
+  it('persisted storage reflects the POP, not the pre-pop stack', async () => {
+    render(<Grouped />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+
+    const api = getRegistry().get('quiz')?.api;
+    await act(async () => {
+      await api!.push('b');
+      await new Promise((r) => setTimeout(r, 50));
+      await api!.pop();
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    const persisted = JSON.stringify(Object.entries(sessionStorage));
+    expect(persisted, 'sessionStorage still lists the popped page -> a remount would restore it')
+      .not.toContain('"b"');
   });
 });
