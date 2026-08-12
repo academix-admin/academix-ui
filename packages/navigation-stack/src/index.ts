@@ -65,7 +65,7 @@ export {
   useComponentsByTag,
 } from './hooks';
 
-export { NavigationErrorBoundary, GroupNavigationStack } from './components';
+export { NavigationErrorBoundary, GroupNavigationStack, getGroupOverlay } from './components';
 export { default, default as NavigationStack } from './components';
 
 // Imperative helper to pop a stack (by id) to its root from outside the React tree — used by
@@ -80,3 +80,24 @@ export type { BodyProps, ScaffoldProps } from './bodies';
 // Keyboard / viewport-inset primitives for a keyboard-safe app shell.
 export { useViewportInsets, ViewportInsetsProvider, useResizeToAvoidKeyboard } from './keyboard';
 export type { ResizeToAvoidKeyboardOptions } from './keyboard';
+
+// Overlay URL state (step 3) and reconstructible named overlays (step 4).
+export {
+  OVERLAY_FRAGMENT_KEY,
+  parseFragment,
+  buildFragment,
+  setInFragment,
+  readOverlayFragment,
+  writeOverlayFragment,
+} from './overlay/hash';
+export type { ParsedFragment } from './overlay/hash';
+export {
+  registerOverlayFactory,
+  getOverlayFactory,
+  clearOverlayFactories,
+  serializeOverlays,
+  parseOverlays,
+  descriptorId,
+} from './overlay/named';
+export type { OverlayDescriptor, OverlayFactory, OverlayParams } from './overlay/named';
+export { hasNativeBackGesture } from './gestures/swipe-back';

@@ -23,6 +23,19 @@ export type SwipeBackOptions = {
   cancelDuration?: number;
   commitDuration?: number;
   disabled?: boolean;
+  /**
+   * Stand down where the platform already provides a back gesture. Defaults to `true`.
+   *
+   * iOS Safari's edge-swipe and Android's system back gesture occupy the same screen region this
+   * hook binds, so running both means fighting for the same touch or popping twice. With real
+   * history entries (see `historyPush`) the platform gesture already pops the stack correctly, so
+   * the custom gesture is only needed where no native one exists — installed/standalone PWAs and
+   * desktop. That is progressive enhancement rather than competition.
+   *
+   * Set `false` to always run the custom gesture (e.g. to keep one identical animation on every
+   * platform).
+   */
+  respectNativeGesture?: boolean;
 };
 
 // ==================== Types ====================

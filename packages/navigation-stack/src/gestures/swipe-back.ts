@@ -3,6 +3,41 @@ import type { NavStackAPI, SwipeBackOptions } from '../types';
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import type { ComponentType, ReactNode, ReactElement } from 'react';
 
+/**
+ * Does the platform already provide its own back gesture in the same edge region?
+ *
+ * iOS (all browsers there are WebKit) has the edge-swipe; Android has the system back gesture,
+ * which is OS-level and cannot be preventDefault'd — so running our handler as well means either a
+ * fight over the touch or a double pop.
+ *
+ * Installed/standalone PWAs are the exception: there is no browser-chrome gesture to defer to, so
+ * ours is the only one available and must stay on. Desktop likewise has no touch back gesture.
+ *
+ * Exported for testing — UA sniffing is unavoidable here (there is no feature query for "does this
+ * platform own the screen edge"), so it should at least be inspectable and overridable.
+ */
+export function hasNativeBackGesture(): boolean {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+
+  const ua = navigator.userAgent || '';
+  const isIOS =
+    /iP(hone|ad|od)/.test(ua) ||
+    // iPadOS 13+ reports as MacIntel; touch points disambiguate it from a real Mac.
+    (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints ?? 0) > 1);
+  const isAndroid = /Android/.test(ua);
+
+  if (!isIOS && !isAndroid) return false; // desktop: no native touch back gesture
+
+  const standalone =
+    (typeof window.matchMedia === 'function' &&
+      (window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches)) ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true;
+
+  // Installed app: no browser gesture to defer to, so ours is needed.
+  return !standalone;
+}
+
 export function useSwipeBack(
   containerRef: React.RefObject<HTMLElement | null>,
   nav: NavStackAPI,
@@ -15,7 +50,13 @@ export function useSwipeBack(
     cancelDuration = 300,
     commitDuration = 200,
     disabled = false,
+    respectNativeGesture = true,
   } = options;
+
+  // Stand down where the platform owns this gesture. Evaluated per render rather than at module
+  // load so a change (installing the PWA, a test overriding the UA) is picked up.
+  const deferToNative = respectNativeGesture && hasNativeBackGesture();
+  const effectiveDisabled = disabled || deferToNative;
 
   const gesture = useRef<{
     active: boolean;
@@ -40,7 +81,8 @@ export function useSwipeBack(
   });
 
   useEffect(() => {
-    if (disabled || typeof window === 'undefined') return;
+    // effectiveDisabled also covers standing down for a native platform gesture.
+    if (effectiveDisabled || typeof window === 'undefined') return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -217,7 +259,7 @@ export function useSwipeBack(
       container.removeEventListener('touchend', onTouchEnd);
       container.removeEventListener('touchcancel', onTouchCancel);
     };
-  }, [nav, edgeWidth, threshold, maxTranslate, cancelDuration, commitDuration, disabled, containerRef]);
+  }, [nav, edgeWidth, threshold, maxTranslate, cancelDuration, commitDuration, effectiveDisabled, containerRef]);
 }
 
 

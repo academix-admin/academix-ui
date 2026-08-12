@@ -1,4 +1,4 @@
-import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI, NavigationMap, RedirectFn, RenderRecord, StackEntry, SwipeBackOptions, TransitionRenderer, TransitionState } from './types';
+import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI, NavigationMap, OverlayRender, RedirectFn, RenderRecord, StackEntry, SwipeBackOptions, TransitionRenderer, TransitionState } from './types';
 import type { GroupNavigationContextType } from './core/contexts';
 import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, useIsomorphicLayoutEffect } from './constants';
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
@@ -8,7 +8,7 @@ import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseComb
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
 import { useSwipeBack } from './gestures/swipe-back';
-import { subscribeOverlays, getOverlayStore, notifyOverlays } from './overlay/registry';
+import { subscribeOverlays, getOverlayStore, notifyOverlays, clampOffset } from './overlay/registry';
 
 let _groupStyleMountCount = 0;
 // Rendered components: loaders, transitions, error boundary, group + main stack.
@@ -609,8 +609,102 @@ export function GroupNavigationStack({
             </div>
           );
         })}
+        {/*
+          Group-scoped overlays. Deliberately a SIBLING of the per-tab containers rather than a
+          child of one: those containers are display:none'd on tab switch, so an overlay hosted
+          inside one would vanish (or reappear in the wrong tab) when the user changes tabs.
+          Rendering here is what lets a sheet opened in one tab survive a switch.
+        */}
+        <GroupOverlayHost groupId={id} />
       </div>
     </GroupNavigationContext.Provider>
+  );
+}
+
+/**
+ * Overlay controller for a GROUP scope — the layer that sits above every tab.
+ *
+ * Same shape as `nav.overlay` (which is stack-scoped), but addressed by group id, so the two
+ * layers stay independent: a dialog belongs to a stack and travels with it, while a bottom sheet /
+ * selection sheet / picker belongs to the group and outlives a tab switch.
+ *
+ * This package still has no idea what any of those components ARE. The caller passes a render
+ * function; wiring a specific viewer to this is the app's job, per the Library Charter.
+ */
+export function getGroupOverlay(groupId: string) {
+  return {
+    insert(render: OverlayRender, opts: { id?: string; offset?: number; barrier?: boolean | string; barrierDismiss?: boolean } = {}) {
+      const store = getOverlayStore(groupId);
+      const oid = opts.id ?? `gov-${Math.random().toString(36).slice(2, 10)}`;
+      store.entries.set(oid, {
+        id: oid,
+        render,
+        abovePage: null, // group overlays are never bound to a page in a child stack
+        offset: clampOffset(opts.offset),
+        barrier: opts.barrier,
+        barrierDismiss: opts.barrierDismiss,
+      });
+      notifyOverlays(groupId);
+      return {
+        id: oid,
+        remove: () => { if (store.entries.delete(oid)) notifyOverlays(groupId); },
+        update: (r: OverlayRender) => {
+          const e = store.entries.get(oid);
+          if (e) { e.render = r; notifyOverlays(groupId); }
+        },
+      };
+    },
+    remove(oid: string) {
+      const store = getOverlayStore(groupId);
+      if (store.entries.delete(oid)) notifyOverlays(groupId);
+    },
+    clear() {
+      const store = getOverlayStore(groupId);
+      if (store.entries.size > 0) { store.entries.clear(); notifyOverlays(groupId); }
+    },
+    list(): string[] {
+      return Array.from(getOverlayStore(groupId).entries.keys());
+    },
+  };
+}
+
+function GroupOverlayHost({ groupId }: { groupId: string }) {
+  const [, force] = useState(0);
+  useEffect(() => subscribeOverlays(groupId, () => force((n) => n + 1)), [groupId]);
+
+  const entries = Array.from(getOverlayStore(groupId).entries.values());
+  if (entries.length === 0) return null;
+
+  return (
+    <>
+      {entries.map((e) => {
+        const content = typeof e.render === 'function' ? e.render() : e.render;
+        return (
+          <div
+            key={e.id}
+            data-ax-group-overlay={e.id}
+            // pointerEvents:none on the wrapper so an empty/!barrier overlay never swallows taps
+            // meant for the app underneath; the content re-enables it for itself.
+            style={{ position: 'fixed', inset: 0, zIndex: e.offset, pointerEvents: 'none' }}
+          >
+            {e.barrier != null && e.barrier !== false && (
+              <div
+                onClick={e.barrierDismiss ? () => getGroupOverlay(groupId).remove(e.id) : undefined}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: typeof e.barrier === 'string' ? e.barrier : 'rgba(0,0,0,0.32)',
+                  pointerEvents: 'auto',
+                }}
+              />
+            )}
+            <div style={{ position: 'relative', width: '100%', height: '100%', pointerEvents: 'auto' }}>
+              {content}
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
