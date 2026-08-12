@@ -3,7 +3,7 @@ import type { GroupNavigationContextType } from './core/contexts';
 import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, useIsomorphicLayoutEffect } from './constants';
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
-import { getRegistry } from './core/registry';
+import { getRegistry, type RegistryEntry } from './core/registry';
 import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack } from './core/persistence';
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
@@ -693,6 +693,16 @@ export default function NavigationStack(props: {
   maxStackSize?: number;
   autoDispose?: boolean;
   syncHistory?: boolean;
+  /**
+   * Whether a `push` creates a real browser history entry (and pop/popUntil/popToRoot give those
+   * entries back), so the browser's back/forward — and therefore the platform's own back gesture —
+   * step through the stack. Defaults to `true`.
+   *
+   * Only takes effect when `syncHistory` is enabled; without URL sync there is nothing meaningful
+   * to push. Set to `false` to keep the older behaviour where every navigation merely *replaces*
+   * the current entry (in which case Back leaves the site rather than popping a page).
+   */
+  historyPush?: boolean;
   lazyComponents?: Record<string, () => LazyComponent>;
   missingRouteConfig?: MissingRouteConfig;
   persist?: boolean;
@@ -734,6 +744,7 @@ export default function NavigationStack(props: {
     maxStackSize,
     autoDispose = true,
     syncHistory = false,
+    historyPush = true,
     lazyComponents,
     missingRouteConfig,
     persist = false,
@@ -796,7 +807,7 @@ export default function NavigationStack(props: {
 
   const api = useMemo(() => {
     const registry = getRegistry();
-    const newApi = createApiFor(id, mergedNavLink, syncHistory || false, parentApi, currentPathRef.current, groupContext, groupStackId);
+    const newApi = createApiFor(id, mergedNavLink, syncHistory || false, parentApi, currentPathRef.current, groupContext, groupStackId, historyPush);
 
     if (parentApi) {
       const parentReg = registry.get(parentApi.id);
@@ -806,7 +817,7 @@ export default function NavigationStack(props: {
     }
 
     return newApi;
-  }, [id, mergedNavLink, syncHistory, parentApi, groupContext]);
+  }, [id, mergedNavLink, syncHistory, historyPush, parentApi, groupContext]);
 
   // C2: register the stack-level redirect + per-route redirects on the api.
   useEffect(() => {
@@ -976,6 +987,18 @@ export default function NavigationStack(props: {
       if (!currentRegEntry) return;
 
       if (!api.isActiveStack()) return;
+
+      // The browser has already moved. Mark the re-derive so emit() does not ALSO hand history
+      // entries back for the resulting pop — that would consume a second entry and skip a page.
+      currentRegEntry.popstateInFlight = true;
+      try {
+        handlePopStateInner(currentRegEntry);
+      } finally {
+        currentRegEntry.popstateInFlight = false;
+      }
+    };
+
+    const handlePopStateInner = (currentRegEntry: RegistryEntry) => {
 
       const searchParams = new URLSearchParams(window.location.search);
       const navPathCombined = searchParams.get('nav');

@@ -258,7 +258,59 @@ export function buildCombinedNavParam(map: Record<string, string>): string {
     .join('|');
 }
 
-export function updateNavQueryParamForStack(stackId: string, path: string | null, groupContext: GroupNavigationContextType | null, groupStackId: string | null) {
+/**
+ * How many history entries THIS stack has pushed.
+ *
+ * Bookkeeping, not decoration: `history.go(-n)` is not clamped by the browser to the entries we
+ * created, so popping deeper than we pushed walks off the front of our own history and out of the
+ * app entirely — e.g. a user who deep-linked straight into a nested page has 1 entry, not 4, and a
+ * naive popToRoot would send them back to whatever site they came from. Every consume is clamped
+ * against this counter.
+ */
+const _pushDepth = new Map<string, number>();
+
+export function getPushDepth(stackId: string): number {
+  return _pushDepth.get(stackId) ?? 0;
+}
+
+export function resetPushDepth(stackId: string): void {
+  _pushDepth.delete(stackId);
+}
+
+/**
+ * Give back up to `requested` history entries that this stack pushed.
+ * Returns how many were actually consumed (0 when we pushed none — a deep link).
+ *
+ * The caller has ALREADY mutated the stack. The resulting `popstate` re-derives the stack from the
+ * restored URL and finds it identical, so the rebuild is a no-op (see the isEqual guard in
+ * components.tsx). That is what keeps programmatic pop and browser-back from double-popping.
+ */
+export function consumeHistoryEntries(stackId: string, requested: number): number {
+  if (typeof window === "undefined" || requested <= 0) return 0;
+  const available = getPushDepth(stackId);
+  const n = Math.min(requested, available);
+  if (n <= 0) return 0;
+  _pushDepth.set(stackId, available - n);
+  try {
+    window.history.go(-n);
+  } catch {
+    return 0;
+  }
+  return n;
+}
+
+export function updateNavQueryParamForStack(
+  stackId: string,
+  path: string | null,
+  groupContext: GroupNavigationContextType | null,
+  groupStackId: string | null,
+  /**
+   * 'push' adds a real history entry so the browser's own back/forward (and therefore the
+   * platform's back gesture) can step through the stack. 'replace' keeps the previous behaviour of
+   * overwriting the current entry. Defaults to 'replace' so every existing caller is unchanged.
+   */
+  mode: 'push' | 'replace' = 'replace',
+) {
   if (typeof window === "undefined") return;
 
   try {
@@ -284,8 +336,19 @@ export function updateNavQueryParamForStack(stackId: string, path: string | null
 
     const newHref = url.toString();
     if (window.location.href !== newHref) {
-      if (groupContext) window.history.replaceState({ group: groupStackId }, "", newHref);
-      window.history.replaceState({ navStack: newParam }, "", newHref);
+      if (mode === 'push') {
+        // One pushState only. Calling it twice (as the replace path does for groups) would create
+        // two entries for a single navigation, so back would need two presses to move one page.
+        window.history.pushState(
+          { navStack: newParam, group: groupContext ? groupStackId : undefined },
+          "",
+          newHref,
+        );
+        _pushDepth.set(stackId, getPushDepth(stackId) + 1);
+      } else {
+        if (groupContext) window.history.replaceState({ group: groupStackId }, "", newHref);
+        window.history.replaceState({ navStack: newParam }, "", newHref);
+      }
     }
   } catch (e) {
   }

@@ -22,6 +22,12 @@ export type RegistryEntry = {
   lifecycleHandlers: Map<LifecycleHook, Set<LifecycleHandler | AsyncLifecycleHandler>>;
   currentState: 'active' | 'paused' | 'background';
   lastActiveEntry?: StackEntry;
+  /**
+   * Set while the popstate handler is re-deriving the stack from the restored URL. A pop caused by
+   * the browser must not hand history entries back again — the browser has already moved. Without
+   * this, browser-back would pop one page and then consume a second entry, skipping a page.
+   */
+  popstateInFlight?: boolean;
 };
 
 export const _clientRegistry =

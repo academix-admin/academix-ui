@@ -4,7 +4,7 @@ import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from '
 import { _currentPageUidByStack } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
-import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam } from './persistence';
+import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, resetPushDepth } from './persistence';
 import { globalObjectRegistry } from '../di/object-registry';
 import { getOverlayStore, notifyOverlays, disposeOverlays, clampOffset, type OverlayEntryRec } from '../overlay/registry';
 import type { OverlayRender, OverlayOptions, OverlayHandle } from '../types';
@@ -12,7 +12,7 @@ import type { OverlayRender, OverlayOptions, OverlayHandle } from '../types';
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import type { ComponentType, ReactNode, ReactElement } from 'react';
 
-export function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, parentApi: NavStackAPI | null, currentPath: string, groupContext: GroupNavigationContextType | null = null, groupStackId: string | null): NavStackAPI {
+export function createApiFor(id: string, navLink: NavigationMap, syncHistory: boolean, parentApi: NavStackAPI | null, currentPath: string, groupContext: GroupNavigationContextType | null = null, groupStackId: string | null, historyPush: boolean = true): NavStackAPI {
   const globalRegistry = getRegistry();
   const transitionManager = new TransitionManager();
   const memoryManager = new PageMemoryManager();
@@ -108,13 +108,42 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     }
 
     if (syncHistory || regEntry.historySyncEnabled) {
+      // Decide whether this navigation should create, consume, or overwrite a history entry, so
+      // the browser's own back/forward walks the stack. Only meaningful when historyPush is on;
+      // with it off every action takes the 'replace' path, i.e. exactly the previous behaviour.
+      //
+      //   push            -> add an entry
+      //   pop/popUntil/   -> hand entries back, clamped to what we actually pushed
+      //   popToRoot
+      //   everything else -> overwrite the current entry (replace, replaceParam, go,
+      //                      pushAndPopUntil, pushAndReplace); the URL still ends up correct,
+      //                      these just do not add or remove browser history steps.
+      //
+      // A pop triggered BY popstate must not touch history again — the browser already moved.
+      // `popstateInFlight` is set by the popstate handler while it re-derives the stack.
+      const actionType = action?.type;
+      const depthDelta = (previousStack?.length ?? stackCopy.length) - stackCopy.length;
+      const isPopFamily =
+        actionType === 'pop' || actionType === 'popUntil' || actionType === 'popToRoot';
+
+      let mode: 'push' | 'replace' = 'replace';
+      if (historyPush && !regEntry.popstateInFlight) {
+        if (actionType === 'push') {
+          mode = 'push';
+        } else if (isPopFamily && depthDelta > 0) {
+          // Stack is already mutated; give the entries back. The resulting popstate re-derives an
+          // identical stack, so its rebuild is a no-op.
+          consumeHistoryEntries(id, depthDelta);
+        }
+      }
+
       try {
         const localPath = buildUrlPath([{ navLink, stack: stackCopy }]);
-        updateNavQueryParamForStack(id, localPath, groupContext, groupStackId);
+        updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, mode);
       } catch (e) {
         try {
           const fallback = buildUrlPath([{ navLink, stack: stackCopy }]);
-          updateNavQueryParamForStack(id, fallback, groupContext, groupStackId);
+          updateNavQueryParamForStack(id, fallback, groupContext, groupStackId, mode);
         } catch { }
       }
     }
@@ -1290,6 +1319,9 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       transitionManager.dispose();
       memoryManager.dispose();
       disposeOverlays(id); // C1: drop this stack's overlay entries
+      // Forget how many history entries this stack pushed. A remounted stack with the same id
+      // would otherwise inherit a stale count and could consume entries it never created.
+      resetPushDepth(id);
       regEntry.listeners.clear();
       regEntry.guards.clear();
       regEntry.middlewares.clear();
