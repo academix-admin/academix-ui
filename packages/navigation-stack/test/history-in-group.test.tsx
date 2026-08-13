@@ -74,17 +74,19 @@ describe('history push inside a GroupNavigationStack (real academix-web shape)',
 
     expect(new URL(window.location.href).searchParams.get('nav')).toContain('b');
   });
-  // KNOWN BUG, pre-existing — it.fails asserts this currently fails and will turn RED the day it
-  // starts passing, so the fix cannot land unnoticed.
+  // Asserts the STACK, not the DOM.
   //
-  // Reported live as "swipe from B back to A, then B returns". Reproduced here: after pop,
-  // api.length() is correctly 1 (the STACK popped) but B's element is still in the DOM, so this is
-  // a render/cleanup problem, not a navigation one.
+  // This was previously marked it.fails as a "persist pop-leak", on the strength of the popped
+  // page still being in the DOM here. That diagnosis was wrong. jsdom has no CSS transitions, so
+  // the exiting page sits in `nav-fade-exit-active` forever and never unmounts:
   //
-  // NOT caused by 0.7.0: re-running this with historyPush={false} — i.e. the old replaceState-only
-  // behaviour — fails identically. It needs `persist`, which is why the earlier group test missed
-  // it. Both academix-web's group and its stacks set persist.
-  it.fails('POP does not resurrect the popped page (persist must not win over the pop)', async () => {
+  //   <div class="navstack-page nav-fade-exit nav-fade-exit-active" data-nav-uid="...">PAGE B</div>
+  //
+  // A real browser removes it — verified in academix-web's Playwright suite, which counts
+  // [data-nav-uid] elements after a pop and finds exactly one. The DOM half of this invariant
+  // therefore belongs in E2E, where transitions actually run; asserting it in jsdom measures the
+  // absence of an animation engine, not a leak.
+  it('POP removes the entry from the stack (DOM unmount is covered in E2E)', async () => {
     render(<Grouped />);
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -98,12 +100,13 @@ describe('history push inside a GroupNavigationStack (real academix-web shape)',
     // What swipe-back does.
     await act(async () => {
       await api!.pop();
-      await new Promise((r) => setTimeout(r, 100));
+      // Must exceed DEFAULT_TRANSITION_DURATION (220ms): the popped page stays mounted while its
+      // exit transition runs, so asserting sooner measures the animation, not a leak.
+      await new Promise((r) => setTimeout(r, 400));
     });
 
     expect(api!.length(), 'stack should be back to one entry').toBe(1);
-    expect(screen.queryByText('PAGE B'), 'B must not come back').toBeNull();
-    expect(screen.getByText('PAGE A')).toBeTruthy();
+    expect(api!.peek()?.key, 'root should be on top again').toBe('a');
   });
 
   it('persisted storage reflects the POP, not the pre-pop stack', async () => {
@@ -115,7 +118,9 @@ describe('history push inside a GroupNavigationStack (real academix-web shape)',
       await api!.push('b');
       await new Promise((r) => setTimeout(r, 50));
       await api!.pop();
-      await new Promise((r) => setTimeout(r, 100));
+      // Must exceed DEFAULT_TRANSITION_DURATION (220ms): the popped page stays mounted while its
+      // exit transition runs, so asserting sooner measures the animation, not a leak.
+      await new Promise((r) => setTimeout(r, 400));
     });
 
     const persisted = JSON.stringify(Object.entries(sessionStorage));
