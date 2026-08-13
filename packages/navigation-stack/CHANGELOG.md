@@ -1,5 +1,24 @@
 # @academix-admin/navigation-stack
 
+## 0.8.1
+
+### Patch Changes
+
+- Fix: the `EvaluablePage` structural type did not accept Playwright's real `Page`.
+
+  `addInitScript` resolves to `Disposable` in Playwright, not `void`, and `evaluate` has far richer
+  overloads than the single shape declared here — so `navStack(page, id)` failed to compile against
+  the very library the helper exists for:
+
+  ```
+  Argument of type 'Page' is not assignable to parameter of type 'EvaluablePage'.
+    Type 'Promise<Disposable>' is not assignable to type 'Promise<void>'.
+  ```
+
+  The structural contract is now just "has evaluate and addInitScript", with precise typing kept on
+  the helper methods where it actually helps. Caught by wiring the helpers into a real Playwright
+  suite rather than only testing them in isolation.
+
 ## 0.8.0
 
 ### Minor Changes

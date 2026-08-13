@@ -31,10 +31,20 @@
  *   });
  */
 
-/** Minimal structural Page — satisfied by Playwright's Page, and by Puppeteer's. */
+/**
+ * Minimal structural Page — satisfied by Playwright's Page, and by Puppeteer's.
+ *
+ * Intentionally loose. A tighter signature does not accept the real thing: Playwright's
+ * `addInitScript` resolves to `Disposable`, not `void`, and its `evaluate` overloads are far more
+ * elaborate than the one shape used here. Declaring exact types made this fail to compile against
+ * the very library it exists to serve, so the structural contract is kept to "has these two
+ * methods" and the precise typing lives on the helpers below, where it is actually useful.
+ */
 export type EvaluablePage = {
-  evaluate<R, A = unknown>(fn: (arg: A) => R, arg?: A): Promise<R>;
-  addInitScript(script: { content: string } | ((arg?: unknown) => void), arg?: unknown): Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  evaluate: (fn: any, arg?: any) => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  addInitScript: (script: any, arg?: any) => Promise<any>;
 };
 
 /**
