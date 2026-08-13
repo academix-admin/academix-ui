@@ -1259,7 +1259,14 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     },
 
     isActiveStack() {
-      if (!regEntry.historySyncEnabled) return false;
+      // `historySyncEnabled` is set ONLY by the imperative syncWithBrowserHistory() API. The
+      // `syncHistory` PROP — how virtually every consumer configures this — never touches it.
+      //
+      // Checking only the flag made this return false for prop-configured stacks, and the popstate
+      // handler bails on `if (!api.isActiveStack()) return`. Browser Back therefore changed the URL
+      // and the stack never re-derived: Back appeared to do nothing, then left the site. emit()
+      // has always tested `syncHistory || regEntry.historySyncEnabled`; this tested half of it.
+      if (!(syncHistory || regEntry.historySyncEnabled)) return false;
 
       const childIds = Array.from(regEntry.childIds || []) as string[];
       for (const childId of childIds) {

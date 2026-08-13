@@ -1,5 +1,24 @@
 # @academix-admin/navigation-stack
 
+## 0.8.2
+
+### Patch Changes
+
+- Fix: browser Back did nothing for stacks configured with the `syncHistory` **prop**.
+
+  `isActiveStack()` consulted only `regEntry.historySyncEnabled`, which is set exclusively by the
+  imperative `syncWithBrowserHistory()` API — the `syncHistory` prop never touches it. The popstate
+  handler opens with `if (!api.isActiveStack()) return`, so for prop-configured stacks (virtually
+  all of them) every popstate was ignored: Back changed the URL while the stack stayed put, which
+  presented as "Back does nothing, then leaves the site".
+
+  `emit()` has always tested `syncHistory || regEntry.historySyncEnabled`; `isActiveStack()` tested
+  half of it. Now consistent.
+
+  Pre-existing, and independent of the 0.7.0 history work — pushing entries could not help while the
+  handler that consumes them was disabled. Found by running the Playwright matrix against a real
+  browser; jsdom unit tests never exercised a genuine popstate.
+
 ## 0.8.1
 
 ### Patch Changes

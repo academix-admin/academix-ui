@@ -123,3 +123,22 @@ describe('history push inside a GroupNavigationStack (real academix-web shape)',
       .not.toContain('"b"');
   });
 });
+
+describe('isActiveStack honours the syncHistory PROP, not just the imperative flag', () => {
+  // Regression for the bug that made browser Back do nothing: the popstate handler bails on
+  // `if (!api.isActiveStack()) return`, and isActiveStack only consulted regEntry.historySyncEnabled
+  // — which the `syncHistory` prop never sets. Prop-configured stacks (i.e. nearly all of them)
+  // therefore ignored every popstate, so Back changed the URL and left the stack untouched.
+  it('is true for a stack configured via the prop alone', async () => {
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/main');
+    render(<Grouped />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+
+    const reg = getRegistry().get('quiz');
+    expect(reg, 'stack should be registered').toBeTruthy();
+    // The prop is set; the imperative flag deliberately is NOT.
+    expect(reg!.historySyncEnabled).toBe(false);
+    expect(reg!.api!.isActiveStack(), 'prop-configured stack must count as active').toBe(true);
+  });
+});
