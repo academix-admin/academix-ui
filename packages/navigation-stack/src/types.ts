@@ -155,17 +155,30 @@ export type MissingRouteConfig = {
   };
 };
 
-export type NavStackAPI = {
+/**
+ * Union of route keys for a given navLink, so `push` can reject typos at compile time.
+ *
+ *   const routes = { home: Home, detail: Detail } satisfies NavigationMap;
+ *   const nav = useNav<RouteKeys<typeof routes>>();
+ *   nav.push('detial');   // Error: not assignable to 'home' | 'detail'
+ */
+export type RouteKeys<T extends NavigationMap> = Extract<keyof T, string>;
+
+/**
+ * `K` defaults to `string`, so every existing consumer type-checks unchanged and the safety is
+ * opt-in. Supply the union (usually via RouteKeys) to have route names validated.
+ */
+export type NavStackAPI<K extends string = string> = {
   id: string;
-  push: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
-  replace: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  push: (rawKey: K, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  replace: (rawKey: K, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
   pop: () => Promise<boolean | NavActionResult>;
   popUntil: (predicate: (entry: StackEntry, idx: number, stack: StackEntry[]) => boolean) => Promise<boolean | NavActionResult>;
   popToRoot: () => Promise<boolean | NavActionResult>;
-  pushAndPopUntil: (rawKey: string, predicate: (entry: StackEntry, idx: number, stack: StackEntry[]) => boolean, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
-  pushAndReplace: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  pushAndPopUntil: (rawKey: K, predicate: (entry: StackEntry, idx: number, stack: StackEntry[]) => boolean, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  pushAndReplace: (rawKey: K, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
   peek: () => StackEntry | undefined;
-  go: (rawKey: string, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
+  go: (rawKey: K, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
   replaceParam: (params: NavParams, merge?: boolean) => Promise<boolean | NavActionResult>;
 
   // ============ C3: Location & deep links ============

@@ -393,8 +393,19 @@ export function updateNavQueryParamForStack(
         // even when one navigation moved several levels.
         if (typeof depthForLedger === 'number') recordEntryDepth(stackId, depthForLedger);
       } else {
-        if (groupContext) window.history.replaceState({ group: groupStackId }, "", newHref);
-        window.history.replaceState({ navStack: newParam }, "", newHref);
+        // ONE replaceState carrying both fields, matching the push branch above.
+        //
+        // This used to write twice — `{ group }` then `{ navStack }` — and the second call
+        // REPLACES state wholesale rather than merging, so `group` was silently dropped. Pushed
+        // entries carried { navStack, group } while replaced entries carried only { navStack }, so
+        // the same logical position had two different state shapes depending on how it was reached.
+        // Anything branching on `event.state.group` during popstate therefore behaved differently
+        // for the same page.
+        window.history.replaceState(
+          { navStack: newParam, group: groupContext ? groupStackId : undefined },
+          "",
+          newHref,
+        );
       }
     }
   } catch (e) {

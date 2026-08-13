@@ -111,3 +111,6 @@ export { NavigationDevtools } from './devtools-ui';
 export type { NavigationDevtoolsProps } from './devtools-ui';
 import { installNavDevtools as _installNavDevtools } from './devtools';
 _installNavDevtools();
+
+// Opt-in compile-time route-key safety: useNav<RouteKeys<typeof routes>>()
+export type { RouteKeys } from './types';

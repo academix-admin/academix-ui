@@ -72,10 +72,17 @@ export function useOverlayEntry(
   }, [nav, currentPageUid, ...deps]);
 }
 
-export function useNav() {
+/**
+ * Pass the route-key union to have `push`/`replace`/`go` validate names at compile time:
+ *   const nav = useNav<RouteKeys<typeof routes>>();
+ * Omitting it keeps the previous `string` behaviour.
+ */
+export function useNav<K extends string = string>(): NavStackAPI<K> {
   const context = useContext(NavContext);
   if (!context) throw new Error("useNav must be used within a NavigationStack");
-  return context;
+  // The context is stored untyped (one context serves every stack); the cast applies the caller's
+  // key union. Purely a compile-time narrowing — no runtime behaviour changes.
+  return context as unknown as NavStackAPI<K>;
 }
 
 export function useIsTop(): boolean {

@@ -1,5 +1,29 @@
 # @academix-admin/navigation-stack
 
+## 0.9.0
+
+### Minor Changes
+
+- Consistent history-entry state, and opt-in compile-time route-key safety.
+
+  **`state.group` is no longer dropped on replace.** The replace path wrote `replaceState` twice —
+  `{ group }` then `{ navStack }` — and the second call replaces state wholesale rather than merging,
+  so `group` was silently lost. Pushed entries carried `{ navStack, group }` while replaced entries
+  carried only `{ navStack }`, meaning the same logical position had two different state shapes
+  depending on how it was reached, and anything branching on `event.state.group` during popstate
+  behaved differently for the same page. Now a single write carries both.
+
+  **`RouteKeys` + a generic `useNav`** make route names checkable:
+
+  ```ts
+  const routes = { home: Home, detail: Detail } satisfies NavigationMap;
+  const nav = useNav<RouteKeys<typeof routes>>();
+  nav.push("detial"); // Error: not assignable to 'home' | 'detail'
+  ```
+
+  `NavStackAPI<K extends string = string>` defaults to `string`, so this is entirely additive —
+  existing consumers compile unchanged and adopt the safety when they choose to.
+
 ## 0.8.6
 
 ### Patch Changes
