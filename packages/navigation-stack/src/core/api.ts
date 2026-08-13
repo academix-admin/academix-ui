@@ -4,7 +4,8 @@ import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from '
 import { _currentPageUidByStack } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
-import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, resetPushDepth } from './persistence';
+import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, resetPushDepth, getPushDepth } from './persistence';
+import { recordNavEvent } from '../devtools';
 import { globalObjectRegistry } from '../di/object-registry';
 import { getOverlayStore, notifyOverlays, disposeOverlays, clampOffset, type OverlayEntryRec } from '../overlay/registry';
 import type { OverlayRender, OverlayOptions, OverlayHandle } from '../types';
@@ -147,6 +148,17 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
         } catch { }
       }
     }
+
+    // Devtools trace. Guarded internally by devtoolsEnabled(), so this is one boolean check in
+    // production. Recorded AFTER the URL write so the captured url matches the resulting state.
+    recordNavEvent({
+      stackId: id,
+      kind: action?.type ?? 'unknown',
+      from: previousStack?.length ?? stackCopy.length,
+      to: stackCopy.length,
+      topKey: stackCopy.length ? stackCopy[stackCopy.length - 1].key : null,
+      pushDepth: getPushDepth(id),
+    });
 
     regEntry.listeners.forEach((l: StackChangeListener) => {
       try { l(stackCopy); } catch (e) { console.warn(e); }

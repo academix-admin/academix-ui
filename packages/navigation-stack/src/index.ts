@@ -101,3 +101,13 @@ export {
 } from './overlay/named';
 export type { OverlayDescriptor, OverlayFactory, OverlayParams } from './overlay/named';
 export { hasNativeBackGesture } from './gestures/swipe-back';
+
+// Dev-only inspector on window.__NAV_STACK__ (mirrors state-stack's __STATE_STACK__).
+// Installed at import time so it is present before any app code runs -- Playwright's
+// addInitScript can set window.__NAV_STACK_DEVTOOLS__ = true to force it on in a prod build.
+export { navDevtools, installNavDevtools, devtoolsEnabled } from './devtools';
+export type { NavEvent, NavSnapshot, NavEntrySnapshot } from './devtools';
+export { NavigationDevtools } from './devtools-ui';
+export type { NavigationDevtoolsProps } from './devtools-ui';
+import { installNavDevtools as _installNavDevtools } from './devtools';
+_installNavDevtools();

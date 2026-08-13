@@ -11,7 +11,9 @@ async function preserveUseClient(dir = 'dist') {
   const files = await readdir(dir);
   await Promise.all(
     files
-      .filter((f) => /\.(js|cjs)$/.test(f))
+      // The playwright entry runs in Node (the test runner), not the browser, so the
+      // client directive does not belong on it.
+      .filter((f) => /\.(js|cjs)$/.test(f) && !f.startsWith('playwright'))
       .map(async (f) => {
         const p = join(dir, f);
         const code = await readFile(p, 'utf8');
@@ -22,7 +24,7 @@ async function preserveUseClient(dir = 'dist') {
 }
 
 export default defineConfig({
-  entry: { index: 'src/index.ts' },
+  entry: { index: 'src/index.ts', playwright: 'src/playwright.ts' },
   format: ['esm', 'cjs'],
   outExtension({ format }) {
     return { js: format === 'cjs' ? '.cjs' : '.js' };

@@ -1,5 +1,49 @@
 # @academix-admin/navigation-stack
 
+## 0.8.0
+
+### Minor Changes
+
+- Devtools: a visual panel, a console inspector, and first-class Playwright helpers.
+
+  `§4` of the client-architecture plan asked for the equivalent of state-stack's
+  `window.__STATE_STACK__`. This follows that pattern rather than inventing a second one, and adds
+  the two surfaces that make it useful for building real apps.
+
+  - **`<NavigationDevtools />`** — a floating panel (Alt+N) showing every live stack top-first, a
+    colour-coded navigation timeline, history ownership, and overlay registrations, plus push / pop /
+    popToRoot controls. Self-contained scoped styles, no dependencies, and no cross-package imports,
+    so it cannot restyle or inherit from the app it is debugging. Returns `null` when disabled, so it
+    is safe to leave mounted.
+
+    It highlights two conditions that are otherwise invisible: a stack several pages deep that owns
+    **zero** history entries (browser Back will leave the site), and a navigation whose depth did not
+    change (a pop that did not pop).
+
+  - **`window.__NAV_STACK__`** — `stacks()`, `snapshot()`, `history()`, `events()`, `debug()`, plus
+    `push`/`pop`/`popToRoot` for reproducing a bug by hand. `pop()` returns `{ before, after, popped }`
+    so a no-op pop is explicit rather than something you have to notice on screen.
+
+  - **`@academix-admin/navigation-stack/playwright`** — `installNavDevtools(page)` and
+    `navStack(page, id)` with `expectDepth`, `expectTop`, `expectPoppedCleanly`, `waitForDepth`,
+    `ownedHistoryEntries`, `events()` and `debug()`. No Playwright dependency is added: the `Page`
+    type is structural, so Puppeteer works too.
+
+    This lets an E2E test assert on navigation state rather than the DOM, which matters because
+    rendering and navigation fail independently — a pop can update the stack correctly and still
+    leave the old page mounted, and a DOM-only assertion reports the wrong cause.
+
+  Two details that would otherwise bite:
+
+  - Every inspector payload is JSON-serializable, and params are sanitized to primitives. Returning
+    a React element or function would throw "could not be cloned" inside `page.evaluate` — a failure
+    that appears only under Playwright and never in the console. Covered by a `structuredClone` test.
+  - Devtools are enabled outside production, but E2E normally runs against a **production** build, so
+    they can be forced on with `window.__NAV_STACK_DEVTOOLS__ = true` (via `addInitScript`, which
+    survives the reloads a deep-link test performs).
+
+  See DEVTOOLS.md, which includes the full navigation test matrix as runnable Playwright tests.
+
 ## 0.7.0
 
 ### Minor Changes
