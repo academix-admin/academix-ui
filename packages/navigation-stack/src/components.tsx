@@ -575,7 +575,22 @@ export function GroupNavigationStack({
       setTimeout(() => {
         if (e.state && e.state.group && navStack.has(e.state.group)) {
           const newGroupId = e.state.group;
-          restUrl();
+          // DELIBERATELY no restUrl() here.
+          //
+          // restUrl() deletes `nav` and `group` from the CURRENT entry — which, during popstate,
+          // is the entry the browser has just restored. Wiping it leaves that history entry
+          // describing nothing, so navigating back onto it later finds no state and falls back to
+          // the stack root.
+          //
+          // Observed on a three-deep walk (profile → redeem_codes → giveback_page): Back onto the
+          // middle entry re-derived the stack correctly and then blanked its URL —
+          //   after push C   nav=profile-stack:1.a1.c1.v1
+          //   back -> B      nav=null          <-- destroyed here
+          // so a later Forward onto that entry restored the root instead of B, and the user saw
+          // "Forward once stays on A, Forward twice jumps to C".
+          //
+          // Clearing the URL is only meaningful when the app SWITCHES tabs itself; on popstate the
+          // browser already restored the correct URL and there is nothing to clean up.
           setActiveStackId(newGroupId);
           onCurrentChange?.(newGroupId);
         }

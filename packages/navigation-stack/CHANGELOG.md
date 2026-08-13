@@ -1,5 +1,35 @@
 # @academix-admin/navigation-stack
 
+## 0.8.5
+
+### Patch Changes
+
+- Fix: browser Forward restored the wrong page because popstate blanked the entry it landed on.
+
+  `GroupNavigationStack`'s popstate handler called `restUrl()`, which deletes `nav` and `group` from
+  the **current** history entry — during popstate that is the entry the browser has just restored.
+  The entry was left describing nothing, so navigating back onto it later found no state and fell
+  back to the stack root.
+
+  Captured on a three-deep walk (profile → redeem_codes → giveback_page):
+
+  ```
+  after push C   depth=3  nav=profile-stack:1.a1.c1.v1
+  back -> B      depth=2  nav=null            <-- destroyed here
+  back -> A      depth=1  nav=profile-stack:1.a1
+  forward        depth=1  top=profile_page    <-- should have been B
+  ```
+
+  Hence the reported "Forward once stays on A, Forward twice jumps to C" — the middle entry was
+  blanked while the deepest entry, never landed on, kept its state. It also explains the swipe
+  variant: forward-swiping to C and then back skipped to A, because B's entry no longer described B.
+
+  Clearing the URL is only meaningful when the app switches tabs itself. On popstate the browser has
+  already restored the correct URL, so there is nothing to clean up.
+
+  Found by an authenticated Playwright walk against the real app; the devtools trace showed
+  `nav=null` appearing at the exact step.
+
 ## 0.8.4
 
 ### Patch Changes
