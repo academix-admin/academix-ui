@@ -269,12 +269,54 @@ export function buildCombinedNavParam(map: Record<string, string>): string {
  */
 const _pushDepth = new Map<string, number>();
 
+/**
+ * The stack depth at which each owned history entry was created, oldest first.
+ *
+ * A bare counter is not enough, because one navigation can change several stack levels at once. A
+ * deep link or a `go` that lands three pages deep creates ONE browser entry (one user action = one
+ * Back press), so a later popToRoot must give back ONE entry — not three. Counting levels instead
+ * of entries drifts the two apart, and the drift only shows up later as Back going somewhere
+ * unexpected.
+ *
+ * Recording the depth each entry was created at makes the question exact: popping to depth D gives
+ * back precisely the entries recorded above D.
+ */
+const _entryDepths = new Map<string, number[]>();
+
 export function getPushDepth(stackId: string): number {
   return _pushDepth.get(stackId) ?? 0;
 }
 
+/** Depths at which this stack owns history entries (oldest first). Exposed for devtools/tests. */
+export function getEntryDepths(stackId: string): number[] {
+  return (_entryDepths.get(stackId) ?? []).slice();
+}
+
+/** Record that an entry was created while the stack was `depth` deep. */
+export function recordEntryDepth(stackId: string, depth: number): void {
+  const list = _entryDepths.get(stackId) ?? [];
+  list.push(depth);
+  _entryDepths.set(stackId, list);
+}
+
+/**
+ * How many owned entries sit above `targetDepth` — i.e. how many to hand back when popping to it.
+ * Also drops them from the ledger, so this is called once per pop.
+ */
+export function takeEntriesAboveDepth(stackId: string, targetDepth: number): number {
+  const list = _entryDepths.get(stackId) ?? [];
+  let n = 0;
+  while (list.length > 0 && list[list.length - 1] > targetDepth) {
+    list.pop();
+    n += 1;
+  }
+  _entryDepths.set(stackId, list);
+  return n;
+}
+
 export function resetPushDepth(stackId: string): void {
   _pushDepth.delete(stackId);
+  _entryDepths.delete(stackId);
 }
 
 /**
@@ -310,6 +352,8 @@ export function updateNavQueryParamForStack(
    * overwriting the current entry. Defaults to 'replace' so every existing caller is unchanged.
    */
   mode: 'push' | 'replace' = 'replace',
+  /** Stack depth this entry represents; recorded so pops can give back the right number. */
+  depthForLedger?: number,
 ) {
   if (typeof window === "undefined") return;
 
@@ -345,6 +389,9 @@ export function updateNavQueryParamForStack(
           newHref,
         );
         _pushDepth.set(stackId, getPushDepth(stackId) + 1);
+        // Ledger the stack depth this entry represents, so a later pop gives back the right count
+        // even when one navigation moved several levels.
+        if (typeof depthForLedger === 'number') recordEntryDepth(stackId, depthForLedger);
       } else {
         if (groupContext) window.history.replaceState({ group: groupStackId }, "", newHref);
         window.history.replaceState({ navStack: newParam }, "", newHref);

@@ -4,7 +4,7 @@ import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from '
 import { _currentPageUidByStack } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
-import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, resetPushDepth, getPushDepth } from './persistence';
+import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, resetPushDepth, getPushDepth, recordEntryDepth, takeEntriesAboveDepth } from './persistence';
 import { recordNavEvent } from '../devtools';
 import { globalObjectRegistry } from '../di/object-registry';
 import { getOverlayStore, notifyOverlays, disposeOverlays, clampOffset, type OverlayEntryRec } from '../overlay/registry';
@@ -109,43 +109,31 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     }
 
     if (syncHistory || regEntry.historySyncEnabled) {
-      // Decide whether this navigation should create, consume, or overwrite a history entry, so
-      // the browser's own back/forward walks the stack. Only meaningful when historyPush is on;
-      // with it off every action takes the 'replace' path, i.e. exactly the previous behaviour.
+      // Direction comes from the action FAMILY; the count comes from the entry ledger.
       //
-      //   push            -> add an entry
-      //   pop/popUntil/   -> hand entries back, clamped to what we actually pushed
-      //   popToRoot
-      //   everything else -> overwrite the current entry (replace, replaceParam, go,
-      //                      pushAndPopUntil, pushAndReplace); the URL still ends up correct,
-      //                      these just do not add or remove browser history steps.
+      // Depth delta alone gets both wrong at the edges. A pushAndPopUntil that adds one page and
+      // pops three has a positive delta and would hand entries back, even though the user moved
+      // FORWARD — Back would then overshoot. And a navigation that grows several levels at once
+      // (deep link, `go`) creates one entry but changes N levels, so consuming by delta gives back
+      // more than we own and desynchronises history from the stack.
       //
-      // A pop triggered BY popstate must not touch history again — the browser already moved.
-      // `popstateInFlight` is set by the popstate handler while it re-derives the stack.
-      // Decide from what the stack actually DID, not from the action's name.
-      //
-      // Keying off `action.type === 'push'` looked equivalent and was not: pushAndPopUntil,
-      // pushAndReplace and go can all GROW the stack, and classifying them as "replace" meant they
-      // silently created no history entry. The user-visible symptom is precise and confusing --
-      // a → b → c where b arrived via one of those leaves history as [a, c], so one Back skips
-      // straight to a and Forward jumps straight to c, with b unreachable in both directions.
-      //
-      // Depth delta is the honest signal and needs no per-action allow-list:
-      //   grew   -> add one entry (one browser step per navigation, regardless of how many
-      //             stack levels were rearranged, so Back always feels like "undo that action")
-      //   shrank -> hand back that many entries, clamped to what we own
-      //   same   -> overwrite in place (replace, replaceParam, a no-op push)
-      const depthDelta = (previousStack?.length ?? stackCopy.length) - stackCopy.length;
+      // Family answers "which way did the user move"; the ledger answers "how many entries is that
+      // worth". One user action always costs exactly one Back press, however many levels moved.
+      const actionType = action?.type;
+      const isPopFamily =
+        actionType === 'pop' || actionType === 'popUntil' || actionType === 'popToRoot';
+      const isReplaceFamily = actionType === 'replace' || actionType === 'replaceParam';
+      const grew = stackCopy.length > (previousStack?.length ?? stackCopy.length);
 
       let mode: 'push' | 'replace' = 'replace';
       let consumed = 0;
       if (historyPush && !regEntry.popstateInFlight) {
-        if (depthDelta < 0) {
+        if (isPopFamily) {
+          // Stack is already mutated; give back exactly the entries recorded above the new depth.
+          // The resulting popstate re-derives an identical stack, so its rebuild is a no-op.
+          consumed = consumeHistoryEntries(id, takeEntriesAboveDepth(id, stackCopy.length));
+        } else if (!isReplaceFamily && (grew || actionType === 'pushAndPopUntil' || actionType === 'pushAndReplace')) {
           mode = 'push';
-        } else if (depthDelta > 0) {
-          // Stack is already mutated; give the entries back. The resulting popstate re-derives an
-          // identical stack, so its rebuild is a no-op.
-          consumed = consumeHistoryEntries(id, depthDelta);
         }
       }
 
@@ -162,11 +150,11 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       if (consumed === 0) {
         try {
           const localPath = buildUrlPath([{ navLink, stack: stackCopy }]);
-          updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, mode);
+          updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, mode, stackCopy.length);
         } catch (e) {
           try {
             const fallback = buildUrlPath([{ navLink, stack: stackCopy }]);
-            updateNavQueryParamForStack(id, fallback, groupContext, groupStackId, mode);
+            updateNavQueryParamForStack(id, fallback, groupContext, groupStackId, mode, stackCopy.length);
           } catch { }
         }
       }

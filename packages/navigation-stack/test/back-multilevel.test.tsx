@@ -183,3 +183,56 @@ describe('history entries follow the DEPTH DELTA, not the action name', () => {
     push.mockRestore();
   });
 });
+
+describe('entry ledger: one Back press per user action, however many levels moved', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/app');
+  });
+  afterEach(() => cleanup());
+
+  it('popToRoot from a multi-level jump gives back only the entries we own', async () => {
+    render(<App />);
+    await settle();
+    const api = getRegistry().get('s')!.api!;
+
+    // One navigation, several levels: creates ONE entry, not three.
+    await act(async () => { await api.push('b'); });
+    await settle();
+    await act(async () => { await api.push('c'); });
+    await settle();
+    expect(api.length()).toBe(3);
+
+    const go = vi.spyOn(window.history, 'go');
+    await act(async () => { await api.popToRoot(); });
+    await settle();
+
+    // Two entries were pushed (b and c), so exactly two are returned -- counting stack LEVELS
+    // instead would have asked for more than we own and desynchronised history from the stack.
+    expect(go).toHaveBeenCalledWith(-2);
+    go.mockRestore();
+  });
+
+  it('a net-SHRINKING pushAndPopUntil still costs one forward step', async () => {
+    render(<App />);
+    await settle();
+    const api = getRegistry().get('s')!.api!;
+
+    await act(async () => { await api.push('b'); });
+    await settle();
+    await act(async () => { await api.push('c'); });
+    await settle();
+
+    // Pushes one and pops back to the root: depth 3 -> 2, a POSITIVE delta, but the user moved
+    // FORWARD. Under a delta-only rule this handed entries back and Back then overshot.
+    const push = vi.spyOn(window.history, 'pushState');
+    const go = vi.spyOn(window.history, 'go');
+    await act(async () => { await api.pushAndPopUntil('b', (e) => e.key === 'a'); });
+    await settle();
+
+    expect(push, 'a forward navigation must add a step').toHaveBeenCalled();
+    expect(go, 'a forward navigation must not hand entries back').not.toHaveBeenCalled();
+    push.mockRestore();
+    go.mockRestore();
+  });
+});

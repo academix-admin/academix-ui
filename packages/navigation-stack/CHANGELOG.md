@@ -1,5 +1,25 @@
 # @academix-admin/navigation-stack
 
+## 0.8.6
+
+### Patch Changes
+
+- History accounting now uses an entry ledger, closing two edge cases in the pop/push mapping.
+
+  Direction comes from the action family; the count comes from a per-stack ledger recording the depth
+  each owned entry was created at. Depth delta alone was wrong at both edges:
+
+  - **A navigation that moves several levels at once** (deep link, `go`) creates ONE browser entry —
+    one user action costs one Back press — but changed N levels. Consuming by delta asked for more
+    entries than we own, drifting history out of sync with the stack. `popToRoot` after two pushes now
+    gives back exactly two, not three.
+  - **A net-shrinking forward navigation** — `pushAndPopUntil` that adds one page and pops three — has
+    a POSITIVE delta, so a delta-only rule handed entries back even though the user moved forward, and
+    Back then overshot. Forward navigations now always cost exactly one forward step.
+
+  The invariant this establishes: one user action is always one Back press, however many stack levels
+  it rearranged.
+
 ## 0.8.5
 
 ### Patch Changes
