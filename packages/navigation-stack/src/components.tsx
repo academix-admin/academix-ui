@@ -1094,13 +1094,32 @@ export default function NavigationStack(props: {
 
     const handlePopStateInner = (currentRegEntry: RegistryEntry) => {
 
+      // Restoring the stack to its ROOT when the URL carries no state for it is the whole point of
+      // these two cases, and returning early here was why browser Back appeared to do nothing.
+      //
+      // The very first history entry has no `?nav=` at all: the param is only written once
+      // something has been pushed. So going Back to it lands on a URL with no nav state, and
+      // treating that as "leave the stack alone" left the pushed page on top forever — the URL
+      // went back while the stack did not.
+      //
+      // Truncating to the existing first entry (rather than re-resolving the `entry` prop) keeps
+      // the root's uid and params exactly as they were, so nothing re-mounts unnecessarily.
+      const restoreToRoot = () => {
+        const rootStack = currentRegEntry.stack.slice(0, 1);
+        if (!isEqual(currentRegEntry.stack, rootStack)) {
+          currentRegEntry.stack = rootStack;
+          setStackSnapshot([...rootStack]);
+          if (persist) writePersistedStack(id, rootStack);
+        }
+      };
+
       const searchParams = new URLSearchParams(window.location.search);
       const navPathCombined = searchParams.get('nav');
-      if (!navPathCombined) return;
+      if (!navPathCombined) { restoreToRoot(); return; }
 
       const map = parseCombinedNavParam(navPathCombined);
       const ourPath = map[id];
-      if (!ourPath) return;
+      if (!ourPath) { restoreToRoot(); return; }
 
       const tokenized = parseUrlPathIntoStacks(ourPath);
       const ourSlice = tokenized[0] || [];

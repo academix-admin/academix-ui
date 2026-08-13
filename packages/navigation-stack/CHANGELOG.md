@@ -1,5 +1,30 @@
 # @academix-admin/navigation-stack
 
+## 0.8.3
+
+### Patch Changes
+
+- Fix: browser Back left the pushed page on top when returning to the first history entry.
+
+  The popstate handler bailed out whenever the restored URL carried no `?nav=` state for the stack:
+
+  ```js
+  if (!navPathCombined) return;
+  if (!ourPath) return;
+  ```
+
+  But the very first history entry has no `nav` param — it is only written once something has been
+  pushed. So Back onto that entry hit the early return, and "no URL state" was treated as "leave the
+  stack alone" rather than "this entry is the stack at its root". The URL went back while the stack
+  did not, leaving the pushed page on top.
+
+  Both cases now restore the stack to its root. Truncating to the existing first entry, rather than
+  re-resolving the `entry` prop, preserves the root's uid and params so nothing needlessly remounts.
+
+  Together with the `isActiveStack` fix in 0.8.2 this completes browser-Back support: 0.8.2 let the
+  handler run at all, and this makes it do the right thing on the boundary entry. Verified against a
+  real browser with Playwright — jsdom cannot produce a genuine popstate.
+
 ## 0.8.2
 
 ### Patch Changes
