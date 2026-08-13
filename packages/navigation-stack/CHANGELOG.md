@@ -1,5 +1,36 @@
 # @academix-admin/navigation-stack
 
+## 0.8.4
+
+### Patch Changes
+
+- Fix two history-integrity bugs that made Back/Forward skip a page.
+
+  **1. Entries are now decided by the stack's DEPTH DELTA, not the action's name.**
+
+  The rule keyed off `action.type === 'push'`, which looked equivalent and was not: `pushAndPopUntil`,
+  `pushAndReplace` and `go` can all GROW the stack, and were classified as "replace" — so they
+  silently created no history entry. With `a → b → c` where b arrived via one of those, history held
+  only `[a, c]`: one Back skipped straight to a, and Forward jumped straight to c, with b unreachable
+  in both directions.
+
+  Depth delta needs no per-action allow-list: grew → add one entry, shrank → hand back that many,
+  unchanged → replace in place. One browser step per navigation regardless of how many stack levels
+  were rearranged, so Back always means "undo that action".
+
+  **2. Popping no longer corrupts the entry it is leaving.**
+
+  `history.go(-n)` is asynchronous — it queues the move and returns. The `replaceState` that followed
+  therefore landed on the entry being LEFT, overwriting that deeper entry's URL with the new shallower
+  path before the browser had moved. Invisible going back, because the target entry is still correct,
+  but it rewrites history _ahead_ of the cursor, so a later Forward restores the wrong state.
+
+  Nothing needs writing after a consume: the browser restores the target entry's own URL when the
+  move completes.
+
+  Tests cover both directions of a three-deep walk (Back c→b→a and Forward a→b→c) standalone and
+  inside a group, plus `pushAndPopUntil` creating an entry while `replace` does not.
+
 ## 0.8.3
 
 ### Patch Changes

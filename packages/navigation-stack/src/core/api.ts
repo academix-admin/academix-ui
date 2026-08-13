@@ -122,30 +122,53 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       //
       // A pop triggered BY popstate must not touch history again — the browser already moved.
       // `popstateInFlight` is set by the popstate handler while it re-derives the stack.
-      const actionType = action?.type;
+      // Decide from what the stack actually DID, not from the action's name.
+      //
+      // Keying off `action.type === 'push'` looked equivalent and was not: pushAndPopUntil,
+      // pushAndReplace and go can all GROW the stack, and classifying them as "replace" meant they
+      // silently created no history entry. The user-visible symptom is precise and confusing --
+      // a → b → c where b arrived via one of those leaves history as [a, c], so one Back skips
+      // straight to a and Forward jumps straight to c, with b unreachable in both directions.
+      //
+      // Depth delta is the honest signal and needs no per-action allow-list:
+      //   grew   -> add one entry (one browser step per navigation, regardless of how many
+      //             stack levels were rearranged, so Back always feels like "undo that action")
+      //   shrank -> hand back that many entries, clamped to what we own
+      //   same   -> overwrite in place (replace, replaceParam, a no-op push)
       const depthDelta = (previousStack?.length ?? stackCopy.length) - stackCopy.length;
-      const isPopFamily =
-        actionType === 'pop' || actionType === 'popUntil' || actionType === 'popToRoot';
 
       let mode: 'push' | 'replace' = 'replace';
+      let consumed = 0;
       if (historyPush && !regEntry.popstateInFlight) {
-        if (actionType === 'push') {
+        if (depthDelta < 0) {
           mode = 'push';
-        } else if (isPopFamily && depthDelta > 0) {
+        } else if (depthDelta > 0) {
           // Stack is already mutated; give the entries back. The resulting popstate re-derives an
           // identical stack, so its rebuild is a no-op.
-          consumeHistoryEntries(id, depthDelta);
+          consumed = consumeHistoryEntries(id, depthDelta);
         }
       }
 
-      try {
-        const localPath = buildUrlPath([{ navLink, stack: stackCopy }]);
-        updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, mode);
-      } catch (e) {
+      // Do NOT write the URL when we just handed entries back.
+      //
+      // history.go(-n) is asynchronous: it queues the move and returns immediately. A replaceState
+      // here therefore lands on the entry we are LEAVING, overwriting that deeper entry's URL with
+      // the new shallower path before the browser has moved. The corruption is invisible going
+      // back — the target entry is still correct — but it silently rewrites history ahead of us, so
+      // Forward later restores the wrong state.
+      //
+      // The browser restores the target entry's own URL when it completes the move, so there is
+      // nothing for us to write.
+      if (consumed === 0) {
         try {
-          const fallback = buildUrlPath([{ navLink, stack: stackCopy }]);
-          updateNavQueryParamForStack(id, fallback, groupContext, groupStackId, mode);
-        } catch { }
+          const localPath = buildUrlPath([{ navLink, stack: stackCopy }]);
+          updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, mode);
+        } catch (e) {
+          try {
+            const fallback = buildUrlPath([{ navLink, stack: stackCopy }]);
+            updateNavQueryParamForStack(id, fallback, groupContext, groupStackId, mode);
+          } catch { }
+        }
       }
     }
 
