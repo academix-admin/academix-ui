@@ -1,5 +1,25 @@
 # @academix-admin/navigation-stack
 
+## 0.11.1
+
+### Patch Changes
+
+- Fix: a re-entered page flashed at its final position before animating.
+
+  Walking a → b → c, going back to b, then forward to c again showed c already in place and only
+  _then_ ran the slide — "I have already seen the page, then the slide applies very fast".
+
+  `useState`'s initial value only applies on a fresh MOUNT, and forward does not remount the page:
+  `memoryManager` caches it by uid and the render record is reused, so only `state` flips to `"enter"`
+  while `stage` is still `"done"` — the final position. A passive `useEffect` then reset it _after_
+  paint, producing: paint at rest (page visibly there) → `init` (snapped off-screen) → `active`
+  (slides in).
+
+  Both transitions now set their entering stage in a layout effect, so the off-screen class lands in
+  the same frame the page becomes visible. Only affects re-entered pages; a first-time push already
+  mounted fresh with the correct initial stage, which is why this never showed on the way forward
+  through new pages.
+
 ## 0.11.0
 
 ### Minor Changes

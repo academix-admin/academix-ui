@@ -258,7 +258,17 @@ export function SlideTransitionRenderer({
 }) {
   const [stage, setStage] = useState<"init" | "active" | "done">(state === "enter" ? "init" : "done");
 
-  useEffect(() => {
+  // LAYOUT effect, not a passive one — this is what stops a re-entered page flashing at its final
+  // position before it animates.
+  //
+  // useState's initial value only applies on a fresh MOUNT. Going back from c and then forward to
+  // c again does not remount it: memoryManager caches the page by uid and the record is reused, so
+  // only `state` flips to "enter" while `stage` is still "done" (final position). A passive effect
+  // resets it AFTER paint, giving the sequence: paint at rest (the page is visibly there) → init
+  // (snapped off-screen) → active (slides in) — reported as "I have already seen the page, then the
+  // slide applies very fast". Running before paint means the off-screen class lands in the same
+  // frame the page becomes visible.
+  useIsomorphicLayoutEffect(() => {
     if (state === "enter") {
       setStage("init");
       const frame = requestAnimationFrame(() => {
@@ -302,7 +312,9 @@ export function FadeTransitionRenderer({
 }) {
   const [stage, setStage] = useState<"active" | "done">(state === "enter" ? "active" : "done");
 
-  useEffect(() => {
+  // Layout effect for the same reason as the slide transition above: a reused (not remounted)
+  // record only flips `state`, so a passive effect would apply the entering class a paint late.
+  useIsomorphicLayoutEffect(() => {
     if (state === "enter") {
       setStage("active");
       setTimeout(() => setStage("done"), DEFAULT_TRANSITION_DURATION);
