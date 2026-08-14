@@ -1,5 +1,32 @@
 # @academix-admin/navigation-stack
 
+## 0.11.0
+
+### Minor Changes
+
+- The active tab is now recorded in the URL instead of being erased.
+
+  A tab switch called `restUrl()`, which DELETED both `group` and `nav`. That lost on every axis: the
+  tab was not shareable, not restorable from the URL, not carried into a new window (sessionStorage is
+  per-tab) — and Back did not undo the switch either, so it did not even buy the trade-off. Reading
+  already preferred `?group=`; nothing ever wrote it back.
+
+  Switching now writes `?group=<tab>` and **preserves `nav`**, so every tab keeps its depth in the URL.
+  Previously one tab's change discarded all of them.
+
+  It **replaces** rather than pushes, deliberately. Switching tabs is lateral navigation while Back is
+  a depth operation, and mixing them makes Back ambiguous — "previous page" or "previous tab"?
+  Pushing also floods history (toggling two tabs ten times would cost ten Backs to leave) and spends
+  history writes against the rate limits browsers enforce (Safari most aggressively), which a drummed
+  bottom-nav can realistically hit; once throttled, navigation state silently stops updating.
+
+  For the Android "back from a secondary tab returns home" convention, express it as an explicit app
+  policy — when Back fires and the active stack is at its root, switch to the home tab — rather than
+  as a side effect of pushed entries. That keeps it inspectable and out of the history stack.
+
+  `history.state` is spread rather than replaced on a tab change, so the entry keeps its own record of
+  every stack (and any foreign keys) — a tab change is not a navigation and must not blank it.
+
 ## 0.10.0
 
 ### Minor Changes

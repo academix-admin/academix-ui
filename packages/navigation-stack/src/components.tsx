@@ -4,7 +4,7 @@ import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, u
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry, type RegistryEntry } from './core/registry';
-import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
+import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState, nextSerial } from './core/persistence';
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
 import { useSwipeBack } from './gestures/swipe-back';
@@ -521,20 +521,45 @@ export function GroupNavigationStack({
   // Sync activeStackId with current prop when it changes from external
   useEffect(() => {
     if (current === activeStackId || !hydrated) return;
-    restUrl();
+    writeGroupToUrl(current);
     setActiveStackId(current);
   }, [current]);
 
 
-  const restUrl = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('group');
-    url.searchParams.delete('nav');
-    const newHref = url.toString();
-    if (window.location.href !== newHref) {
-      window.history.replaceState({ group: null }, "", newHref);
-      window.history.replaceState({ navStack: null }, "", newHref);
-    }
+  /**
+   * Record the active tab in the URL on a switch.
+   *
+   * Replaces the old `restUrl()`, which DELETED `group` and `nav`. That lost on every axis: the tab
+   * was not shareable, not restorable from the URL, not carried into a new window (sessionStorage
+   * is per-tab) — and Back did not undo the switch either, so it did not even buy the trade-off.
+   * Reading already preferred `?group=` (see getInitialActiveStackId); nothing ever wrote it back.
+   *
+   * `nav` is deliberately left ALONE: it holds every stack's path, so preserving it keeps each
+   * tab's depth in the URL. Deleting it discarded all of them to record a change to one.
+   *
+   * REPLACE, not push. Switching tabs is lateral navigation; Back is a depth operation, and mixing
+   * them makes Back ambiguous ("previous page" or "previous tab"?). Pushing also floods history —
+   * toggling two tabs ten times would cost ten Backs to leave — and browsers rate-limit history
+   * writes (Safari most aggressively), which a drummed bottom-nav can realistically hit; once
+   * throttled, navigation state silently stops updating. The Android "back from a secondary tab
+   * returns home" convention is better expressed as an explicit app policy than as a side effect
+   * of pushed entries.
+   */
+  const writeGroupToUrl = (nextStackId: string) => {
+    if (typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('group', nextStackId);
+      const newHref = url.toString();
+      if (window.location.href === newHref) return;
+      // Spread the existing state so `navStack` (and any foreign keys) survive — this is a tab
+      // change, not a navigation, and must not blank the entry's own record of its stacks.
+      window.history.replaceState(
+        { ...(window.history.state ?? {}), group: nextStackId, axSerial: nextSerial() },
+        "",
+        newHref,
+      );
+    } catch (e) { /* URL/history can throw in exotic embedders; a tab change is not worth crashing */ }
   }
 
   // Group context implementation
@@ -545,7 +570,7 @@ export function GroupNavigationStack({
 
     goToGroupId: async (groupId: string) => {
       if (navStack.has(groupId)) {
-        restUrl();
+        writeGroupToUrl(groupId);
         setActiveStackId(groupId);
         onCurrentChange?.(groupId);
         return true;
