@@ -154,3 +154,52 @@ describe('per-entry state survives a hostile URL rewrite', () => {
     expect(api.peek()?.key).toBe('b');
   });
 });
+
+describe('browser-driven navigations are not re-animated', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/app');
+    // The registry is process-global and survives cleanup(), so a flag left set by an earlier
+    // test leaks into this one. Passing in isolation but failing in the full suite is that.
+    const reg = getRegistry().get('s');
+    if (reg) reg.browserDrivenChange = false;
+  });
+  afterEach(() => cleanup());
+
+  it('marks a popstate rebuild as browser-driven', async () => {
+    render(<App />);
+    await settle();
+    const api = getRegistry().get('s')!.api!;
+
+    await act(async () => { await api.push('b'); });
+    await settle();
+    const state = window.history.state;
+
+    await act(async () => { await api.popToRoot(); });
+    await settle(200);
+
+    // Arriving via popstate: the platform (edge-swipe / back button) already animated it, so the
+    // arrival must render at rest rather than replaying our slide over the browser's own animation.
+    await act(async () => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state }));
+    });
+    await settle(50);
+
+    // Consumed by the reconciler once it has rendered the arrival at rest.
+    const reg = getRegistry().get('s')!;
+    expect(reg.browserDrivenChange, 'the flag should be consumed, not left set').toBeFalsy();
+    expect(api.length(), 'the stack still rebuilds').toBe(2);
+  });
+
+  it('a programmatic push is NOT marked browser-driven (it should animate)', async () => {
+    render(<App />);
+    await settle();
+    const api = getRegistry().get('s')!.api!;
+
+    await act(async () => { await api.push('b'); });
+    await settle();
+
+    expect(getRegistry().get('s')!.browserDrivenChange).toBeFalsy();
+    expect(api.length()).toBe(2);
+  });
+});

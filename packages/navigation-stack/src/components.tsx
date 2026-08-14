@@ -1137,6 +1137,11 @@ export default function NavigationStack(props: {
       // The browser has already moved. Mark the re-derive so emit() does not ALSO hand history
       // entries back for the resulting pop — that would consume a second entry and skip a page.
       currentRegEntry.popstateInFlight = true;
+      // The browser has ALREADY animated this navigation (iOS Safari's edge-swipe, Android's back
+      // gesture, or the back/forward buttons). Replaying our own enter transition on top shows the
+      // page, then slides it in again — reported as "I have already seen the page, then the slide
+      // applies very fast". Cleared by the reconciler, which runs after this handler returns.
+      currentRegEntry.browserDrivenChange = true;
       try {
         handlePopStateInner(currentRegEntry, event);
       } finally {
@@ -1353,9 +1358,18 @@ export default function NavigationStack(props: {
     }
 
     if (added.length > 0) {
-      const newRecords = added.map((a) => ({ entry: a, state: "enter" as const, createdAt: Date.now() }));
+      // A browser-driven arrival is already on screen — the platform animated it. Mount it at rest
+      // ("idle") rather than replaying the slide over the top of the browser's own animation.
+      const reg = getRegistry().get(id);
+      const browserDriven = reg?.browserDrivenChange === true;
+      const arrivalState = browserDriven ? ("idle" as const) : ("enter" as const);
+
+      const newRecords = added.map((a) => ({ entry: a, state: arrivalState, createdAt: Date.now() }));
       setRenders((prev) => prev.concat(newRecords));
-      added.forEach(a => transitionManager.start(a.uid, transitionDuration, () => { }));
+      if (!browserDriven) {
+        added.forEach(a => transitionManager.start(a.uid, transitionDuration, () => { }));
+      }
+      if (reg) reg.browserDrivenChange = false;
     }
 
     if (removed.length > 0) {

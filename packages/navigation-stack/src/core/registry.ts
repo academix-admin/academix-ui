@@ -34,6 +34,13 @@ export type RegistryEntry = {
    * just wrote ourselves when an async history.go lands after the stack was mutated.
    */
   lastAppliedSerial?: number;
+  /**
+   * Set while a stack change came from the BROWSER (popstate: back/forward buttons, iOS Safari's
+   * edge-swipe, Android's back gesture). The platform has already animated that navigation, so
+   * replaying our own enter transition shows the page and then slides it in again. Consumed and
+   * cleared by the render reconciler.
+   */
+  browserDrivenChange?: boolean;
 };
 
 export const _clientRegistry =

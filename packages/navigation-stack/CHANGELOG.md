@@ -1,5 +1,27 @@
 # @academix-admin/navigation-stack
 
+## 0.11.2
+
+### Patch Changes
+
+- Fix: browser-driven navigations were animated twice.
+
+  Going back and then forward again showed the destination page and _then_ slid it in — "I have
+  already seen the page, then the slide applies very fast".
+
+  The cause is not a paint flash (the previous release's diagnosis). It is that **the platform has
+  already animated the navigation**: iOS Safari's edge-swipe, Android's back gesture, and the
+  back/forward buttons all animate before `popstate` fires. Our reconciler then saw the page's uid
+  reappear in the stack, classified it as newly `added`, and replayed its own enter transition over
+  the top of the animation the browser had just finished.
+
+  Arrivals that came from `popstate` now mount at rest instead of animating. Programmatic
+  navigation is unaffected and still animates.
+
+  Diagnosed from a screen recording: frame-stepping an iOS Safari capture showed the native
+  edge-swipe drag (the outgoing page tracking right across frames 42–47) followed by a separate,
+  clean 330ms slide of our own — two animations for one navigation.
+
 ## 0.11.1
 
 ### Patch Changes
