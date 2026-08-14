@@ -4,7 +4,7 @@ import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, u
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry, type RegistryEntry } from './core/registry';
-import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack } from './core/persistence';
+import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
 import { useSwipeBack } from './gestures/swipe-back';
@@ -1101,13 +1101,13 @@ export default function NavigationStack(props: {
       // entries back for the resulting pop — that would consume a second entry and skip a page.
       currentRegEntry.popstateInFlight = true;
       try {
-        handlePopStateInner(currentRegEntry);
+        handlePopStateInner(currentRegEntry, event);
       } finally {
         currentRegEntry.popstateInFlight = false;
       }
     };
 
-    const handlePopStateInner = (currentRegEntry: RegistryEntry) => {
+    const handlePopStateInner = (currentRegEntry: RegistryEntry, event: PopStateEvent) => {
 
       // Restoring the stack to its ROOT when the URL carries no state for it is the whole point of
       // these two cases, and returning early here was why browser Back appeared to do nothing.
@@ -1128,8 +1128,32 @@ export default function NavigationStack(props: {
         }
       };
 
-      const searchParams = new URLSearchParams(window.location.search);
-      const navPathCombined = searchParams.get('nav');
+      // Prefer the ENTRY'S OWN state over the shared `?nav=` URL.
+      //
+      // The URL is a single mutable string every stack and the group write to, so a write aimed at
+      // one of them can clobber another's slice — that is exactly how a popstate handler calling
+      // restUrl() blanked a neighbouring entry and made browser Forward restore the wrong page.
+      // `history.state` is per-entry: a write aimed at a different entry cannot reach it, so an
+      // entry's own record of what it was survives whatever else rewrites the URL.
+      //
+      // The URL remains the fallback (and stays correct for sharing and deep links): entries
+      // predating this, or created by something other than this library, carry no ax state.
+      const axState = readAxState(event.state);
+      if (axState) {
+        // Recorded for diagnostics/ordering only — deliberately NOT used to skip the rebuild.
+        //
+        // Skipping on a repeated serial looks like a safe optimisation and is not: revisiting an
+        // entry is normal. Walk a → b → c, Back to b (applies serial N), Back to a (whose entry
+        // predates our writes, so the marker stays N), then Forward to b — the serial is N again,
+        // but the stack is now at depth 1 and genuinely needs rebuilding. The skip left it there.
+        //
+        // A redundant rebuild is already free: the isEqual guard below makes it a no-op.
+        currentRegEntry.lastAppliedSerial = axState.axSerial;
+      }
+
+      const navPathCombined = axState
+        ? axState.navStack
+        : new URLSearchParams(window.location.search).get('nav');
       if (!navPathCombined) { restoreToRoot(); return; }
 
       const map = parseCombinedNavParam(navPathCombined);

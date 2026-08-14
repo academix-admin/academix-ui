@@ -283,6 +283,44 @@ const _pushDepth = new Map<string, number>();
  */
 const _entryDepths = new Map<string, number[]>();
 
+/**
+ * Monotonic counter stamped onto every history entry this library writes.
+ *
+ * `history.go(-n)` is asynchronous: it queues the move and returns, so a popstate can arrive after
+ * other work has already run. A serial makes each entry say which generation of navigation state it
+ * is, so an arrival can be recognised as already-applied (skip the rebuild) or out of order
+ * (diagnosable) instead of being inferred from a URL that any other writer may have rewritten
+ * since.
+ *
+ * Deliberately process-wide rather than per stack: entries are global, and a single ordering across
+ * all of them is what makes "did this arrive out of order" answerable at all.
+ */
+let _serial = 0;
+
+export function nextSerial(): number {
+  _serial += 1;
+  return _serial;
+}
+
+/** Shape this library stores in `history.state`. Foreign keys on the same object are preserved. */
+export type AxHistoryState = {
+  /** Combined `stackId:path|stackId:path` for EVERY stack — the same string as `?nav=`. */
+  navStack: string | null;
+  /** Active group stack id, when inside a group. */
+  group?: string;
+  /** Generation of this entry. */
+  axSerial: number;
+};
+
+/** Read our slice of an entry's state, if this entry was written by us. */
+export function readAxState(state: unknown): AxHistoryState | null {
+  if (!state || typeof state !== 'object') return null;
+  const s = state as Partial<AxHistoryState>;
+  if (typeof s.axSerial !== 'number') return null;      // not ours, or written before serials
+  if (typeof s.navStack !== 'string' && s.navStack !== null) return null;
+  return { navStack: s.navStack ?? null, group: s.group, axSerial: s.axSerial };
+}
+
 export function getPushDepth(stackId: string): number {
   return _pushDepth.get(stackId) ?? 0;
 }
@@ -384,7 +422,7 @@ export function updateNavQueryParamForStack(
         // One pushState only. Calling it twice (as the replace path does for groups) would create
         // two entries for a single navigation, so back would need two presses to move one page.
         window.history.pushState(
-          { navStack: newParam, group: groupContext ? groupStackId : undefined },
+          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: nextSerial() },
           "",
           newHref,
         );
@@ -402,7 +440,7 @@ export function updateNavQueryParamForStack(
         // Anything branching on `event.state.group` during popstate therefore behaved differently
         // for the same page.
         window.history.replaceState(
-          { navStack: newParam, group: groupContext ? groupStackId : undefined },
+          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: nextSerial() },
           "",
           newHref,
         );

@@ -1,5 +1,30 @@
 # @academix-admin/navigation-stack
 
+## 0.10.0
+
+### Minor Changes
+
+- Navigation state is now carried per history entry, with the URL as a fallback.
+
+  `?nav=` is a single mutable string that every stack **and** the group write to, so a write aimed at
+  one of them can clobber another's slice. That is not a hypothetical: it is exactly how a popstate
+  handler calling `restUrl()` blanked a neighbouring entry and made browser Forward restore the wrong
+  page (fixed in 0.8.5 by removing that call — but the shared-URL design left the door open).
+
+  Each entry now carries its own `{ navStack, group, axSerial }` in `history.state`, and popstate
+  reads that first. A write aimed at a different entry cannot reach it, so an entry's record of what
+  it was survives whatever else rewrites the URL. The URL stays authoritative for sharing and deep
+  links, and remains the fallback for entries with no state (shared links, history written by an
+  earlier version, or by another library).
+
+  `axSerial` is a monotonic generation stamp, recorded for diagnosing the ordering that asynchronous
+  `history.go(-n)` makes possible. It is deliberately **not** used to skip a rebuild: revisiting an
+  entry is normal, so the same serial legitimately arrives when the stack does need rebuilding, and a
+  redundant rebuild is already free via the existing isEqual guard.
+
+  Foreign keys on `history.state` are preserved rather than overwritten, so this coexists with other
+  libraries writing to the same object.
+
 ## 0.9.0
 
 ### Minor Changes

@@ -28,6 +28,12 @@ export type RegistryEntry = {
    * this, browser-back would pop one page and then consume a second entry, skipping a page.
    */
   popstateInFlight?: boolean;
+  /**
+   * Serial of the last history entry this stack applied. Lets a popstate for a generation we have
+   * already applied be skipped rather than re-derived — the browser can deliver one for state we
+   * just wrote ourselves when an async history.go lands after the stack was mutated.
+   */
+  lastAppliedSerial?: number;
 };
 
 export const _clientRegistry =
