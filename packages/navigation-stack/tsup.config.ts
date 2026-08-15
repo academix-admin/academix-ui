@@ -1,6 +1,7 @@
 import { defineConfig } from 'tsup';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import pkg from './package.json';
 
 /**
  * Prepend the "use client" directive to every runtime output file.
@@ -35,5 +36,8 @@ export default defineConfig({
   treeshake: true,
   splitting: false,
   external: ['react', 'react-dom', 'react/jsx-runtime'],
+  // devtools' debug() blob reports the version; injecting it here keeps it from drifting behind
+  // the package, which it silently had been.
+  define: { __NAVSTACK_VERSION__: JSON.stringify(pkg.version) },
   onSuccess: () => preserveUseClient('dist'),
 });

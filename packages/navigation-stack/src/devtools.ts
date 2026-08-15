@@ -31,6 +31,8 @@ import { getOverlayStore } from './overlay/registry';
 import { readOverlayFragment } from './overlay/hash';
 import type { NavParams, StackEntry } from './types';
 
+declare const __NAVSTACK_VERSION__: string;
+
 export type NavEventKind =
   | 'push' | 'replace' | 'pop' | 'popUntil' | 'popToRoot'
   | 'pushAndPopUntil' | 'pushAndReplace' | 'go' | 'replaceParam'
@@ -102,14 +104,20 @@ export function devtoolsEnabled(): boolean {
  * Called from the navigation funnel. Cheap and guarded: when devtools are off this is a single
  * boolean check, so it costs nothing in production.
  */
+let _traceFn: ((e: NavEvent) => void) | null = null;
+
 export function recordNavEvent(e: Omit<NavEvent, 't' | 'url'>): void {
   if (!devtoolsEnabled()) return;
-  _events.push({
+  const full: NavEvent = {
     ...e,
     t: Date.now(),
     url: typeof window !== 'undefined' ? window.location.href : '',
-  });
+  };
+  _events.push(full);
   if (_events.length > RING) _events = _events.slice(-RING);
+  if (_traceFn) {
+    try { _traceFn(full); } catch { /* a broken tracer must never break navigation */ }
+  }
 }
 
 function snapshotOf(id: string): NavSnapshot | null {
@@ -185,10 +193,41 @@ export const navDevtools = {
     _events = [];
   },
 
+  /**
+   * Live console trace: every navigation prints as it happens.
+   *
+   * `events()` is a ring buffer you read AFTER the fact, which is the wrong shape for the question
+   * a developer actually has at the devtools console — "I am about to press Back; show me what
+   * fires." Reading a buffer afterwards cannot distinguish "no event fired" from "an event fired
+   * and I am looking at the wrong entry". A line appearing the instant you press Back can.
+   *
+   *     __NAV_STACK__.trace()        // start
+   *     __NAV_STACK__.trace(false)   // stop
+   *
+   * Prints e.g. `nav profile-stack popstate 2->1 top=profile_page pushDepth=1`, and lifecycle
+   * hooks appear as their own `lifecycle:onExit` lines — so an exit path that fires with no
+   * handler attached is visibly different from one that never fires at all.
+   */
+  trace(on = true): { ok: true; tracing: boolean } {
+    _traceFn = on
+      ? (e) => {
+          const arrow = e.from === e.to ? `${e.to}` : `${e.from}->${e.to}`;
+          // eslint-disable-next-line no-console
+          console.log(
+            `%cnav%c ${e.stackId} %c${e.kind}%c ${arrow} top=${e.topKey ?? '-'} pushDepth=${e.pushDepth}`,
+            'color:#888', 'color:inherit', 'font-weight:bold', 'color:inherit',
+          );
+        }
+      : null;
+    return { ok: true, tracing: on };
+  },
+
   /** One pasteable blob for a bug report. */
   debug() {
     return {
-      version: '0.7.0',
+      // Injected at build time. It was hardcoded and had drifted several releases behind, which is
+      // worse than absent in a bug report: it points the reader at the wrong source.
+      version: typeof __NAVSTACK_VERSION__ === 'string' ? __NAVSTACK_VERSION__ : 'unknown',
       enabled: devtoolsEnabled(),
       stacks: this.snapshot(),
       history: this.history(),

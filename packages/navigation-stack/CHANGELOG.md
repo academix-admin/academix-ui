@@ -1,5 +1,29 @@
 # @academix-admin/navigation-stack
 
+## 0.12.0
+
+### Minor Changes
+
+- Add `__NAV_STACK__.trace()` — a live console stream of every navigation.
+
+  `events()` is a ring buffer you read _after_ the fact, which is the wrong shape for the question a
+  developer has at the console: "I am about to press Back — show me what fires." Reading a buffer
+  afterwards cannot distinguish "no event fired" from "an event fired and I'm looking at the wrong
+  entry"; a line appearing the instant you press Back can.
+
+  ```js
+  __NAV_STACK__.trace(); // start
+  __NAV_STACK__.trace(false); // stop
+  ```
+
+  Prints `nav profile-stack popstate 2->1 top=profile_page pushDepth=1`. Lifecycle hooks stream as
+  their own `lifecycle:onExit` lines, recorded _before_ the has-handlers check — so a path that fires
+  with nothing attached reads differently from one that never fires at all.
+
+  Also: `debug()` reported a hardcoded `version: '0.7.0'` that had drifted several releases behind.
+  In a bug report that is worse than no version — it points the reader at the wrong source. It is now
+  injected at build time from package.json.
+
 ## 0.11.4
 
 ### Patch Changes
