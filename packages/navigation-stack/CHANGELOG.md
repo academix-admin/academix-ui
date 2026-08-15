@@ -1,5 +1,25 @@
 # @academix-admin/navigation-stack
 
+## 0.11.4
+
+### Patch Changes
+
+- Fix: `api.subscribe()` listeners were not notified for browser-driven navigation.
+
+  Same root cause as the lifecycle fix in 0.11.3 — the popstate path bypasses `emit()`, which is
+  where both lifecycle triggers AND subscriber notification live. 0.11.3 fixed lifecycle; subscribers
+  had the identical blind spot.
+
+  This one has a concrete consequence: `onExitStack` is implemented as a subscriber watching for the
+  stack reaching length 0. So a stack could be left via browser Back or the edge-swipe without its
+  owner ever being told — which is precisely the "abandon the signup flow with Back" case that
+  `onExitStack` exists to catch.
+
+  Browser-driven changes are also recorded in the devtools timeline as `popstate` events, so a
+  timeline no longer shows an unexplained gap where the user pressed Back.
+
+  New test asserts a subscriber observes a browser-driven pop.
+
 ## 0.11.3
 
 ### Patch Changes

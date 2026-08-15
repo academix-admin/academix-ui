@@ -70,4 +70,19 @@ describe('onExit coverage per exit path', () => {
     expect(exits, 'browser Back must fire onExit — swipe-back and the back button use this path')
       .toContain('B');
   });
+
+  // Subscribers ride the same emit() path lifecycle does, so they shared the same blind spot.
+  // onExitStack is implemented as a subscriber watching for length 0, which is why a stack could be
+  // left via Back without its owner ever hearing about it.
+  it('notifies api.subscribe() on browser Back, not only on programmatic navigation', async () => {
+    const api = await toB();
+    const seen: number[] = [];
+    const unsub = api.subscribe((stack) => seen.push(stack.length));
+
+    await act(async () => { window.history.back(); });
+    await settle(400);
+    unsub();
+
+    expect(seen, 'a subscriber must observe the browser-driven pop').toContain(1);
+  });
 });

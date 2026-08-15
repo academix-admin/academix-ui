@@ -1245,6 +1245,24 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
         lifecycleManager.trigger('onEnter', { stack: stackCopy, current: currentTop, previous: previousTop, action });
       }
       regEntry.lastActiveEntry = currentTop;
+
+      // Subscribers live on the same emit() path lifecycle does, so they were equally blind to
+      // browser-driven changes. onExitStack is detected by a subscriber watching for length 0, so
+      // popping past the root with Back/swipe never reported the stack as exited. Record the event
+      // too, so a devtools timeline shows browser navigation alongside programmatic navigation
+      // rather than as an unexplained gap.
+      recordNavEvent({
+        stackId: id,
+        kind: 'popstate',
+        from: previousStack.length,
+        to: stackCopy.length,
+        topKey: currentTop?.key ?? null,
+        pushDepth: getPushDepth(id),
+      });
+
+      regEntry.listeners.forEach((l: StackChangeListener) => {
+        try { l(stackCopy); } catch (e) { console.warn(e); }
+      });
     },
 
     syncWithBrowserHistory(enabled) {
