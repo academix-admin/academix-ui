@@ -175,6 +175,27 @@ Render a `<NavigationStack />` inside a page of another stack — the child
 auto-detects its parent. For coordinated siblings (e.g. a tab bar), wrap them in
 `<GroupNavigationStack>`.
 
+## Scroll restoration
+
+Each page's scroll position is captured as you scroll and restored when you return to it.
+
+Positions are stored with the container **width** and max scroll at capture time, because a pixel
+offset only means something at the width it was measured at:
+
+| On return | Restored to |
+|---|---|
+| Same width | The exact offset — what the user actually saw |
+| Different width | The same **proportion** of the document, clamped to its current height |
+
+Without this, an offset captured at 1200px and replayed at 430px lands somewhere the user was never
+at: narrower columns make content taller, so the same number is much earlier in the document. And if
+it exceeds the new height the browser silently clamps it, so reading the value back cannot tell you
+it was wrong.
+
+**Limitation:** proportional position is not *semantic* position. If content reflows unevenly, 10%
+down at 1200px is not the same paragraph as 10% down at 430px. Exactness there needs a content
+anchor — remembering which element was at the top — which this does not do.
+
 ## Devtools
 
 In any non-production build, the library installs `window.__NAV_STACK__` — a JSON-safe inspector
