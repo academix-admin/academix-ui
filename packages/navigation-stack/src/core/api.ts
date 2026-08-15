@@ -29,6 +29,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       redirects: new Set(),
       maxStackSize: DEFAULT_MAX_STACK_SIZE,
       historySyncEnabled: false,
+      historySyncProp: syncHistory,
       snapshotBuffer: [],
       parentId: parentApi?.id || null,
       childIds: new Set(),
@@ -49,6 +50,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     safeRegEntry.navLink = navLink;
     safeRegEntry.parentId = parentApi?.id || null;
   }
+  safeRegEntry.historySyncProp = syncHistory;
   const regEntry = safeRegEntry;
 
 

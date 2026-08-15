@@ -1,5 +1,24 @@
 # @academix-admin/navigation-stack
 
+## 0.12.1
+
+### Patch Changes
+
+- Fix: devtools reported `historySyncEnabled: false` for stacks that were syncing.
+
+  `historySyncEnabled` on the registry is only the _imperative_ override set by
+  `syncWithBrowserHistory()`. Effective sync is `syncHistory prop || override` — every internal call
+  site already tests that OR, but the devtools snapshot reported just the override. So a stack mounted
+  with `syncHistory` read as `historySyncEnabled: false`.
+
+  That is the first field anyone checks when Back misbehaves, and it pointed at the wrong conclusion:
+  "history sync is off, that's why Back leaves the site" — when sync was on and the cause was
+  elsewhere. Found while reading a real timeline for the signup stack, which showed
+  `historySyncEnabled: false` next to a URL the same stack had just written.
+
+  The snapshot now reports the effective value, plus `historySyncSource` (`prop` | `runtime` |
+  `prop+runtime` | `off`) so the override is still distinguishable from the prop.
+
 ## 0.12.0
 
 ### Minor Changes

@@ -60,6 +60,7 @@ export type NavSnapshot = {
   top: string | null;
   pushDepth: number;
   historySyncEnabled: boolean;
+  historySyncSource: 'prop' | 'runtime' | 'prop+runtime' | 'off';
   currentState: string;
   isInGroup: boolean;
   groupId?: string;
@@ -130,7 +131,11 @@ function snapshotOf(id: string): NavSnapshot | null {
     entries: entries.map((e) => ({ uid: e.uid, key: e.key, params: safeParams(e.params) })),
     top: entries.length ? entries[entries.length - 1].key : null,
     pushDepth: getPushDepth(id),
-    historySyncEnabled: !!reg.historySyncEnabled,
+    // Effective, not the raw override: see registry.historySyncProp.
+    historySyncEnabled: !!(reg.historySyncProp || reg.historySyncEnabled),
+    historySyncSource: reg.historySyncProp
+      ? (reg.historySyncEnabled ? 'prop+runtime' : 'prop')
+      : (reg.historySyncEnabled ? 'runtime' : 'off'),
     currentState: reg.currentState ?? 'unknown',
     isInGroup: !!reg.isInGroup,
     groupId: reg.groupId,

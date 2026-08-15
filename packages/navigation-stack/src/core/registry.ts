@@ -11,6 +11,14 @@ export type RegistryEntry = {
   redirects?: Set<RedirectFn>;
   maxStackSize: number;
   historySyncEnabled: boolean;
+  /**
+   * The `syncHistory` PROP, recorded separately from the imperative `historySyncEnabled` override.
+   * Effective sync is `historySyncProp || historySyncEnabled` -- every call site already tests that
+   * OR, but devtools reported only the override, so a prop-synced stack read as
+   * `historySyncEnabled: false`. That is the first field anyone checks when Back misbehaves, and it
+   * was pointing at the wrong conclusion.
+   */
+  historySyncProp?: boolean;
   snapshotBuffer: StackEntry[];
   parentId: string | null;
   childIds: Set<string>;
