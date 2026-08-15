@@ -1218,6 +1218,35 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       },
     },
 
+    /**
+     * Fire lifecycle hooks for a stack change the BROWSER made (popstate: back/forward buttons,
+     * iOS edge-swipe, Android back gesture).
+     *
+     * The popstate handler re-derives the stack and assigns it directly, bypassing emit() — which
+     * is where lifecycle triggers live. So onExit/onEnter never fired for browser-driven
+     * navigation, and anything bound to onExit silently did not run on the MOST COMMON way users
+     * leave a page. That is a scope leak by construction (ACADEMIX_PLAN §3b): flow-scoped
+     * state-stack scopes are cleared on onExit, so they survived every browser/gesture exit.
+     *
+     * Deliberately lifecycle-only: no history writes and no URL updates, because the browser
+     * already owns both by the time this runs.
+     */
+    _notifyExternalStackChange(previousStack: StackEntry[]) {
+      const stackCopy = regEntry.stack.slice();
+      const previousTop = previousStack[previousStack.length - 1];
+      const currentTop = stackCopy[stackCopy.length - 1];
+      if (previousTop?.uid === currentTop?.uid) return;
+
+      const action = { type: 'popstate' as const, target: currentTop };
+      if (previousTop) {
+        lifecycleManager.trigger('onExit', { stack: stackCopy, current: currentTop, previous: previousTop, action });
+      }
+      if (currentTop) {
+        lifecycleManager.trigger('onEnter', { stack: stackCopy, current: currentTop, previous: previousTop, action });
+      }
+      regEntry.lastActiveEntry = currentTop;
+    },
+
     syncWithBrowserHistory(enabled) {
       regEntry.historySyncEnabled = enabled;
       if (enabled) {

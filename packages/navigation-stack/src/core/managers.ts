@@ -3,6 +3,8 @@ import { MEMORY_CACHE_EXPIRY, MEMORY_CACHE_SIZE } from '../constants';
 // Transition / page-memory / lifecycle managers.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import type { ComponentType, ReactNode, ReactElement } from 'react';
+import { recordNavEvent } from '../devtools';
+import { getPushDepth } from './persistence';
 
 export class TransitionManager {
   private activeTransitions = new Map<string, any>();
@@ -276,6 +278,27 @@ export class EnhancedLifecycleManager {
   }
 
   async trigger(hook: LifecycleHook, context: any): Promise<void> {
+    // Recorded BEFORE the handler check, deliberately.
+    //
+    // The timeline's job here is to answer "did this exit path fire at all?" — which is exactly
+    // what you are auditing when you ask whether swipe-back, browser Back, a guard redirect or a
+    // tab switch reach onExit. Recording only when a handler happens to be attached would make an
+    // unwired path look identical to a path that never fires, which is the failure being hunted.
+    //
+    // Cheap when devtools are off: recordNavEvent returns immediately.
+    try {
+      const stack = context?.stack;
+      const depth = Array.isArray(stack) ? stack.length : 0;
+      recordNavEvent({
+        stackId: this.stackId,
+        kind: `lifecycle:${hook}`,
+        from: depth,
+        to: depth,
+        topKey: context?.current?.key ?? null,
+        pushDepth: getPushDepth(this.stackId),
+      });
+    } catch { /* observability must never break navigation */ }
+
     const hookHandlers = this.handlers.get(hook);
     if (!hookHandlers) return;
 

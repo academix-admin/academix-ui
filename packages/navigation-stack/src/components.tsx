@@ -1164,9 +1164,11 @@ export default function NavigationStack(props: {
       const restoreToRoot = () => {
         const rootStack = currentRegEntry.stack.slice(0, 1);
         if (!isEqual(currentRegEntry.stack, rootStack)) {
+          const previousStack = currentRegEntry.stack;
           currentRegEntry.stack = rootStack;
           setStackSnapshot([...rootStack]);
           if (persist) writePersistedStack(id, rootStack);
+          api._notifyExternalStackChange(previousStack);
         }
       };
 
@@ -1217,9 +1219,15 @@ export default function NavigationStack(props: {
       });
 
       if (!isEqual(currentRegEntry.stack, newStack)) {
+        const previousStack = currentRegEntry.stack;
         currentRegEntry.stack = newStack;
         setStackSnapshot([...newStack]);
         if (persist) writePersistedStack(id, newStack);
+        // Assigning the stack directly bypasses emit(), where lifecycle triggers live — so
+        // onExit/onEnter never fired for browser Back/Forward, the iOS edge-swipe or the Android
+        // back gesture. Anything bound to onExit (flow-scope cleanup, analytics, pausing work)
+        // silently skipped the most common way users leave a page.
+        api._notifyExternalStackChange(previousStack);
       }
     };
 

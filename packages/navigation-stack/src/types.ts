@@ -180,6 +180,11 @@ export type NavStackAPI<K extends string = string> = {
   peek: () => StackEntry | undefined;
   go: (rawKey: K, params?: NavParams, metadata?: StackEntry['metadata']) => Promise<boolean | NavActionResult>;
   replaceParam: (params: NavParams, merge?: boolean) => Promise<boolean | NavActionResult>;
+  /**
+   * Internal: fire lifecycle hooks for a browser-driven (popstate) stack change. Called by the
+   * popstate handler, which assigns the stack directly and so bypasses the normal emit path.
+   */
+  _notifyExternalStackChange: (previousStack: StackEntry[]) => void;
 
   // ============ C3: Location & deep links ============
 

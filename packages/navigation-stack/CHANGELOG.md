@@ -1,5 +1,31 @@
 # @academix-admin/navigation-stack
 
+## 0.11.3
+
+### Patch Changes
+
+- Fix: `onExit`/`onEnter` never fired for browser-driven navigation.
+
+  The popstate handler re-derives the stack and assigns it directly, bypassing `emit()` — which is
+  where lifecycle triggers live. So browser Back/Forward, the iOS edge-swipe and the Android back
+  gesture changed the stack **without** firing lifecycle hooks, while `pop()`, `popToRoot()` and
+  `replace()` all did.
+
+  Anything bound to `onExit` therefore silently skipped the most common ways a user leaves a page.
+  Consumers clearing flow-scoped state there (see the ACADEMIX_PLAN §3b pattern) leaked it on every
+  gesture and browser exit — stale data surviving into the next visit.
+
+  Lifecycle now fires on the popstate path too, deliberately without any history or URL writes, since
+  the browser already owns both by then.
+
+  Also: lifecycle triggers are recorded in the devtools timeline as `lifecycle:onExit` etc., and
+  recorded BEFORE the has-handlers check — so an exit path that fires with nothing attached is
+  distinguishable from one that never fires at all, which is exactly the question when auditing
+  coverage.
+
+  New test asserts `onExit` for pop, popToRoot, replace and browser Back. Browser Back was failing
+  before this fix.
+
 ## 0.11.2
 
 ### Patch Changes
