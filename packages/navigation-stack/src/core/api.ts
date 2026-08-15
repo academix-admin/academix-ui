@@ -133,7 +133,11 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
         if (isPopFamily) {
           // Stack is already mutated; give back exactly the entries recorded above the new depth.
           // The resulting popstate re-derives an identical stack, so its rebuild is a no-op.
-          consumed = consumeHistoryEntries(id, takeEntriesAboveDepth(id, stackCopy.length));
+          consumed = consumeHistoryEntries(
+            id,
+            takeEntriesAboveDepth(id, stackCopy.length),
+            stackCopy.length,
+          );
         } else if (!isReplaceFamily && (grew || actionType === 'pushAndPopUntil' || actionType === 'pushAndReplace')) {
           mode = 'push';
         }

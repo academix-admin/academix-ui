@@ -445,12 +445,59 @@ export function usePullToRefresh(options: UsePullToRefreshOptions): PullToRefres
 }
 
 
+/**
+ * What the container looked like when a scroll position was captured.
+ *
+ * A pixel offset only means something at the width it was measured at. Capture 200px at 1200px
+ * wide, restore it at 430px, and the content has reflowed underneath: 200px is now a different
+ * place in the document — usually much further down, since narrower columns make everything taller.
+ * The restore "works" and lands somewhere the user never was.
+ *
+ * Stored in a SEPARATE map rather than widening `scrollPositions`, which is part of the exported
+ * `globalScrollData` surface — changing its value type would break anything reading it.
+ */
+type ScrollMetrics = {
+  /** Container width at capture time. */
+  width: number;
+  /** Maximum scrollable distance at capture time (scrollHeight - clientHeight). */
+  maxScroll: number;
+};
+
 export const globalScrollData = {
   scrollPositions: new Map<string, number>(),
+  scrollMetrics: new Map<string, ScrollMetrics>(),
   lastUid: null as string | null,
   lastGroupStackKey: null as string | null,
   // lastActive: true,
 };
+
+/** Widths within this many px count as unchanged — scrollbars and subpixel rounding move it slightly. */
+const WIDTH_TOLERANCE_PX = 2;
+
+/**
+ * Where to scroll to, given what the container looked like when the position was captured.
+ *
+ * Same width: the exact pixel offset, which is what the user actually saw.
+ * Different width: the same PROPORTION of the document. Not perfect — proportional position is not
+ * semantic position, and only a content anchor would be — but it keeps the user near where they
+ * were instead of at an offset that now means something else entirely.
+ */
+export function resolveScrollTarget(
+  saved: number,
+  captured: ScrollMetrics | undefined,
+  currentWidth: number,
+  currentMaxScroll: number,
+): number {
+  if (saved <= 0) return 0;
+  if (!captured || captured.maxScroll <= 0) return Math.min(saved, Math.max(currentMaxScroll, 0));
+
+  if (Math.abs(captured.width - currentWidth) <= WIDTH_TOLERANCE_PX) {
+    return Math.min(saved, Math.max(currentMaxScroll, 0));
+  }
+
+  const ratio = saved / captured.maxScroll;
+  return Math.min(Math.round(ratio * currentMaxScroll), Math.max(currentMaxScroll, 0));
+}
 
 export interface ContainerData {
   element: HTMLElement;
@@ -657,7 +704,18 @@ export function useUnifiedScrollRestoration(
       scrollData.pendingCleanups.set(uid, { observer, timeoutId });
     });
 
-    const attachScrollListener = (uid: string, container: HTMLElement, entry: StackEntry) => {
+    // Declared as a hoisted `function`, not a `const` arrow.
+    //
+    // It is CALLED above, in the forEach that wires up new pages -- 33 lines before this point. As a
+    // const it sits in the temporal dead zone at that moment, so the synchronous branch (the page's
+    // scroll container already in the DOM) threw "Cannot access 'attachScrollListener' before
+    // initialization" and killed scroll tracking for that page.
+    //
+    // It hid because the synchronous branch is the uncommon one: with a single stack the container
+    // usually is not mounted yet, so the MutationObserver path runs instead and fires long after
+    // this line has executed. A SECOND mounted stack changes that -- its container is already there
+    // -- which is why this only showed up with sibling stacks, the exact shape academix-web runs.
+    function attachScrollListener(uid: string, container: HTMLElement, entry: StackEntry) {
       const handleScroll = () => {
         const scrollPosition = getCurrentScrollPosition(container);
         globalScrollData.scrollPositions.set(uid, scrollPosition);
@@ -665,6 +723,14 @@ export function useUnifiedScrollRestoration(
         const scrollHeight = container?.scrollHeight ?? 0;
         const clientHeight = container?.clientHeight ?? 0;
         const maxScroll = Math.max(scrollHeight - clientHeight, 0);
+
+        // Recorded with every position: a pixel offset is only meaningful at the width it was taken
+        // at, and the width can change between capture and restore (rotation, resize, a responsive
+        // breakpoint).
+        globalScrollData.scrollMetrics.set(uid, {
+          width: container?.clientWidth ?? 0,
+          maxScroll,
+        });
         const scrollPercentage = maxScroll > 0 ? (scrollPosition / maxScroll) * 100 : 0;
 
         scrollBroadcaster.broadcast({
@@ -682,7 +748,7 @@ export function useUnifiedScrollRestoration(
 
       const removeListener = addScrollListener(container, handleScroll);
       scrollData.activeListeners.set(uid, removeListener);
-    };
+    }
 
     return () => {
       // Empty return - listeners stay active even when stack changes
@@ -715,7 +781,15 @@ export function useUnifiedScrollRestoration(
           return;
         }
         const savedPosition = globalScrollData.scrollPositions.get(scrollKey) ?? 0;
-        setScrollPosition(savedPosition, container);
+        const captured = globalScrollData.scrollMetrics.get(scrollKey);
+        const currentMaxScroll = Math.max(
+          (container.scrollHeight ?? 0) - (container.clientHeight ?? 0),
+          0,
+        );
+        setScrollPosition(
+          resolveScrollTarget(savedPosition, captured, container.clientWidth ?? 0, currentMaxScroll),
+          container,
+        );
       };
 
       // Immediate restore
@@ -802,6 +876,7 @@ export function useUnifiedScrollRestoration(
         }
 
         globalScrollData.scrollPositions.delete(key);
+        globalScrollData.scrollMetrics.delete(key);
         scrollData.pendingListeners.delete(key);
       });
     }

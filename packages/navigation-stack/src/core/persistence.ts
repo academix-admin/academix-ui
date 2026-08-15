@@ -365,6 +365,138 @@ export function takeEntriesAboveDepth(stackId: string, targetDepth: number): num
  * only Back would trade an over-count for an under-count, and an under-count is worse — a pop that
  * gives back too few entries leaves the URL describing a page the user has already left.
  */
+/**
+ * Ordered log of the history entries THIS LIBRARY wrote, oldest first.
+ *
+ * `_pushDepth` counts entries per stack, but `history.go(-n)` is positional over the browser's
+ * single, GLOBAL entry list — and entries from different stacks interleave. Counting therefore
+ * answers the wrong question:
+ *
+ *     payment pushes   -> entry P1
+ *     profile pushes   -> entry F1
+ *     profile pushes   -> entry F2
+ *     payment.pop()    -> payment owns 1 entry, so go(-1) ... lands on F2, profile's entry
+ *
+ * The pop travels one entry back as asked and arrives somewhere that belongs to a different stack,
+ * restoring that stack's URL and (in a tab group) its `group=`. From the outside: "I popped on one
+ * tab and ended up on another." It is intermittent precisely because it depends on the interleaving
+ * — pop the most recently pushed stack and the count happens to be right.
+ *
+ * Recording what each entry actually represents turns the question from "how many entries" into
+ * "which entry", which is the one that has a correct answer.
+ */
+type EntryRecord = { serial: number; navParam: string | null };
+let _entryLog: EntryRecord[] = [];
+
+/** Stands in for an entry we did not write (the one we were on at first push). Never a real serial. */
+const SEEDED_ENTRY_SERIAL = 0;
+
+/** Depth of `stackId` as encoded in a combined nav param. 0 when the stack is absent. */
+function depthOfStackIn(navParam: string | null, stackId: string): number {
+  if (!navParam) return 0;
+  const path = parseCombinedNavParam(navParam)[stackId];
+  if (!path) return 0;
+  const parsed = parseUrlPathIntoStacks(path);
+  return parsed[0]?.length ?? 0;
+}
+
+export function currentSerial(): number | null {
+  if (typeof window === 'undefined') return null;
+  return readAxState(window.history.state)?.axSerial ?? null;
+}
+
+/**
+ * Record an entry we just wrote. `push` truncates anything ahead of the current position first,
+ * mirroring what the browser itself does to forward history on pushState — a log that kept those
+ * entries would offer deltas to entries that no longer exist.
+ */
+export function recordWrittenEntry(
+  /**
+   * Serial of the entry we were standing on BEFORE this write, captured by the caller.
+   *
+   * It cannot be read here: pushState/replaceState have already run by the time this is called, so
+   * `history.state` reports the entry just written. Looking it up here found the new serial, which
+   * is never in the log yet — so every lookup missed, every write took the "unknown entry" branch,
+   * and the log was truncated to a single record each time. A log that resets on every write is
+   * indistinguishable from no log at all, which is exactly how it behaved.
+   */
+  prevSerial: number | null,
+  serial: number,
+  navParam: string | null,
+  mode: 'push' | 'replace',
+  /** Nav param of the entry we were standing on, so an unseeded log can start from reality. */
+  prevNavParam?: string | null,
+): void {
+  const i = prevSerial === null ? -1 : _entryLog.findIndex((e) => e.serial === prevSerial);
+
+  // We are standing on an entry the log does not contain — a full page load, a cross-document
+  // navigation, or anything else that replaced history.state. The log's relationship to the
+  // browser's list is now unknown, so every record in it is untrustworthy: keeping them would let
+  // a later lookup return a delta into entries that may no longer exist, which is worse than having
+  // no log at all. Start again from where we actually are.
+  if (i < 0) {
+    if (mode === 'replace') {
+      _entryLog = [{ serial, navParam }];
+      return;
+    }
+
+    // A push leaves the entry we were standing on BEHIND us, and that entry is a legitimate target
+    // for a later pop — it is the state the first push moved away from. Dropping it meant the very
+    // first pushed page had no recorded predecessor, so a pop could never find its own target and
+    // silently fell back to counting, which is the behaviour this log exists to replace. Seed it
+    // with a serial no real entry can have (serials start at 1).
+    _entryLog = [
+      { serial: SEEDED_ENTRY_SERIAL, navParam: prevNavParam ?? null },
+      { serial, navParam },
+    ];
+    return;
+  }
+
+  if (mode === 'replace') {
+    _entryLog[i] = { serial, navParam };
+    return;
+  }
+
+  _entryLog = _entryLog.slice(0, i + 1);
+  _entryLog.push({ serial, navParam });
+}
+
+/** Drop the entry log. Exposed for tests and teardown; production resets itself on an unknown entry. */
+export function resetEntryLog(): void {
+  _entryLog = [];
+}
+
+/**
+ * How far back to travel so `stackId` sits at `targetDepth`, or null when this log cannot answer.
+ *
+ * Null is a real answer, not a failure: after a reload the log is empty but the browser's entries
+ * still exist, and the count-based path remains the best available approximation. Guessing a delta
+ * from an empty log would be strictly worse than the behaviour it replaces.
+ */
+export function findBackDeltaForDepth(stackId: string, targetDepth: number): number | null {
+  const cur = currentSerial();
+  if (cur === null) return null;
+  const i = _entryLog.findIndex((e) => e.serial === cur);
+  if (i < 0) return null;
+
+  for (let j = i - 1; j >= 0; j -= 1) {
+    const d = depthOfStackIn(_entryLog[j].navParam, stackId);
+    if (d === targetDepth) return i - j;
+
+    // A stack ABSENT from an entry's nav param is a stack sitting at its root: nothing is written
+    // until the first push, so the entry the user started on encodes no path for it at all. Without
+    // this, popping back to the root could never match the entry it was trying to reach — the one
+    // case that matters most, since it is where the app started.
+    if (d === 0 && targetDepth === 1) return i - j;
+  }
+  return null;
+}
+
+/** Exposed for devtools and tests: the entry log as this library understands it. */
+export function getEntryLog(): { serial: number; navParam: string | null }[] {
+  return _entryLog.map((e) => ({ ...e }));
+}
+
 export function reconcileLedgerToDepth(stackId: string, previousDepth: number, newDepth: number): void {
   if (newDepth === previousDepth) return;
 
@@ -396,12 +528,25 @@ export function resetPushDepth(stackId: string): void {
  * restored URL and finds it identical, so the rebuild is a no-op (see the isEqual guard in
  * components.tsx). That is what keeps programmatic pop and browser-back from double-popping.
  */
-export function consumeHistoryEntries(stackId: string, requested: number): number {
+export function consumeHistoryEntries(stackId: string, requested: number, targetDepth?: number): number {
   if (typeof window === "undefined" || requested <= 0) return 0;
   const available = getPushDepth(stackId);
-  const n = Math.min(requested, available);
-  if (n <= 0) return 0;
-  _pushDepth.set(stackId, available - n);
+  const counted = Math.min(requested, available);
+  if (counted <= 0) return 0;
+
+  // Prefer the entry we can NAME over the number we counted.
+  //
+  // The count is only correct when the entries behind us all belong to this stack. Interleave two
+  // stacks and it silently addresses someone else's entry — see the _entryLog comment. When the log
+  // can identify the target, its delta is authoritative even where the two disagree; the count is
+  // the fallback for when it cannot (after a reload, say).
+  let n = counted;
+  if (typeof targetDepth === 'number') {
+    const targeted = findBackDeltaForDepth(stackId, targetDepth);
+    if (targeted !== null && targeted > 0) n = targeted;
+  }
+
+  _pushDepth.set(stackId, Math.max(0, available - counted));
   try {
     window.history.go(-n);
   } catch {
@@ -449,14 +594,18 @@ export function updateNavQueryParamForStack(
 
     const newHref = url.toString();
     if (window.location.href !== newHref) {
+      // Captured BEFORE the write: afterwards history.state describes the new entry.
+      const prevSerial = currentSerial();
       if (mode === 'push') {
         // One pushState only. Calling it twice (as the replace path does for groups) would create
         // two entries for a single navigation, so back would need two presses to move one page.
+        const serial = nextSerial();
         window.history.pushState(
-          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: nextSerial() },
+          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: serial },
           "",
           newHref,
         );
+        recordWrittenEntry(prevSerial, serial, newParam, 'push', current);
         _pushDepth.set(stackId, getPushDepth(stackId) + 1);
         // Ledger the stack depth this entry represents, so a later pop gives back the right count
         // even when one navigation moved several levels.
@@ -470,11 +619,13 @@ export function updateNavQueryParamForStack(
         // the same logical position had two different state shapes depending on how it was reached.
         // Anything branching on `event.state.group` during popstate therefore behaved differently
         // for the same page.
+        const serial = nextSerial();
         window.history.replaceState(
-          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: nextSerial() },
+          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: serial },
           "",
           newHref,
         );
+        recordWrittenEntry(prevSerial, serial, newParam, 'replace');
       }
     }
   } catch (e) {

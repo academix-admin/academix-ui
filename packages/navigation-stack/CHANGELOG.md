@@ -1,5 +1,44 @@
 # @academix-admin/navigation-stack
 
+## 0.13.0
+
+### Minor Changes
+
+- Fix: a pop could land on **another stack's** history entry.
+
+  `_pushDepth` counts entries per stack, but `history.go(-n)` is positional over the browser's single,
+  **global** entry list — and entries from different stacks interleave:
+
+  ```
+  payment pushes  -> P1
+  profile pushes  -> F1
+  profile pushes  -> F2
+  payment.pop()   -> payment owns 1 entry, so go(-1) ... lands on F2, profile's entry
+  ```
+
+  The pop travels exactly as far as asked and arrives at a state belonging to a different stack,
+  restoring that stack's URL and (in a tab group) its `group=`. From the outside: _"I popped on one tab
+  and ended up on another."_ Intermittent by nature — pop the most recently pushed stack and the count
+  happens to be right, which is why it came and went.
+
+  Counting cannot fix this, because "how many entries back" is the wrong question. The library now
+  keeps an ordered log of the entries it wrote, each with the nav state it represents, and a pop asks
+  **which entry** puts this stack at the target depth. The count remains the fallback for when the log
+  cannot answer (after a reload, say), where it is still the best available approximation.
+
+  Also fixed here, both found while building the above:
+
+  - **A crash in scroll tracking with sibling stacks.** `attachScrollListener` is called 33 lines
+    before its `const` declaration — a temporal dead zone error. It hid because the synchronous branch
+    (container already in the DOM) is uncommon with a single stack; a second mounted stack makes it
+    the normal path, killing scroll tracking for that page.
+  - **Scroll restoration ignored width changes.** A captured pixel offset only means something at the
+    width it was captured at: 200px at 1200px wide is a different place in the document at 430px,
+    where narrower columns make content taller. Positions now record the container width and max
+    scroll; an unchanged width restores the exact offset, a changed one restores the same _proportion_
+    and clamps to the current document. Not perfect — only a content anchor would be — but it keeps
+    the user near where they were instead of at an offset that now means something else.
+
 ## 0.12.3
 
 ### Patch Changes
