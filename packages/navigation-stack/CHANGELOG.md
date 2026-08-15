@@ -1,5 +1,23 @@
 # @academix-admin/navigation-stack
 
+## 0.12.3
+
+### Patch Changes
+
+- Fix: the devtools panel covered the app's bottom navigation bar.
+
+  Default anchor moved from `bottom-right` to `top-right`, and the panel is now capped to the
+  viewport (`calc(100vw - 32px)` / `calc(100vh - 32px)`) so it cannot run off the edge of a
+  phone-sized window — the part that runs off is the part you cannot scroll to.
+
+  Bottom corners are where app UI actually lives. A mobile-style bottom nav bar sits exactly under a
+  bottom-anchored panel, and the panel's high z-index means it _swallows_ those taps rather than
+  merely overlapping them. Found when it blocked tab clicks in an E2E probe. A debugging tool that
+  breaks the app it is meant to observe is the one failure mode it cannot have.
+
+  New `offset` prop (default 16) for the distance from the anchored corner. `position` still accepts
+  all four corners, so the old placement is one prop away.
+
 ## 0.12.2
 
 ### Patch Changes

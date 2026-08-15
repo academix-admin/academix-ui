@@ -38,7 +38,7 @@ const ACTION_COLORS: Record<string, string> = {
 
 const CSS = `
 .${P}-root{position:fixed;z-index:2147483000;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.45;color:#e5e7eb}
-.${P}-fab{position:fixed;bottom:16px;right:16px;z-index:2147483000;width:40px;height:40px;border-radius:10px;background:#111827;color:#e5e7eb;border:1px solid #374151;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.${P}-fab{position:fixed;z-index:2147483000;width:40px;height:40px;border-radius:10px;background:#111827;color:#e5e7eb;border:1px solid #374151;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .${P}-fab:hover{background:#1f2937}
 .${P}-panel{display:flex;flex-direction:column;background:#0b0f19;border:1px solid #263042;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.55);overflow:hidden;resize:both}
 .${P}-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#111827;border-bottom:1px solid #263042;cursor:move;user-select:none}
@@ -92,14 +92,24 @@ export type NavigationDevtoolsProps = {
   defaultOpen?: boolean;
   /** Poll interval in ms. Default 250. */
   intervalMs?: number;
-  /** Corner to anchor to. Default 'bottom-right'. */
+  /**
+   * Corner to anchor to. Default 'top-right'.
+   *
+   * Bottom corners are where app UI actually lives — a mobile-style bottom navigation bar sits
+   * exactly under a bottom-anchored panel, and the panel's high z-index means it swallows those
+   * taps rather than merely overlapping them. That is a debugging tool breaking the app it is
+   * meant to observe, which is the one thing it must never do.
+   */
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  /** Distance from the anchored corner, in px. Default 16. */
+  offset?: number;
 };
 
 export function NavigationDevtools({
   defaultOpen = false,
   intervalMs = 250,
-  position = 'bottom-right',
+  position = 'top-right',
+  offset = 16,
 }: NavigationDevtoolsProps) {
   const enabled = devtoolsEnabled();
   const [open, setOpen] = useState(defaultOpen);
@@ -141,10 +151,10 @@ export function NavigationDevtools({
   if (!enabled) return null;
 
   const anchor: React.CSSProperties =
-    position === 'bottom-right' ? { bottom: 16, right: 16 }
-    : position === 'bottom-left' ? { bottom: 16, left: 16 }
-    : position === 'top-right' ? { top: 16, right: 16 }
-    : { top: 16, left: 16 };
+    position === 'bottom-right' ? { bottom: offset, right: offset }
+    : position === 'bottom-left' ? { bottom: offset, left: offset }
+    : position === 'top-right' ? { top: offset, right: offset }
+    : { top: offset, left: offset };
 
   if (!open) {
     return (
@@ -160,7 +170,12 @@ export function NavigationDevtools({
   return (
     <>
       <style>{CSS}</style>
-      <div className={`${P}-root`} style={{ ...anchor, width: 420, height: 460 }}>
+      {/* Capped to the viewport: a fixed 420x460 runs off the edge of a phone-sized window, and the
+          part that runs off is the part you cannot scroll to. */}
+      <div
+        className={`${P}-root`}
+        style={{ ...anchor, width: 420, height: 460, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 32px)' }}
+      >
         <div className={`${P}-panel`} style={{ width: '100%', height: '100%' }}>
           <div className={`${P}-head`}>
             <span className={`${P}-title`}>navigation-stack</span>
