@@ -4,7 +4,7 @@ import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from '
 import { _currentPageUidByStack } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
-import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, resetPushDepth, getPushDepth, recordEntryDepth, takeEntriesAboveDepth } from './persistence';
+import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, reconcileLedgerToDepth, resetPushDepth, getPushDepth, recordEntryDepth, takeEntriesAboveDepth } from './persistence';
 import { recordNavEvent } from '../devtools';
 import { globalObjectRegistry } from '../di/object-registry';
 import { getOverlayStore, notifyOverlays, disposeOverlays, clampOffset, type OverlayEntryRec } from '../overlay/registry';
@@ -1235,6 +1235,11 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
      */
     _notifyExternalStackChange(previousStack: StackEntry[]) {
       const stackCopy = regEntry.stack.slice();
+
+      // Before anything else: the browser just moved us across entries this stack owns, and the
+      // ledger that decides how far a later pop travels does not know it yet.
+      reconcileLedgerToDepth(id, previousStack.length, stackCopy.length);
+
       const previousTop = previousStack[previousStack.length - 1];
       const currentTop = stackCopy[stackCopy.length - 1];
       if (previousTop?.uid === currentTop?.uid) return;

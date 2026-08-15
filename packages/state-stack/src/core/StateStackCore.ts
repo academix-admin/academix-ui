@@ -446,6 +446,36 @@ export class StateStackCore {
       }
     }
 
+    // Everything above walks IN-MEMORY structures, so it can only clear what this session happens
+    // to have touched. A key persisted in an earlier session, or whose entry has since been
+    // evicted, is in neither `stacks` nor `loadedKeys` — its stored record survived the clear and
+    // rehydrated on the next load. That is why leaving a flow looked like it worked and the stale
+    // value reappeared later, nowhere near the clear that should have removed it.
+    //
+    // Sweeping storage by prefix is the only way to be complete: the durable copy is the source of
+    // truth on the next load, so a scope clear that skips it has not cleared the scope.
+    if (removePersist && typeof storage.getAllKeys === 'function') {
+      try {
+        // The separator is what makes the boundary exact. Matching the bare scope name would make
+        // clearScope('mission') also destroy 'mission_flow'.
+        const prefix = this.storageKey(scope, '');
+        const all = await storage.getAllKeys();
+        for (const sk of all) {
+          if (!sk.startsWith(prefix)) continue;
+          try {
+            await storage.removeItem(sk);
+            this.broadcastStateChange(scope, sk.slice(prefix.length), null);
+          } catch (err) {
+            console.error('[StateStack] clearScope persist sweep error:', err);
+          }
+        }
+      } catch (err) {
+        // A storage that cannot enumerate is not a reason to fail the clear — the in-memory pass
+        // above has already run, which is the pre-existing behaviour.
+        console.error('[StateStack] clearScope getAllKeys error:', err);
+      }
+    }
+
     this.scopeSubscriberCounts.delete(scope);
   }
 

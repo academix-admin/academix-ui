@@ -352,6 +352,37 @@ export function takeEntriesAboveDepth(stackId: string, targetDepth: number): num
   return n;
 }
 
+/**
+ * Bring the ledger back in line after the BROWSER moved us, rather than us moving ourselves.
+ *
+ * `consumeHistoryEntries()` is the only other place the ledger shrinks, and it is the programmatic
+ * path. A browser Back also crosses an owned entry — that entry is now AHEAD of us, not behind —
+ * but nothing decremented it, so the ledger over-counted from that point on. The error stayed
+ * invisible until the next programmatic pop, which then handed back more entries than were actually
+ * behind us and jumped several at once.
+ *
+ * Symmetric on purpose: Forward puts those entries back behind us, so it re-records them. Handling
+ * only Back would trade an over-count for an under-count, and an under-count is worse — a pop that
+ * gives back too few entries leaves the URL describing a page the user has already left.
+ */
+export function reconcileLedgerToDepth(stackId: string, previousDepth: number, newDepth: number): void {
+  if (newDepth === previousDepth) return;
+
+  if (newDepth < previousDepth) {
+    const released = takeEntriesAboveDepth(stackId, newDepth);
+    if (released > 0) {
+      _pushDepth.set(stackId, Math.max(0, getPushDepth(stackId) - released));
+    }
+    return;
+  }
+
+  // Forward: one entry per level regained, each recorded at the depth it was created.
+  for (let d = previousDepth + 1; d <= newDepth; d += 1) {
+    recordEntryDepth(stackId, d);
+    _pushDepth.set(stackId, getPushDepth(stackId) + 1);
+  }
+}
+
 export function resetPushDepth(stackId: string): void {
   _pushDepth.delete(stackId);
   _entryDepths.delete(stackId);

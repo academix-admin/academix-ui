@@ -1,5 +1,26 @@
 # @academix-admin/navigation-stack
 
+## 0.12.2
+
+### Patch Changes
+
+- Fix: browser Back left the history ledger over-counting, so a later pop jumped several entries.
+
+  `_pushDepth`/`_entryDepths` track "entries this stack pushed that sit behind us", and every
+  programmatic pop hands them back with `history.go(-n)`. Only `consumeHistoryEntries()` decremented
+  them — the programmatic path. A browser Back also crosses an owned entry (that entry is now _ahead_
+  of us) but left the ledger untouched.
+
+  The error is silent until the next programmatic pop multiplies it: that pop calls `history.go(-n)`
+  with an `n` larger than what is actually behind us and travels several entries at once, landing on
+  an old URL. In a tab-group app that old URL carries a different `group=`, so the whole app
+  re-derives to a different tab — **pressing Back on one tab lands you on another**, which is what
+  this looked like from the outside and nothing like a counter being wrong.
+
+  Reconciliation is symmetric: Forward puts those entries back behind us, so they are re-recorded.
+  Handling only Back would trade an over-count for an under-count, and an under-count is worse — a pop
+  that gives back too few entries leaves the URL describing a page the user already left.
+
 ## 0.12.1
 
 ### Patch Changes
