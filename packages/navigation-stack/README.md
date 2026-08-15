@@ -175,6 +175,50 @@ Render a `<NavigationStack />` inside a page of another stack — the child
 auto-detects its parent. For coordinated siblings (e.g. a tab bar), wrap them in
 `<GroupNavigationStack>`.
 
+## Devtools
+
+In any non-production build, the library installs `window.__NAV_STACK__` — a JSON-safe inspector
+you can use from the browser console.
+
+```js
+__NAV_STACK__.stacks()              // ['home-stack', 'profile-stack', ...]
+__NAV_STACK__.snapshot('signup')    // depth, entries, top, pushDepth, historySync…
+__NAV_STACK__.history()             // browser history vs. entries this library owns
+__NAV_STACK__.events()              // recent navigations (ring buffer, oldest first)
+__NAV_STACK__.debug()               // one pasteable blob for a bug report
+```
+
+**Watching navigation as it happens** — the answer to "I'm about to press Back, what fires?":
+
+```js
+__NAV_STACK__.trace()        // start streaming to the console
+__NAV_STACK__.trace(false)   // stop
+```
+
+```
+nav signup push        1->2 top=step2       pushDepth=1
+nav signup lifecycle:onExit  2  top=step2   pushDepth=1
+nav signup popstate    2->1 top=step1       pushDepth=0
+```
+
+Lifecycle triggers are recorded *before* the has-handlers check, so a hook that fires with nothing
+attached looks different from one that never fires at all — which is the actual question when you
+are auditing whether some exit path reaches your cleanup.
+
+Two fields answer most "Back is behaving strangely" reports:
+
+- **`pushDepth` is 0 while pages are stacked** → nothing was pushed to history, so Back will leave
+  the site rather than pop a page. Different bug from Back popping twice.
+- **`history().historyLength` vs `ownedEntries`** → how much of the browser's history this library
+  believes it owns.
+
+`setHistorySync(stackId, bool)` flips history behaviour at runtime with no rebuild, so you can A/B a
+suspected regression on a live page: toggle, repeat the gesture, compare.
+
+In a production build the inspector is absent by default. Set `window.__NAV_STACK_DEVTOOLS__ = true`
+before the app boots to force it on — which is how the Playwright helpers (`./playwright`) drive it
+against a real production bundle.
+
 ## SSR / Next.js
 
 Both the component and its hooks are client-only; the module carries the
