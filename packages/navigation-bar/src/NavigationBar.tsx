@@ -222,6 +222,8 @@ export default function NavigationBar({
   const [hidden, setHidden] = useState(false);
   const [fabClicked, setFabClicked] = useState(false);
   const prevScroll = useRef(0);
+  /** Which page last reported a scroll, so a change of page can reset the bar. */
+  const lastSource = useRef<string | null>(null);
 
   // Reset hidden state when mode changes
   useEffect(() => {
@@ -240,6 +242,21 @@ export default function NavigationBar({
 
     if (typeof current !== 'number') return;
 
+    /*
+     * A new page starts with the bar showing.
+     *
+     * Scroll state belongs to the page that was scrolled. Carrying a hidden bar across a
+     * navigation means arriving somewhere new with no visible navigation — and if the new page
+     * does not scroll, nothing will ever reveal it.
+     */
+    const source = event.pageKey ?? event.uid ?? null;
+    if (source != null && source !== lastSource.current) {
+      lastSource.current = source;
+      prevScroll.current = current;
+      setHidden(false);
+      return;
+    }
+
     // If page is not scrollable at all, keep navbar visible
     const isScrollable = scrollHeight > clientHeight;
     if (!isScrollable) {
@@ -250,7 +267,19 @@ export default function NavigationBar({
     const atTop = current <= 0;
     const atBottom = clientHeight + current >= scrollHeight - 2;
 
-    if (atTop || atBottom) {
+    // At the very top the bar must be SHOWING, not merely left as it was.
+    //
+    // This used to return early, so a jump straight to the top — `scrollTop = 0`, an anchor, a
+    // "back to top" control — left an autohidden bar hidden with no way to bring it back: the
+    // only thing that reveals it is an upward scroll, and there is nothing left to scroll. On a
+    // page whose content then fits the screen, the app is stranded with no navigation at all.
+    if (atTop) {
+      prevScroll.current = current;
+      setHidden(false);
+      return;
+    }
+
+    if (atBottom) {
       prevScroll.current = current;
       return;
     }
