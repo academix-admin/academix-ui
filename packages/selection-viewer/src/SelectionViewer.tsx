@@ -126,6 +126,13 @@ type SelectionViewerProps = {
   initialSnap?: number;
   unmountOnClose?: boolean;
   zIndex?: number;
+  /**
+   * Accessible name for the sheet, announced when it opens.
+   *
+   * A modal with no name is announced simply as "dialog", which tells a screen-reader user that
+   * something has taken over the screen and nothing at all about what.
+   */
+  ariaLabel?: string;
   maxHeight?: string;
   minHeight?: string;
   selectionState?: SelectionState;
@@ -324,6 +331,56 @@ const useInjectStyles = (id: string) => {
 };
 
 // ==================== Component ====================
+/**
+ * Escape closes the viewer, and Tab stays inside it.
+ *
+ * The viewer covers the screen, so what is behind it is not available — but nothing said so to the
+ * keyboard. Tab walked out of the option list into the page underneath, where a person was
+ * operating controls they could not see, and Escape did nothing at all, which is the one key
+ * everybody reaches for to get out of a picker.
+ *
+ * Deliberately a private copy rather than an import from a sibling package: every library here
+ * stands alone, and a shared helper between two of them is a dependency the consumer did not ask
+ * for. Takes the container's `id` rather than a ref, because the sheet element belongs to the
+ * underlying modal-sheet component; looking it up when a key is pressed finds it however that
+ * component chooses to mount it. Focusables are re-queried on every Tab, since the option list
+ * changes as the consumer filters it and a list captured on open is a list of dead elements.
+ */
+const useModalKeys = (isOpen: boolean, onClose: () => void, containerId: string) => {
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const focusable = document.getElementById(containerId)?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),' +
+          ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose, containerId]);
+};
+
 const SelectionViewer: React.FC<SelectionViewerProps> = ({
   id: providedId,
   isOpen,
@@ -343,6 +400,7 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
   initialSnap = 1,
   unmountOnClose = true,
   zIndex = 1000,
+  ariaLabel,
   maxHeight = "90dvh",
   minHeight = "65dvh",
   selectionState: selectionStateProp = "initial",
@@ -360,6 +418,8 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
   const headerRef = useRef<HTMLDivElement>(null);
 
   useInjectStyles(id);
+  // Escape closes the viewer and Tab stays inside it — see useModalKeys.
+  useModalKeys(isOpen, onClose, id);
 
   // Descendant sections (a Column, or anything else) can report a cumulative state up through this —
   // starts empty, so a plain SelectionViewer with no Row/Column children behaves exactly as before.
@@ -501,6 +561,12 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
     >
       <Sheet.Container
         id={id}
+        // Announced as a modal dialog. Without this a screen reader reads the sheet as one more
+        // region of the page and gives no indication that what is behind it is unavailable — and
+        // an automated check for an open dialog finds nothing at all.
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
         style={{
           maxHeight: maxHeight,
           minHeight: isSearchFocused ? "100dvh" : minHeight,

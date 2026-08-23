@@ -6,6 +6,7 @@ import {
   getSearchViewerStyles,
   useInjectStyles,
   useKeyboardHeight,
+  useModalKeys,
   useSearchInput,
 } from "./core";
 import type { EachViewerProps } from "./EachViewer";
@@ -51,6 +52,8 @@ function MultipleSearchViewer({
 
   useInjectStyles(id, "search-viewer-styles", getSearchViewerStyles);
   const keyboardHeight = useKeyboardHeight();
+  // Escape closes the viewer and Tab stays inside it — see useModalKeys.
+  useModalKeys(isOpen, onClose, id);
 
   const handleDebouncedSearch = useCallback((value: string) => {
     setDebouncedSearchValue(value);

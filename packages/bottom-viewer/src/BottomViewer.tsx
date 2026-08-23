@@ -41,6 +41,13 @@ interface BottomViewerProps {
   disableDrag?: boolean;
   avoidKeyboard?: boolean;
   closeThreshold?: number;
+  /**
+   * Accessible name for the sheet, announced when it opens.
+   *
+   * A modal with no name is announced simply as "dialog", which tells a screen-reader user that
+   * something has taken over the screen and nothing at all about what.
+   */
+  ariaLabel?: string;
 }
 
 // ==================== Styles ====================
@@ -152,6 +159,7 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
   detent = "content",
   disableDrag = false,
   avoidKeyboard = true,
+  ariaLabel,
   closeThreshold = 0.2,
 }, ref) => {
   const [id] = useState(() => providedId || `bottomviewer-${Math.random().toString(36).substr(2, 9)}`);
@@ -212,6 +220,59 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
       document.body.classList.remove('body-bottom-sheet-open');
     };
   }, [isOpen]);
+
+  /*
+   * Escape closes it, and Tab stays inside it.
+   *
+   * Neither was here. A sheet without them is one a keyboard or screen-reader user can tab
+   * straight out of — into controls they cannot see behind the backdrop — with no way to dismiss
+   * what is covering the screen except a pointer. On a surface that takes payments that is not an
+   * acceptable gap, and without it every consumer has to rebuild the same thing; store-manager
+   * had, in a hand-rolled sheet that existed only because of this.
+   *
+   * The trap re-queries on each Tab rather than caching the focusable list: a sheet's content
+   * changes while it is open — a list loads, a form reveals a field — and a cached list sends
+   * focus to an element that is no longer there.
+   */
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+
+    // Focus the container itself rather than its first control: announcing the sheet before its
+    // first field gives a screen-reader user the context for what they are about to fill in.
+    const focusTimer = setTimeout(() => containerRef.current?.focus(), 60);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const focusable = containerRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),' +
+          ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      clearTimeout(focusTimer);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   const handleBackdropTap = useCallback((event: any) => {
     if (event && typeof event.stopPropagation === 'function') {
@@ -286,6 +347,12 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
         boxShadow="0 -4px 20px rgba(0,0,0,0.15)"
         maxWidth={getMaxWidth()}
         className="bottom-viewer-container"
+        // Announced as a modal dialog. Without this a screen reader treats it as another region of
+        // the page and gives no indication that what is behind it is unavailable.
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        tabIndex={-1}
         style={{
           maxHeight: layoutProp?.maxHeight,
         }}

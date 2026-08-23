@@ -379,6 +379,55 @@ export const useSearchInput = (
 
 // ==================== useKeyboardHeight hook ====================
 
+/**
+ * Escape closes the viewer, and Tab stays inside it.
+ *
+ * The viewer covers the whole screen, so what is behind it is not available — but nothing said so
+ * to the keyboard. Tab walked out of the search results into the page underneath, where a person
+ * was operating controls they could not see, and Escape did nothing at all, which is the one key
+ * everybody reaches for to get out of a search.
+ *
+ * Takes the container's `id` rather than a ref: the sheet element belongs to the underlying
+ * modal-sheet component and is looked up when a key is actually pressed, which also means it is
+ * found however that component chooses to mount it. Focusables are re-queried on every Tab rather
+ * than captured once, because a search viewer's contents change with every keystroke — a list
+ * cached when the viewer opened is a list of elements that have since been replaced.
+ */
+export const useModalKeys = (isOpen: boolean, onClose: () => void, containerId: string) => {
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const focusable = document.getElementById(containerId)?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),' +
+          ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose, containerId]);
+};
+
 export const useKeyboardHeight = () => {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 

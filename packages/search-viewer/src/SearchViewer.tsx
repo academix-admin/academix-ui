@@ -18,6 +18,7 @@ import {
   paddingStr,
   useInjectStyles,
   useKeyboardHeight,
+  useModalKeys,
   useSearchInput,
 } from "./core";
 
@@ -37,6 +38,13 @@ export type SearchViewerProps<T = any, C = any> = {
   children?: React.ReactNode;
   unmountOnClose?: boolean;
   zIndex?: number;
+  /**
+   * Accessible name for the sheet, announced when it opens.
+   *
+   * A modal with no name is announced simply as "dialog", which tells a screen-reader user that
+   * something has taken over the screen and nothing at all about what.
+   */
+  ariaLabel?: string;
   maxHeight?: string;
   minHeight?: string;
   searchState?: SearchState;
@@ -74,6 +82,7 @@ function SearchViewer<T = any, C = any>({
   children,
   unmountOnClose = true,
   zIndex = 1000,
+  ariaLabel,
   maxHeight = "90dvh",
   searchState: externalSearchState = "initial",
   onInitialData,
@@ -110,6 +119,8 @@ function SearchViewer<T = any, C = any>({
 
   useInjectStyles(id, "search-viewer-styles", getSearchViewerStyles);
   const keyboardHeight = useKeyboardHeight();
+  // Escape closes the viewer and Tab stays inside it — see useModalKeys.
+  useModalKeys(isOpen, onClose, id);
 
   // Descendant sections (a Column, or anything else) can report a cumulative state up through this —
   // starts empty, so a plain SearchViewer with no Row/Column children behaves exactly as before.
@@ -419,6 +430,12 @@ function SearchViewer<T = any, C = any>({
       >
         <Sheet.Container
           id={id}
+          // Announced as a modal dialog. Without this a screen reader reads the sheet as one more
+          // region of the page and gives no indication that what is behind it is unavailable — and
+          // an automated check for an open dialog finds nothing at all.
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabel}
           style={{
             maxHeight: "100dvh",
             minHeight: "100%",

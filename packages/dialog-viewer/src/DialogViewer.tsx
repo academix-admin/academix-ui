@@ -35,6 +35,14 @@ interface DialogViewerProps {
   unmountOnClose?: boolean;
   zIndex?: number;
   closeOnBackdrop?: boolean;
+  /**
+   * Accessible name for the dialog, announced when it opens.
+   *
+   * Defaults to `title`, which is what nearly every dialog wants. Supply this only when the visible
+   * title is not a usable name on its own — an icon-only header, or a title so terse out of context
+   * ("Are you sure?") that hearing it alone says nothing about what is being confirmed.
+   */
+  ariaLabel?: string;
 }
 
 // ==================== Styles ====================
@@ -274,6 +282,7 @@ const DialogViewer = React.forwardRef<any, DialogViewerProps>(({
   unmountOnClose = true,
   zIndex = 1000,
   closeOnBackdrop = true,
+  ariaLabel,
 }, ref) => {
   const [id] = useState(() => providedId || `dialog-${Math.random().toString(36).substr(2, 9)}`);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -316,6 +325,50 @@ const DialogViewer = React.forwardRef<any, DialogViewerProps>(({
       document.body.classList.remove('body-dialog-open');
     };
   }, [isOpen]);
+
+  /*
+   * Escape closes it, and Tab stays inside it.
+   *
+   * The dialog already took focus and gave it back, but nothing kept focus WITHIN it and nothing
+   * answered Escape. A keyboard user could tab straight out into the page behind the overlay and
+   * operate controls they could not see, with no key to dismiss what was covering the screen.
+   *
+   * Focusables are re-queried on every Tab rather than captured once: a dialog's buttons appear and
+   * disappear while it is open (a busy state, a revealed field), and a cached list sends focus to an
+   * element that has since been removed.
+   */
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),' +
+          ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   // Overlay ref — needed to attach non-passive native scroll/touch listeners
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -416,6 +469,11 @@ const DialogViewer = React.forwardRef<any, DialogViewerProps>(({
       <div
         ref={dialogRef}
         className="dialog-container"
+        // Announced as a modal dialog, so a screen reader says the page behind is unavailable
+        // rather than reading this as one more region of it.
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel ?? title}
         tabIndex={-1}
         style={{
           backgroundColor: layoutProp?.backgroundColor || "#fff",
