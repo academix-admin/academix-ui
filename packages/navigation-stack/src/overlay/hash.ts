@@ -102,7 +102,9 @@ export function writeOverlayFragment(ours: string | null, mode: 'push' | 'replac
     url.hash = next; // URL drops the '#' by itself when next is ''
     const href = url.toString();
     if (href === window.location.href) return;
-    if (mode === 'push') window.history.pushState({ ...(window.history.state ?? {}), axOverlay: ours }, '', href);
+    // Same reasoning as core/persistence.ts: a PUSH starts a new entry and must not inherit
+    // another consumer's state, or their markers appear to belong to it.
+    if (mode === 'push') window.history.pushState({ axOverlay: ours }, '', href);
     else window.history.replaceState({ ...(window.history.state ?? {}), axOverlay: ours }, '', href);
   } catch {
     /* URL parsing/history can throw in exotic embedders; overlay state is not worth crashing for */

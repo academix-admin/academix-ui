@@ -600,8 +600,19 @@ export function updateNavQueryParamForStack(
         // One pushState only. Calling it twice (as the replace path does for groups) would create
         // two entries for a single navigation, so back would need two presses to move one page.
         const serial = nextSerial();
+        // NOT spread from the previous entry.
+        //
+        // A push creates a NEW history entry, and the browser itself gives a real navigation a
+        // fresh null state. Copying the previous entry's state forward made every other consumer's
+        // marker look as though it belonged here too — a bottom sheet that had written
+        // `{ smSheet: id }` before a page was pushed saw its own id on the pushed entry, concluded
+        // the entry was its own, and called history.back() as it closed. The page that had just
+        // been pushed was silently thrown away.
+        //
+        // `replace` below still merges, and must: that is the SAME entry, so another consumer's
+        // state on it is still theirs.
         window.history.pushState(
-          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: serial },
+          { navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: serial },
           "",
           newHref,
         );
