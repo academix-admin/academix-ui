@@ -1,4 +1,5 @@
 import type { NavParams, NavigationMap, ParsedStack, StackEntry } from '../types';
+import { setInFragment } from '../overlay/hash';
 import { NAV_STACK_VERSION, STACK_SEPARATOR, STORAGE_TTL_MS } from '../constants';
 import type { GroupNavigationContextType } from './contexts';
 // Stack persistence, URL/param encoding and uid helpers.
@@ -591,6 +592,22 @@ export function updateNavQueryParamForStack(
       if (groupContext) url.searchParams.delete('group');
       url.searchParams.delete('nav');
     }
+
+    /*
+     * A PUSH lands on a page with no overlay open, so it must not inherit one.
+     *
+     * The overlay fragment (`#ax=…`) rides along in `url` because it was copied from the current
+     * location. Carrying it onto a NEW entry tells every overlay that its own id is still on top —
+     * so an overlay closing in the same tick as a navigation concludes the new entry is its own
+     * and calls `history.back()`, throwing the destination away.
+     *
+     * Observed in store-manager: settling a sale closes the payment sheet and pushes a receipt
+     * page together, and the receipt was silently discarded. Exactly the failure 0.13.1 fixed for
+     * `history.state`, arriving by the other route.
+     *
+     * `replace` keeps it: that is the same entry, and an overlay open on it is still open.
+     */
+    if (mode === 'push') url.hash = setInFragment(url.hash, null);
 
     const newHref = url.toString();
     if (window.location.href !== newHref) {
