@@ -627,8 +627,17 @@ const SheetBackdrop = forwardRef<any, SheetBackdropProps>(({
         ...style,
       }}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      animate={{ opacity: 1, pointerEvents: 'auto' }}
+      /*
+       * Stops taking pointer events the moment it starts fading, not when the fade ends.
+       *
+       * The backdrop swallows events on purpose while the sheet is up. On the way out it kept doing
+       * so for the whole `fadeDuration`, invisibly: a tap aimed at the page a fraction of a second
+       * after the sheet closed landed on a backdrop that was almost transparent and on its way to
+       * being unmounted. It looked like the app dropping taps at random, and it is why an automated
+       * run would fail on one pass and pass on the next with nothing changed.
+       */
+      exit={{ opacity: 0, pointerEvents: 'none' }}
       transition={{ duration: fadeDuration }}
       onTap={onTap as any}
       onClick={onClick}
