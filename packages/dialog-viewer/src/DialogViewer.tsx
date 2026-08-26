@@ -373,6 +373,34 @@ const DialogViewer = React.forwardRef<any, DialogViewerProps>(({
   // Overlay ref — needed to attach non-passive native scroll/touch listeners
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  /*
+   * Publish how much of the screen the keyboard is covering.
+   *
+   * The stylesheet already subtracted `--ax-keyboard-inset` from the dialog's max height — in two
+   * places — and NOTHING EVER SET IT. It fell back to 0 every time, so the accommodation was
+   * written, shipped, and inert: on a phone the dialog kept its full height and the keyboard was
+   * drawn straight over the field being typed into.
+   *
+   * `visualViewport.height` shrinks by exactly the keyboard's height, and `offsetTop` accounts for
+   * the page being scrolled up to reveal the focused field.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vp = window.visualViewport;
+    const publish = () => {
+      const inset = Math.max(0, window.innerHeight - vp.height - vp.offsetTop);
+      document.documentElement.style.setProperty('--ax-keyboard-inset', `${inset}px`);
+    };
+    publish();
+    vp.addEventListener('resize', publish);
+    vp.addEventListener('scroll', publish);
+    return () => {
+      vp.removeEventListener('resize', publish);
+      vp.removeEventListener('scroll', publish);
+      document.documentElement.style.removeProperty('--ax-keyboard-inset');
+    };
+  }, []);
+
   // Stop propagation for clicks directly on the container (capture phase)
   useEffect(() => {
     const handler = (e: MouseEvent) => {

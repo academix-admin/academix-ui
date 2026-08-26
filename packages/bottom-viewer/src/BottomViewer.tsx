@@ -7,6 +7,8 @@ interface LayoutProps {
   handleColor?: string;
   handleWidth?: string;
   maxHeight?: string;
+  /** Height the sheet opens at before its content is measured. Stops the open-and-jump. */
+  minHeight?: string;
   maxWidth?: string;
 }
 
@@ -181,6 +183,75 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
     }
   }, [children]);
 
+  /*
+   * How much of the screen the on-screen keyboard is covering.
+   *
+   * `visualViewport.height` shrinks when the keyboard opens; the difference is what the keyboard
+   * has taken. Without this the sheet keeps its full height, the keyboard is drawn over the bottom
+   * of it, and the field being typed into is underneath — which is the single most common way a
+   * mobile form becomes unusable.
+   */
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vp = window.visualViewport;
+    const onResize = () => {
+      setKeyboardHeight(Math.max(0, window.innerHeight - vp.height - vp.offsetTop));
+    };
+    onResize();
+    vp.addEventListener('resize', onResize);
+    vp.addEventListener('scroll', onResize);
+    return () => {
+      vp.removeEventListener('resize', onResize);
+      vp.removeEventListener('scroll', onResize);
+    };
+  }, []);
+
+  /*
+   * Whether a field inside the sheet has focus.
+   *
+   * Two things depend on it, and both are faults people hit immediately:
+   *
+   *  DRAGGING is turned off. The sheet is draggable by its whole surface, so a touch that lands on
+   *  a text field — or the small drag as a thumb settles on it — was read as a dismiss gesture and
+   *  the sheet closed mid-sentence, losing what had been typed.
+   *
+   *  THE SHEET GROWS to the full height. A content-sized sheet has no room to scroll the focused
+   *  field above the keyboard, so it stays hidden behind it however far the content is scrolled.
+   *
+   * Detected with focusin/focusout rather than by wiring props through, because the children are
+   * the consumer's and this component cannot know where their fields are.
+   */
+  const [fieldFocused, setFieldFocused] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!isOpen || !el) return;
+
+    const isField = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.tagName === 'INPUT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.tagName === 'SELECT' ||
+        t.isContentEditable);
+
+    const onFocusIn = (e: FocusEvent) => { if (isField(e.target)) setFieldFocused(true); };
+    const onFocusOut = (e: FocusEvent) => {
+      // The related target is where focus is going. Staying inside another field must not be read
+      // as leaving, or the sheet would shrink and re-grow between two fields.
+      if (!isField(e.relatedTarget)) setFieldFocused(false);
+    };
+
+    el.addEventListener('focusin', onFocusIn);
+    el.addEventListener('focusout', onFocusOut);
+    return () => {
+      el.removeEventListener('focusin', onFocusIn);
+      el.removeEventListener('focusout', onFocusOut);
+      setFieldFocused(false);
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     const updateVh = () => {
       const vh = window.visualViewport
@@ -331,13 +402,29 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
       isOpen={isOpen}
       onClose={onClose}
       mountPoint={mountPoint}
-      detent="content"
+      /*
+       * The PROP, not a hardcoded "content".
+       *
+       * `detent` was accepted, documented, and then ignored — every sheet was content-sized
+       * whatever the consumer asked for, so a caller wanting a full-height sheet silently got a
+       * short one. While a field has focus it is forced full anyway: a content-sized sheet has no
+       * room to scroll that field clear of the keyboard.
+       */
+      detent={fieldFocused ? 'full' : detent}
       ease="easeOut"
       duration={0.25}
       style={{ zIndex }}
-      disableDrag={disableDrag}
+      /*
+       * Dragging off while typing.
+       *
+       * The whole sheet is a drag surface, so a touch settling on a text field read as a dismiss
+       * and the sheet closed mid-sentence, taking what had been typed with it.
+       */
+      disableDrag={disableDrag || fieldFocused}
       avoidKeyboard={avoidKeyboard}
-      maxHeight={layoutProp?.maxHeight}
+      // Never taller than the screen. Without a ceiling a long child list pushed the sheet's top
+      // above the viewport, so its title and close button were off screen and unreachable.
+      maxHeight={layoutProp?.maxHeight ?? '92dvh'}
     >
       <Sheet.Container
         id={id}
@@ -354,7 +441,16 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
         aria-label={ariaLabel}
         tabIndex={-1}
         style={{
-          maxHeight: layoutProp?.maxHeight,
+          maxHeight: layoutProp?.maxHeight ?? '92dvh',
+          /*
+           * A floor, so the sheet does not animate open at zero height and then jump.
+           *
+           * Without it the panel arrives empty and snaps to its content's height a frame later —
+           * the jank the search and selection viewers avoid by stating a minimum. Full height
+           * while a field has focus, for the same reason `detent` is forced there.
+           */
+          minHeight: fieldFocused ? '92dvh' : (layoutProp?.minHeight ?? '20dvh'),
+          transition: 'min-height 0.2s ease',
         }}
       >
         <Sheet.Header>
@@ -397,6 +493,11 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
           <div
             className="bottom-viewer-content"
             onClick={e => e.stopPropagation()}
+            style={{
+              // Pads by exactly what the keyboard is covering, so the last field in a form can
+              // still be scrolled into view instead of sitting permanently underneath it.
+              paddingBottom: keyboardHeight > 0 ? `${keyboardHeight + 16}px` : undefined,
+            }}
           >
             {currentContent}
           </div>
