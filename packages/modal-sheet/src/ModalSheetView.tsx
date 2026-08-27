@@ -464,7 +464,7 @@ const SheetContainer = forwardRef<any, SheetContainerProps>(({
   id,
   ...rest
 }, ref) => {
-  const { y, detent, sheetRef, sheetBoundsRef, visualViewportHeight } = useSheetContext();
+  const { y, detent, sheetRef, sheetBoundsRef } = useSheetContext();
 
   const containerStyle: MotionStyle = {
     zIndex: 2,
@@ -489,41 +489,33 @@ const SheetContainer = forwardRef<any, SheetContainerProps>(({
   };
 
   /*
-   * Never taller than what is actually on screen.
+   * Height by detent, and NOTHING ELSE TOUCHES IT.
    *
-   * `visualViewportHeight` was computed, put on the context and then read by nobody, so a sheet
-   * sized in `dvh` kept its full height when the keyboard came up — and `dvh` is the LAYOUT
-   * viewport, which does not shrink for a keyboard. A 92dvh sheet on a phone with a keyboard up is
-   * taller than the visible area, so its top — the title, the close button, the drag handle — sat
-   * off the top of the screen, out of reach.
+   * A viewport cap lived here briefly — `min(declared, visualViewportHeight)` — meant to keep a
+   * sheet's top on screen when the keyboard is up. It was a mistake twice over.
    *
-   * Capping to the visual viewport is what keeps the top of the sheet in view. It does nothing at
-   * all when no keyboard is up, because then the two viewports are the same size.
+   * It caused harm. This container is anchored to the BOTTOM of the layout viewport, so shrinking
+   * it with a keyboard up did not move its top down into view, it crushed the sheet into a thin
+   * band above the keyboard: a form whose fields were gone and only Cancel/Save left.
+   *
+   * And it was not needed. The "top off screen" case it was written for came from bottom-viewer
+   * raising its own `minHeight` to 92dvh whenever a field took focus, which is gone. The way to
+   * live with a keyboard is the way search-viewer and selection-viewer have always done it — the
+   * sheet keeps its declared height, and the CONTENT scroller carries bottom padding equal to the
+   * keyboard, so the focused field scrolls clear of it.
+   *
+   * `dvh` is the layout viewport and does not shrink for a keyboard. That is fine. It is the
+   * content that has to move, not the sheet.
    */
-  const viewportCap =
-    visualViewportHeight > 0 ? `${Math.round(visualViewportHeight)}px` : null;
-  const capped = (value: string | number | undefined) => {
-    if (!viewportCap) return value;
-    if (value === undefined) return viewportCap;
-    return `min(${typeof value === 'number' ? `${value}px` : value}, ${viewportCap})`;
-  };
-
-  // Apply height based on detent
   if (detent === 'default') {
     containerStyle.height = 'calc(100% - env(safe-area-inset-top) - 34px)';
-    containerStyle.maxHeight = capped(undefined);
   } else if (detent === 'full') {
     containerStyle.height = '100%';
-    containerStyle.maxHeight = capped('100%');
+    containerStyle.maxHeight = '100%';
   } else {
     containerStyle.height = 'auto';
-    containerStyle.maxHeight = capped(maxHeight);
-    if (minHeight) {
-      // The floor is capped too. A `minHeight` taller than the visible area would push the top off
-      // screen just as surely as a `maxHeight` would, and a floor that cannot be honoured is not a
-      // floor.
-      containerStyle.minHeight = capped(minHeight);
-    }
+    if (maxHeight) containerStyle.maxHeight = maxHeight;
+    if (minHeight) containerStyle.minHeight = minHeight;
   }
 
   const mergedRef = useCallback((node: HTMLDivElement | null) => {
