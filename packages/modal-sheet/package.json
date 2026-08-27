@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/modal-sheet",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A flexible, gesture-driven bottom-sheet / modal for React with snap detents, built on Motion.",
   "keywords": [
     "react",

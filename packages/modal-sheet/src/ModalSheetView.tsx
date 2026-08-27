@@ -312,9 +312,36 @@ const SheetBase = forwardRef<any, SheetProps>(({
    * visible until the slide starts, so the wait costs an imperceptible delay and buys an entrance
    * that lands on the right height first time.
    */
+  /*
+   * PARK IT OFF-SCREEN IMMEDIATELY, animate once the height has settled.
+   *
+   * Two separate faults lived in this one effect, and both showed as the sheet appearing in place
+   * for a few frames before sliding in from the bottom.
+   *
+   * IT PARKED AT THE WRONG DISTANCE. The entrance translated by `effectiveMaxHeight` — the CAP,
+   * derived from `maxHeight` and `window.innerHeight` — while the close path has always used the
+   * MEASURED `sheetHeight`. When the real height exceeds that cap, and on iOS it does (content not
+   * yet clamped, safe-area padding, an `innerHeight` that lags the visible area while the URL bar
+   * moves), translating by the cap leaves `sheetHeight - cap` pixels of the sheet showing at the
+   * TOP of the screen. Which is exactly what it looked like: the top of the form, then the rest
+   * arriving from below. Parking by the measured height, as the close path does, is exact whatever
+   * the height turns out to be.
+   *
+   * AND IT PARKED TOO LATE. Waiting for the measurement to settle is right, but the `y.set` was
+   * inside that wait, so for those milliseconds the sheet sat whereever `y` happened to be — its
+   * initial value, or wherever the last close left it, neither of which is this sheet's height.
+   * Parking is now immediate and unconditional; only the animation waits.
+   */
   useEffect(() => {
-    if (state !== 'opening' || sheetHeight <= 0) return;
+    if (state !== 'opening') return;
     if (openAnimationStarted.current) return;
+
+    // Off-screen NOW, by whichever distance is certain to clear the viewport.
+    const parkAt = Math.max(sheetHeight, effectiveMaxHeight);
+    if (parkAt > 0) y.set(parkAt);
+
+    // Nothing to animate to until the sheet has been measured at all.
+    if (sheetHeight <= 0) return;
 
     if (settleTimer.current) clearTimeout(settleTimer.current);
     settleTimer.current = setTimeout(() => {
@@ -322,7 +349,7 @@ const SheetBase = forwardRef<any, SheetProps>(({
       openAnimationStarted.current = true;
 
       onOpenStart?.();
-      y.set(effectiveMaxHeight);
+      y.set(Math.max(sheetHeight, effectiveMaxHeight));
       (animate as any)(y, 0, {
         ...animOpts,
         onComplete: () => { setState('open'); onOpenEnd?.(); },
@@ -410,8 +437,14 @@ const SheetBase = forwardRef<any, SheetProps>(({
     return val + 2 >= effectiveHeight ? -1 : (style?.zIndex as number ?? 9999);
   });
   const opacity = useTransform(y, (val) => {
-    if (state === 'opening' && val >= effectiveMaxHeight * 0.95) return 0;
-    const effectiveHeight = sheetHeight || effectiveMaxHeight;
+    /*
+     * Measured height first, cap second — the same order the parking uses above.
+     *
+     * This compared against `effectiveMaxHeight` alone, so a sheet taller than its cap counted as
+     * "arrived" while it was still parked past it, and became visible before it had moved.
+     */
+    const effectiveHeight = Math.max(sheetHeight, effectiveMaxHeight) || effectiveMaxHeight;
+    if (state === 'opening' && val >= effectiveHeight * 0.95) return 0;
     return val + 2 >= effectiveHeight ? 0 : 1;
   });
 
