@@ -211,6 +211,83 @@ function usePreventScroll(isOpen: boolean) {
   }, [isOpen]);
 }
 
+/*
+ * Keep the sheet where it was put when the keyboard opens.
+ *
+ * iOS reveals a focused field by SCROLLING THE LAYOUT VIEWPORT. That is fine for a field in the
+ * page, and wrong for one in a sheet: the sheet is in a fixed overlay, so the whole thing goes up
+ * with the page and its top leaves the screen. Reported precisely — the first field in a form
+ * behaves perfectly because it is already above the keyboard and nothing needs to scroll, while the
+ * second and third push the sheet's top out of view.
+ *
+ * `overflow: hidden` on the document does not prevent it; Safari scrolls for keyboard avoidance
+ * regardless. So the scroll is undone and the reveal is done properly instead: the field is brought
+ * into view inside the SHEET'S OWN scroller, which is where a sheet's content is supposed to move.
+ *
+ * Runs on focus and again after the keyboard's animation, and stays subscribed to the visual
+ * viewport for as long as a field inside the sheet has focus, because iOS keeps adjusting while the
+ * keyboard settles.
+ */
+const FOCUSABLE_FIELD = 'input, textarea, select, [contenteditable="true"]';
+
+function useKeepAnchored(isOpen: boolean, sheetRef: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    if (!isOpen || IS_SSR) return;
+
+    const vv = window.visualViewport;
+
+    const focusedField = (): HTMLElement | null => {
+      const active = document.activeElement as HTMLElement | null;
+      const sheet = sheetRef.current;
+      if (!active || !sheet || !sheet.contains(active)) return null;
+      return active.matches?.(FOCUSABLE_FIELD) ? active : null;
+    };
+
+    const realign = () => {
+      const field = focusedField();
+      if (!field) return;
+
+      // Undo the page scroll iOS did to reveal it. Guarded, so the scroll event this fires does
+      // not come straight back in.
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+
+      const scroller =
+        (field.closest('.react-modal-sheet-content-scroller') as HTMLElement | null) ??
+        (sheetRef.current?.querySelector('.react-modal-sheet-content-scroller') as HTMLElement | null);
+      if (!scroller) return;
+
+      // Where the keyboard starts. `visualViewport.height` shrinks by exactly that much.
+      const keyboard = Math.max(0, window.innerHeight - (vv?.height ?? window.innerHeight));
+      const safeBottom = window.innerHeight - keyboard - 12;
+
+      const box = field.getBoundingClientRect();
+      if (box.bottom > safeBottom) {
+        scroller.scrollTop += box.bottom - safeBottom;
+      } else if (box.top < 8) {
+        scroller.scrollTop -= 8 - box.top;
+      }
+    };
+
+    // Once immediately for the layout, once after the keyboard has finished animating in.
+    const onFocusIn = () => {
+      requestAnimationFrame(realign);
+      setTimeout(realign, 300);
+    };
+
+    document.addEventListener('focusin', onFocusIn);
+    window.addEventListener('scroll', realign);
+    vv?.addEventListener('resize', realign);
+    vv?.addEventListener('scroll', realign);
+
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      window.removeEventListener('scroll', realign);
+      vv?.removeEventListener('resize', realign);
+      vv?.removeEventListener('scroll', realign);
+    };
+  }, [isOpen, sheetRef]);
+}
+
 // ─── Sheet ────────────────────────────────────────────────────────────────────
 
 type SheetState = 'closed' | 'opening' | 'open' | 'closing';
@@ -431,6 +508,7 @@ const SheetBase = forwardRef<any, SheetProps>(({
 
   useImperativeHandle(ref, () => ({ y, height: sheetHeight }));
   usePreventScroll(isOpen);
+  useKeepAnchored(isOpen, sheetRef);
 
   const zIndex = useTransform(y, (val) => {
     const effectiveHeight = sheetHeight || effectiveMaxHeight;
