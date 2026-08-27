@@ -176,7 +176,18 @@ function useVisualViewportHeight() {
     const vv = window.visualViewport;
     if (!vv) return;
 
-    const handler = () => setH(vv.height);
+    /*
+     * Thresholded, because iOS fires this continuously.
+     *
+     * `visualViewport` scroll fires on every frame that the page moves under a raised keyboard,
+     * and each `setH` re-rendered the whole sheet subtree. Movement smaller than a few pixels is
+     * not something a person can see, and re-rendering for it is how a sheet ends up janking on
+     * the one platform whose keyboard animates.
+     */
+    const handler = () => {
+      const next = vv.height;
+      setH((prev) => (Math.abs(prev - next) > 4 ? next : prev));
+    };
     handler();
     vv.addEventListener('resize', handler);
     vv.addEventListener('scroll', handler);
@@ -260,9 +271,37 @@ const SheetBase = forwardRef<any, SheetProps>(({
     }
   }, [isOpen]);
 
-  // Once children are mounted and sheetHeight is measured, start open animation
+  /*
+   * Start the open animation ONCE per open — not every time the sheet is re-measured.
+   *
+   * This effect depends on `sheetHeight`, which a ResizeObserver updates whenever the sheet's
+   * content changes size. It used to re-run on every one of those, and each run did
+   * `y.set(effectiveMaxHeight)` — teleporting the sheet back down to the bottom — before animating
+   * it up again. Two transforms read `y` and both treat "at the bottom" as gone: `zIndex` returns
+   * -1 and `opacity` returns 0. So every re-measure made the sheet VANISH for a frame and then
+   * slide back up.
+   *
+   * On a sheet holding a text field that is continuous. The soft keyboard changes the content
+   * height, and each change re-triggered the teleport; because every re-animate also restarted the
+   * 0.25s timer, `state` never reached 'open', so the guard above never stopped firing. iOS is
+   * where it was reported and iOS is where it is worst — its keyboard produces a stream of
+   * intermediate `visualViewport` sizes, where Android resizes once — but the fault is not
+   * platform-specific, it is just harder to see when the height settles quickly.
+   *
+   * What a person saw: a sheet that flickered, sat at a different height every frame, and looked
+   * like it had closed itself while they were typing into it.
+   *
+   * The ref records that this open cycle has already begun animating. Later height changes still
+   * resize the sheet — that is the ResizeObserver's job and it still works — they just no longer
+   * restart the entrance.
+   */
+  const openAnimationStarted = useRef(false);
+
   useEffect(() => {
     if (state !== 'opening' || sheetHeight <= 0) return;
+    if (openAnimationStarted.current) return;
+    openAnimationStarted.current = true;
+
     onOpenStart?.();
     y.set(effectiveMaxHeight);
     (animate as any)(y, 0, {
@@ -271,8 +310,29 @@ const SheetBase = forwardRef<any, SheetProps>(({
     });
   }, [state, sheetHeight, effectiveMaxHeight]);
 
+  // Armed again for the next open. Reset on 'closed' rather than on `isOpen` flipping, so a sheet
+  // reopened before its close animation finished still gets a clean entrance.
   useEffect(() => {
-    if (state !== 'closing') return;
+    if (state === 'closed') openAnimationStarted.current = false;
+  }, [state]);
+
+  /*
+   * Same guard on the way out.
+   *
+   * Closing a sheet dismisses the keyboard, which changes the height, which re-ran this effect and
+   * restarted the slide-out from the top — so a sheet with a focused field appeared to bounce
+   * before it left.
+   */
+  const closeAnimationStarted = useRef(false);
+
+  useEffect(() => {
+    if (state !== 'closing') {
+      if (state === 'open' || state === 'opening') closeAnimationStarted.current = false;
+      return;
+    }
+    if (closeAnimationStarted.current) return;
+    closeAnimationStarted.current = true;
+
     onCloseStart?.();
     const closeY = sheetHeight > 0 ? sheetHeight : effectiveMaxHeight;
     (animate as any)(y, closeY, {
@@ -374,7 +434,7 @@ const SheetContainer = forwardRef<any, SheetContainerProps>(({
   id,
   ...rest
 }, ref) => {
-  const { y, detent, sheetRef, sheetBoundsRef } = useSheetContext();
+  const { y, detent, sheetRef, sheetBoundsRef, visualViewportHeight } = useSheetContext();
 
   const containerStyle: MotionStyle = {
     zIndex: 2,
@@ -398,16 +458,42 @@ const SheetContainer = forwardRef<any, SheetContainerProps>(({
     ...style,
   };
 
+  /*
+   * Never taller than what is actually on screen.
+   *
+   * `visualViewportHeight` was computed, put on the context and then read by nobody, so a sheet
+   * sized in `dvh` kept its full height when the keyboard came up — and `dvh` is the LAYOUT
+   * viewport, which does not shrink for a keyboard. A 92dvh sheet on a phone with a keyboard up is
+   * taller than the visible area, so its top — the title, the close button, the drag handle — sat
+   * off the top of the screen, out of reach.
+   *
+   * Capping to the visual viewport is what keeps the top of the sheet in view. It does nothing at
+   * all when no keyboard is up, because then the two viewports are the same size.
+   */
+  const viewportCap =
+    visualViewportHeight > 0 ? `${Math.round(visualViewportHeight)}px` : null;
+  const capped = (value: string | number | undefined) => {
+    if (!viewportCap) return value;
+    if (value === undefined) return viewportCap;
+    return `min(${typeof value === 'number' ? `${value}px` : value}, ${viewportCap})`;
+  };
+
   // Apply height based on detent
   if (detent === 'default') {
     containerStyle.height = 'calc(100% - env(safe-area-inset-top) - 34px)';
+    containerStyle.maxHeight = capped(undefined);
   } else if (detent === 'full') {
     containerStyle.height = '100%';
-    containerStyle.maxHeight = '100%';
+    containerStyle.maxHeight = capped('100%');
   } else {
     containerStyle.height = 'auto';
-    if (maxHeight) containerStyle.maxHeight = maxHeight;
-    if (minHeight) containerStyle.minHeight = minHeight;
+    containerStyle.maxHeight = capped(maxHeight);
+    if (minHeight) {
+      // The floor is capped too. A `minHeight` taller than the visible area would push the top off
+      // screen just as surely as a `maxHeight` would, and a floor that cannot be honoured is not a
+      // floor.
+      containerStyle.minHeight = capped(minHeight);
+    }
   }
 
   const mergedRef = useCallback((node: HTMLDivElement | null) => {

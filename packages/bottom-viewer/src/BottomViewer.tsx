@@ -196,9 +196,27 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
     const vp = window.visualViewport;
+
     const onResize = () => {
-      setKeyboardHeight(Math.max(0, window.innerHeight - vp.height - vp.offsetTop));
+      /*
+       * `innerHeight - vp.height`, WITHOUT `offsetTop`.
+       *
+       * `offsetTop` is how far the visual viewport has been scrolled within the layout viewport,
+       * which on iOS changes continuously while the page moves under a raised keyboard. Folding it
+       * in here meant this value changed on every scroll frame, and since it feeds the content's
+       * `paddingBottom`, the sheet was re-measured on every one of those frames. That is the same
+       * measurement storm the sheet's entrance animation used to restart on.
+       *
+       * The keyboard's height is a property of the keyboard, not of how far the page has scrolled.
+       * search-viewer and selection-viewer have always computed it this way.
+       */
+      const next = Math.max(0, Math.round(window.innerHeight - vp.height));
+
+      // Ignore sub-threshold movement. iOS reports a stream of intermediate heights as the
+      // keyboard animates, and re-rendering on each one buys nothing a person can see.
+      setKeyboardHeight((prev) => (Math.abs(prev - next) > 8 ? next : prev));
     };
+
     onResize();
     vp.addEventListener('resize', onResize);
     vp.addEventListener('scroll', onResize);
@@ -252,25 +270,17 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    const updateVh = () => {
-      const vh = window.visualViewport
-        ? window.visualViewport.height * 0.01
-        : window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
-    };
-
-    updateVh();
-    window.visualViewport?.addEventListener('resize', updateVh);
-    window.visualViewport?.addEventListener('scroll', updateVh);
-    window.addEventListener('resize', updateVh);
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', updateVh);
-      window.visualViewport?.removeEventListener('scroll', updateVh);
-      window.removeEventListener('resize', updateVh);
-    };
-  }, []);
+  /*
+   * A `--vh` custom property used to be published here on every viewport resize AND scroll.
+   *
+   * Nothing read it — not this package, not the other viewers, not any consumer. What it did do
+   * was write to `document.documentElement.style` on every one of those events, which invalidates
+   * style for the whole document. On iOS, where `visualViewport` scroll fires continuously while a
+   * keyboard is up, that is a document-wide recalculation per frame, paid for nothing.
+   *
+   * Removed rather than kept "just in case": an unused global write is not a feature, and a sheet
+   * has no business setting a property on the root element of somebody else's page.
+   */
 
   const getMaxWidth = useCallback(() => {
     return layoutProp?.maxWidth || '500px';
@@ -403,14 +413,18 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
       onClose={onClose}
       mountPoint={mountPoint}
       /*
-       * The PROP, not a hardcoded "content".
+       * The PROP, unchanged for as long as the sheet is open.
        *
-       * `detent` was accepted, documented, and then ignored — every sheet was content-sized
-       * whatever the consumer asked for, so a caller wanting a full-height sheet silently got a
-       * short one. While a field has focus it is forced full anyway: a content-sized sheet has no
-       * room to scroll that field clear of the keyboard.
+       * `detent` was originally accepted, documented and then ignored — every sheet was
+       * content-sized whatever the consumer asked for. Passing it through was right. Flipping it
+       * to 'full' on focus was not: `detent` decides the container's CSS `height` ('auto' vs
+       * '100%'), so changing it mid-open resizes the sheet, and a resize mid-open used to restart
+       * the entrance animation from the bottom of the screen.
+       *
+       * The sheet still grows to clear the keyboard — that now happens through `minHeight` below,
+       * which is how selection-viewer has always done it.
        */
-      detent={fieldFocused ? 'full' : detent}
+      detent={detent}
       ease="easeOut"
       duration={0.25}
       style={{ zIndex }}
@@ -443,14 +457,19 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
         style={{
           maxHeight: layoutProp?.maxHeight ?? '92dvh',
           /*
-           * A floor, so the sheet does not animate open at zero height and then jump.
+           * A floor, so the sheet does not animate open at zero height and then jump — and the
+           * room a focused field needs to be scrolled clear of the keyboard.
            *
-           * Without it the panel arrives empty and snaps to its content's height a frame later —
-           * the jank the search and selection viewers avoid by stating a minimum. Full height
-           * while a field has focus, for the same reason `detent` is forced there.
+           * NOT TRANSITIONED. There was a `transition: min-height 0.2s ease` here, which meant the
+           * container's height changed on every frame of that 200ms. Each of those frames was a
+           * ResizeObserver callback, and the sheet's entrance used to restart on every one — so
+           * the animation intended to smooth this out was the thing making it stutter.
+           *
+           * The sheet's own transform animation is the only motion here now. Same arrangement as
+           * selection-viewer, which states `minHeight: isSearchFocused ? "100dvh" : minHeight`
+           * with no transition at all.
            */
           minHeight: fieldFocused ? '92dvh' : (layoutProp?.minHeight ?? '20dvh'),
-          transition: 'min-height 0.2s ease',
         }}
       >
         <Sheet.Header>
