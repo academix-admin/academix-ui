@@ -296,24 +296,54 @@ const SheetBase = forwardRef<any, SheetProps>(({
    * restart the entrance.
    */
   const openAnimationStarted = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /*
+   * Wait for the height to SETTLE, then animate once, straight to it.
+   *
+   * Starting on the first non-zero measurement is too early. A sheet's first measured height is
+   * whatever its content happens to be at that instant — before a font swaps, before an image gets
+   * its box, before the first data arrives — so the sheet slid up to one height and then resized
+   * to another. The entrance was correct; the destination was a guess.
+   *
+   * So a height change while still `opening` restarts a short timer, and the entrance begins only
+   * once the measurement has held still for a couple of frames. `y` stays parked at the bottom
+   * meanwhile, which is exactly where a sheet that has not opened yet should be — nothing is
+   * visible until the slide starts, so the wait costs an imperceptible delay and buys an entrance
+   * that lands on the right height first time.
+   */
   useEffect(() => {
     if (state !== 'opening' || sheetHeight <= 0) return;
     if (openAnimationStarted.current) return;
-    openAnimationStarted.current = true;
 
-    onOpenStart?.();
-    y.set(effectiveMaxHeight);
-    (animate as any)(y, 0, {
-      ...animOpts,
-      onComplete: () => { setState('open'); onOpenEnd?.(); },
-    });
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      if (openAnimationStarted.current) return;
+      openAnimationStarted.current = true;
+
+      onOpenStart?.();
+      y.set(effectiveMaxHeight);
+      (animate as any)(y, 0, {
+        ...animOpts,
+        onComplete: () => { setState('open'); onOpenEnd?.(); },
+      });
+    }, 32);
+
+    return () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    };
   }, [state, sheetHeight, effectiveMaxHeight]);
 
   // Armed again for the next open. Reset on 'closed' rather than on `isOpen` flipping, so a sheet
   // reopened before its close animation finished still gets a clean entrance.
   useEffect(() => {
-    if (state === 'closed') openAnimationStarted.current = false;
+    if (state === 'closed') {
+      openAnimationStarted.current = false;
+      if (settleTimer.current) {
+        clearTimeout(settleTimer.current);
+        settleTimer.current = null;
+      }
+    }
   }, [state]);
 
   /*

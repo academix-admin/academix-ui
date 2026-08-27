@@ -169,6 +169,16 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<Element | null>(null);
 
+  /*
+   * `onClose`, reachable without being a dependency.
+   *
+   * Consumers pass an inline arrow, so its identity changes on every render. Anything that lists
+   * it in a dependency array therefore re-runs on every render — which is how the focus timer
+   * above came to fire after every keystroke.
+   */
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const initialChildrenRef = useRef<React.ReactNode>(children);
   const [currentContent, setCurrentContent] = useState<React.ReactNode>(children);
 
@@ -227,48 +237,29 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
   }, []);
 
   /*
-   * Whether a field inside the sheet has focus.
+   * THERE IS NO `fieldFocused` HERE ANY MORE, AND THAT IS THE POINT.
    *
-   * Two things depend on it, and both are faults people hit immediately:
+   * This component used to watch focusin/focusout and, when a field was focused, flip `detent` to
+   * 'full', raise `minHeight` to 92dvh and turn dragging off. Every one of those changes the
+   * sheet's height, and it changed them at the exact moment the keyboard was also changing it —
+   * so the sheet stretched to the screen, snapped back to its content, and shifted again as focus
+   * moved between fields. On a form with an autofocused field it did all of that during the
+   * entrance.
    *
-   *  DRAGGING is turned off. The sheet is draggable by its whole surface, so a touch that lands on
-   *  a text field — or the small drag as a thumb settles on it — was read as a dismiss gesture and
-   *  the sheet closed mid-sentence, losing what had been typed.
+   * search-viewer, which is stable while you type, has nothing of the kind: `detent="content"`,
+   * `minHeight: "100%"`, and no notion of focus at all. Its height is decided once and never
+   * reconsidered. That is the property that matters — not how cleverly the height is recomputed,
+   * but that it is NOT recomputed.
    *
-   *  THE SHEET GROWS to the full height. A content-sized sheet has no room to scroll the focused
-   *  field above the keyboard, so it stays hidden behind it however far the content is scrolled.
+   * The two things focus was being used for are handled properly instead:
    *
-   * Detected with focusin/focusout rather than by wiring props through, because the children are
-   * the consumer's and this component cannot know where their fields are.
+   *   Keeping a focused field clear of the keyboard is the CONTENT's job, by padding its scroller
+   *   with the keyboard's height (below) and letting the browser scroll the field into view. It
+   *   never needed the whole sheet to grow.
+   *
+   *   Stopping a touch on a field from dismissing the sheet is done by not making the content a
+   *   drag surface in the first place — see `Sheet.Content` below.
    */
-  const [fieldFocused, setFieldFocused] = useState(false);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!isOpen || !el) return;
-
-    const isField = (t: EventTarget | null) =>
-      t instanceof HTMLElement &&
-      (t.tagName === 'INPUT' ||
-        t.tagName === 'TEXTAREA' ||
-        t.tagName === 'SELECT' ||
-        t.isContentEditable);
-
-    const onFocusIn = (e: FocusEvent) => { if (isField(e.target)) setFieldFocused(true); };
-    const onFocusOut = (e: FocusEvent) => {
-      // The related target is where focus is going. Staying inside another field must not be read
-      // as leaving, or the sheet would shrink and re-grow between two fields.
-      if (!isField(e.relatedTarget)) setFieldFocused(false);
-    };
-
-    el.addEventListener('focusin', onFocusIn);
-    el.addEventListener('focusout', onFocusOut);
-    return () => {
-      el.removeEventListener('focusin', onFocusIn);
-      el.removeEventListener('focusout', onFocusOut);
-      setFieldFocused(false);
-    };
-  }, [isOpen]);
 
   /*
    * A `--vh` custom property used to be published here on every viewport resize AND scroll.
@@ -318,14 +309,31 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return;
 
-    // Focus the container itself rather than its first control: announcing the sheet before its
-    // first field gives a screen-reader user the context for what they are about to fill in.
-    const focusTimer = setTimeout(() => containerRef.current?.focus(), 60);
+    /*
+     * NOTHING FOCUSES THE CONTAINER, AND THAT IS DELIBERATE.
+     *
+     * There used to be a `setTimeout(() => containerRef.current.focus(), 60)` here, to announce the
+     * sheet to a screen reader on arrival. It was the cause of "typing closes the bottom viewer":
+     * the effect listed `onClose` in its dependencies, every consumer passes that as an inline
+     * arrow, so the effect tore down and re-ran on every render — and 60ms after each keystroke the
+     * timer moved focus off the input onto this div. Typing "First Bank" left "F" in the field and
+     * `document.activeElement` on a DIV.
+     *
+     * A ref would have stopped the re-runs, but the right question is whether the focus call earns
+     * its place at all. search-viewer and selection-viewer — the two that have always been stable
+     * while typing — never focus their container; they set `role="dialog"`, `aria-modal` and an
+     * `aria-label` and leave focus alone. That is enough: the dialog is announced when focus enters
+     * it, and where a sheet wants a particular field first, `autoFocus` on that field says so
+     * exactly.
+     *
+     * So this matches them. The Escape handler and focus trap below stay — those are the parts
+     * `useModalKeys` gives the other two.
+     */
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -350,10 +358,9 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
 
     document.addEventListener('keydown', onKeyDown);
     return () => {
-      clearTimeout(focusTimer);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   const handleBackdropTap = useCallback((event: any) => {
     if (event && typeof event.stopPropagation === 'function') {
@@ -428,13 +435,15 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
       ease="easeOut"
       duration={0.25}
       style={{ zIndex }}
+      disableDrag={disableDrag}
       /*
-       * Dragging off while typing.
+       * The consumer's threshold, which was accepted and then dropped on the floor.
        *
-       * The whole sheet is a drag surface, so a touch settling on a text field read as a dismiss
-       * and the sheet closed mid-sentence, taking what had been typed with it.
+       * `closeThreshold` has been in this component's props all along and was never passed on, so
+       * every sheet used the underlying default of 0.6 whatever it asked for. Third prop found
+       * accepted-and-ignored here, after `detent` and `minHeight`.
        */
-      disableDrag={disableDrag || fieldFocused}
+      dragCloseThreshold={closeThreshold}
       avoidKeyboard={avoidKeyboard}
       // Never taller than the screen. Without a ceiling a long child list pushed the sheet's top
       // above the viewport, so its title and close button were off screen and unreachable.
@@ -469,7 +478,7 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
            * selection-viewer, which states `minHeight: isSearchFocused ? "100dvh" : minHeight`
            * with no transition at all.
            */
-          minHeight: fieldFocused ? '92dvh' : (layoutProp?.minHeight ?? '20dvh'),
+          minHeight: layoutProp?.minHeight ?? '20dvh',
         }}
       >
         <Sheet.Header>
@@ -508,7 +517,21 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
           </div>
         </Sheet.Header>
 
-        <Sheet.Content >
+        {/*
+          NOT A DRAG SURFACE.
+
+          `Sheet.Content` takes the same drag gesture the header does, so every text field inside a
+          sheet sat on top of `drag: 'y'`. A touch that moves a few pixels while a thumb settles on
+          an input is a drag, and on release the sheet asks whether it was dragged far enough to
+          dismiss — measured as a fraction of the sheet's own height. A short content-sized sheet
+          therefore closes on a smaller movement than a tall one, which is why this bit BottomViewer
+          and not the full-screen search viewer: the same stray touch is 5% of a search sheet and
+          40% of a 200px one.
+
+          Dragging belongs to the handle and the header. Nothing is lost — the handle is still
+          there, still drags, still dismisses.
+        */}
+        <Sheet.Content disableDrag>
           <div
             className="bottom-viewer-content"
             onClick={e => e.stopPropagation()}
