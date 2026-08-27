@@ -221,12 +221,28 @@ export function useDemandState<T>(
     prevDepsRef.current = deps;
   }, deps);
 
+  /*
+   * The last loader this consumer supplied.
+   *
+   * Kept so an INVALIDATION can re-run it. `clearScope` / `clearKey` correctly drop the demand
+   * flag, but dropping a flag does not fetch anything: the loader only runs when a consumer calls
+   * `demand()`, and a mounted component has no reason to call it again — its effect already ran
+   * and neither `deps` nor the callback identity changed. So the value went to empty and stayed
+   * there, and a screen that had invalidated its own cache sat on a loading state with nothing in
+   * flight. Remembering the loader is what makes "invalidate" mean "fetch again".
+   */
+  const lastLoaderRef = useRef<
+    | ((helpers: { get: () => T; set: (v: T, opts?: DemandSetOptions) => void }) => void | Promise<void>)
+    | null
+  >(null);
+
   const demand = useCallback(
     (
       loader: (
         helpers: { get: () => T; set: (v: T) => void }
       ) => void | Promise<void>
     ) => {
+      lastLoaderRef.current = loader as typeof lastLoaderRef.current;
       if (core.isDemanded(scope, key)) return;
       core
         .runDemandOperation(scope, key, async () => {
@@ -258,6 +274,34 @@ export function useDemandState<T>(
     },
     [scope, key, ttl, persist, storage]
   );
+
+  /*
+   * Re-run the loader when this key is invalidated by someone else.
+   *
+   * `clearScope` notifies subscribers, so this hears about it. If the demand flag has been dropped
+   * and there is a loader to re-run, run it — that is the whole contract of invalidation, and
+   * without it every consumer has to arrange its own re-fetch, which in practice means a timer.
+   *
+   * Guarded three ways so this cannot loop: only with a loader recorded, only when the flag is
+   * actually clear (a normal `set` marks it, so ordinary writes do not re-enter), and only while
+   * mounted.
+   */
+  useEffect(() => {
+    let mounted = true;
+    return core.subscribe(scope, key, () => {
+      if (!mounted) return;
+      if (!lastLoaderRef.current) return;
+      if (core.isDemanded(scope, key)) return;
+      // Next tick: the notification arrives mid-clear, and re-demanding inside it would race the
+      // rest of the teardown.
+      queueMicrotask(() => {
+        if (!mounted || !lastLoaderRef.current) return;
+        if (core.isDemanded(scope, key)) return;
+        demand(lastLoaderRef.current);
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, key, demand]);
 
   const set = useCallback(
     (v: T | ((prev: T) => T)) => {

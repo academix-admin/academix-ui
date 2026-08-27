@@ -15,6 +15,16 @@ export type NavigationBarScrollEvent = {
 
 export type NavigationModeType = 'normal' | 'float' | 'autohide';
 
+/** What the bar is currently doing, for anything a consumer anchors to it. */
+export type NavigationBarVisibility = {
+  /** True while the bar is translated out of view. */
+  hidden: boolean;
+  /** The bar's current CSS height — it shrinks in `float` mode. */
+  height: string;
+  /** The mode in force, so a consumer can tell "not hidden" from "never hides". */
+  mode: NavigationModeType;
+};
+
 export interface NavItem {
   id: string;
   text: string;
@@ -36,6 +46,21 @@ export interface NavigationBarProps {
 
   /** Scroll Handler Injection */
   onScroll?: (callback: (event: NavigationBarScrollEvent) => void) => void;
+  /**
+   * Fired whenever the bar's own presentation changes: it hides, it returns, its height changes.
+   *
+   * Exists because a consumer often has something ELSE anchored to the bar — a running total, a
+   * secondary action, a toast — and until now the only way to keep it in step was to guess. Two
+   * ways were tried in the wild and both were wrong: re-implementing the autohide rules in the
+   * consumer (two copies of a rule drift, and they did — the two controls ended up on visibly
+   * different lines), and listening for `transitionrun` on the bar's DOM node (works, but reaches
+   * into another component's internals and breaks the moment the animation is expressed
+   * differently).
+   *
+   * The bar knows its own state. This says so, and stays true whatever moves it — a scroll, a
+   * change of page, a tap on the floating button.
+   */
+  onVisibilityChange?: (state: NavigationBarVisibility) => void;
 
   /** Colors */
   activeColor?: string;
@@ -162,6 +187,7 @@ export default function NavigationBar({
   onChange,
   onReselect,
   onScroll,
+  onVisibilityChange,
 
   /** Colors */
   activeColor = '#166534',
@@ -399,6 +425,24 @@ export default function NavigationBar({
     mode === 'float'
       ? `calc(${normalHeight} - (${normalHeight} - ${shrinkHeight}) * ${shrinkRatio})`
       : normalHeight;
+
+  /*
+   * Tell the consumer whenever the bar's presentation changes.
+   *
+   * Fires for EVERY cause — a scroll, a change of page, a tap on the floating button that brings
+   * the bar back — because a consumer anchoring something to the bar cares about the outcome, not
+   * about which of those happened. That last one is what made this necessary: tapping the floating
+   * button reveals the bar with no scroll event at all, so anything watching scrolling kept a
+   * stale position and ended up underneath the bar it was meant to sit above.
+   *
+   * Held in a ref so a consumer passing an inline arrow does not re-fire this on every render.
+   */
+  const visibilityRef = useRef(onVisibilityChange);
+  visibilityRef.current = onVisibilityChange;
+
+  useEffect(() => {
+    visibilityRef.current?.({ hidden, height: currentHeight, mode });
+  }, [hidden, currentHeight, mode]);
 
   // Helper to extract border thickness from border string (e.g., "1px solid rgba(...)" -> "1px")
   const extractBorderThickness = (borderStyle: string): string => {
