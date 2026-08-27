@@ -167,37 +167,61 @@ function useWindowHeight() {
 // Tracks the *visual* viewport height, which shrinks when the software keyboard
 // appears. Falls back to window.innerHeight when the API is unavailable.
 
-function useVisualViewportHeight() {
-  const [h, setH] = useState(() =>
-    IS_SSR ? 800 : (window.visualViewport?.height ?? window.innerHeight)
-  );
+/**
+ * The visible rectangle: how tall it is, and how far down the page it starts.
+ *
+ * `height` shrinks when a keyboard opens. `offsetTop` is how far the browser has scrolled the
+ * visual viewport within the layout viewport — which is exactly what iOS does to lift a focused
+ * field above the keyboard, and exactly what drags a `position: fixed` sheet off the top of the
+ * screen.
+ *
+ * Both are needed to ABSORB that behaviour rather than fight it. An earlier attempt reset
+ * `window.scrollTo(0, 0)` whenever iOS scrolled, which works in the sense that the numbers end up
+ * right and is horrible to use: the browser scrolls, the sheet scrolls back, and it reads as the
+ * sheet struggling against the phone. Following the viewport has no such contest — the sheet is
+ * simply drawn where the visible area actually is.
+ */
+function useVisualViewport() {
+  const read = () => {
+    if (IS_SSR) return { height: 800, offsetTop: 0 };
+    const vv = window.visualViewport;
+    return {
+      height: vv?.height ?? window.innerHeight,
+      offsetTop: vv?.offsetTop ?? 0,
+    };
+  };
+
+  const [metrics, setMetrics] = useState(read);
 
   useIsoLayoutEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
 
     /*
-     * Thresholded, because iOS fires this continuously.
-     *
-     * `visualViewport` scroll fires on every frame that the page moves under a raised keyboard,
-     * and each `setH` re-rendered the whole sheet subtree. Movement smaller than a few pixels is
-     * not something a person can see, and re-rendering for it is how a sheet ends up janking on
-     * the one platform whose keyboard animates.
+     * Thresholded, because iOS fires this on every frame while a keyboard is up. Movement smaller
+     * than a couple of pixels is not something a person can see, and re-rendering the whole sheet
+     * subtree for it is how a sheet ends up janking on the one platform whose keyboard animates.
      */
     const handler = () => {
-      const next = vv.height;
-      setH((prev) => (Math.abs(prev - next) > 4 ? next : prev));
+      const next = read();
+      setMetrics((prev) =>
+        Math.abs(prev.height - next.height) > 2 || Math.abs(prev.offsetTop - next.offsetTop) > 2
+          ? next
+          : prev,
+      );
     };
     handler();
     vv.addEventListener('resize', handler);
     vv.addEventListener('scroll', handler);
+    window.addEventListener('resize', handler);
     return () => {
       vv.removeEventListener('resize', handler);
       vv.removeEventListener('scroll', handler);
+      window.removeEventListener('resize', handler);
     };
   }, []);
 
-  return h;
+  return metrics;
 }
 
 // ─── usePreventScroll ─────────────────────────────────────────────────────────
@@ -212,79 +236,61 @@ function usePreventScroll(isOpen: boolean) {
 }
 
 /*
- * Keep the sheet where it was put when the keyboard opens.
+ * Bring a focused field into view INSIDE THE SHEET.
  *
- * iOS reveals a focused field by SCROLLING THE LAYOUT VIEWPORT. That is fine for a field in the
- * page, and wrong for one in a sheet: the sheet is in a fixed overlay, so the whole thing goes up
- * with the page and its top leaves the screen. Reported precisely — the first field in a form
- * behaves perfectly because it is already above the keyboard and nothing needs to scroll, while the
- * second and third push the sheet's top out of view.
+ * The sheet no longer moves when a keyboard opens — the overlay tracks the visual viewport, so the
+ * browser's own scrolling is compensated rather than resisted. What is left to do is the part the
+ * browser was trying to do in the first place: make sure the field you just tapped is not behind
+ * the keyboard.
  *
- * `overflow: hidden` on the document does not prevent it; Safari scrolls for keyboard avoidance
- * regardless. So the scroll is undone and the reveal is done properly instead: the field is brought
- * into view inside the SHEET'S OWN scroller, which is where a sheet's content is supposed to move.
+ * An earlier version of this hook did that by resetting `window.scrollTo(0, 0)` on every viewport
+ * event. The numbers came out right and it was horrible to use — the browser scrolled, this
+ * scrolled back, and it read as the sheet struggling against the phone. Scrolling the sheet's OWN
+ * scroller has no such contest, and it is where a sheet's content is supposed to move anyway.
  *
- * Runs on focus and again after the keyboard's animation, and stays subscribed to the visual
- * viewport for as long as a field inside the sheet has focus, because iOS keeps adjusting while the
- * keyboard settles.
+ * Runs on focus and once more after the keyboard has finished animating, and then stops. It is not
+ * subscribed to anything continuous, because there is nothing left to correct.
  */
 const FOCUSABLE_FIELD = 'input, textarea, select, [contenteditable="true"]';
 
-function useKeepAnchored(isOpen: boolean, sheetRef: React.RefObject<HTMLDivElement | null>) {
+function useRevealFocusedField(
+  isOpen: boolean,
+  sheetRef: React.RefObject<HTMLDivElement | null>,
+) {
   useEffect(() => {
     if (!isOpen || IS_SSR) return;
 
-    const vv = window.visualViewport;
-
-    const focusedField = (): HTMLElement | null => {
+    const reveal = () => {
       const active = document.activeElement as HTMLElement | null;
       const sheet = sheetRef.current;
-      if (!active || !sheet || !sheet.contains(active)) return null;
-      return active.matches?.(FOCUSABLE_FIELD) ? active : null;
-    };
-
-    const realign = () => {
-      const field = focusedField();
-      if (!field) return;
-
-      // Undo the page scroll iOS did to reveal it. Guarded, so the scroll event this fires does
-      // not come straight back in.
-      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      if (!active || !sheet || !sheet.contains(active)) return;
+      if (!active.matches?.(FOCUSABLE_FIELD)) return;
 
       const scroller =
-        (field.closest('.react-modal-sheet-content-scroller') as HTMLElement | null) ??
-        (sheetRef.current?.querySelector('.react-modal-sheet-content-scroller') as HTMLElement | null);
+        (active.closest('.react-modal-sheet-content-scroller') as HTMLElement | null) ??
+        (sheet.querySelector('.react-modal-sheet-content-scroller') as HTMLElement | null);
       if (!scroller) return;
 
-      // Where the keyboard starts. `visualViewport.height` shrinks by exactly that much.
-      const keyboard = Math.max(0, window.innerHeight - (vv?.height ?? window.innerHeight));
-      const safeBottom = window.innerHeight - keyboard - 12;
+      // The scroller's own visible band. Because the overlay now tracks the visual viewport, this
+      // rectangle is already clear of the keyboard — no separate keyboard arithmetic needed.
+      const view = scroller.getBoundingClientRect();
+      const box = active.getBoundingClientRect();
 
-      const box = field.getBoundingClientRect();
-      if (box.bottom > safeBottom) {
-        scroller.scrollTop += box.bottom - safeBottom;
-      } else if (box.top < 8) {
-        scroller.scrollTop -= 8 - box.top;
+      if (box.bottom > view.bottom - 12) {
+        scroller.scrollTop += box.bottom - view.bottom + 12;
+      } else if (box.top < view.top + 8) {
+        scroller.scrollTop -= view.top + 8 - box.top;
       }
     };
 
-    // Once immediately for the layout, once after the keyboard has finished animating in.
     const onFocusIn = () => {
-      requestAnimationFrame(realign);
-      setTimeout(realign, 300);
+      requestAnimationFrame(reveal);
+      // Again once the keyboard has finished animating and the viewport has settled.
+      setTimeout(reveal, 320);
     };
 
     document.addEventListener('focusin', onFocusIn);
-    window.addEventListener('scroll', realign);
-    vv?.addEventListener('resize', realign);
-    vv?.addEventListener('scroll', realign);
-
-    return () => {
-      document.removeEventListener('focusin', onFocusIn);
-      window.removeEventListener('scroll', realign);
-      vv?.removeEventListener('resize', realign);
-      vv?.removeEventListener('scroll', realign);
-    };
+    return () => document.removeEventListener('focusin', onFocusIn);
   }, [isOpen, sheetRef]);
 }
 
@@ -315,7 +321,8 @@ const SheetBase = forwardRef<any, SheetProps>(({
   const [sheetBoundsRef, sheetHeight] = useMeasureHeight();
   const sheetRef = useRef<HTMLDivElement>(null);
   const windowHeight = useWindowHeight();
-  const visualViewportHeight = useVisualViewportHeight();
+  const viewport = useVisualViewport();
+  const visualViewportHeight = viewport.height;
 
   // Calculate effective max height immediately
   const effectiveMaxHeight = React.useMemo(() => {
@@ -508,7 +515,7 @@ const SheetBase = forwardRef<any, SheetProps>(({
 
   useImperativeHandle(ref, () => ({ y, height: sheetHeight }));
   usePreventScroll(isOpen);
-  useKeepAnchored(isOpen, sheetRef);
+  useRevealFocusedField(isOpen, sheetRef);
 
   const zIndex = useTransform(y, (val) => {
     const effectiveHeight = sheetHeight || effectiveMaxHeight;
@@ -534,13 +541,31 @@ const SheetBase = forwardRef<any, SheetProps>(({
 
   const sheet = (
     <SheetContext.Provider value={context}>
+      {/*
+        The overlay is the VISIBLE rectangle, not the layout viewport.
+
+        It used to be `top: 0; bottom: 0` — the layout viewport, which does not shrink for a
+        keyboard and does not move when iOS scrolls to reveal a field. Two consequences, both
+        reported: a sheet anchored to its bottom sat BEHIND the keyboard, so its content could
+        never be scrolled to the end; and when iOS scrolled the page to lift a focused field, the
+        whole fixed overlay went with it and the sheet's top left the screen.
+
+        Sizing to `visualViewport.height` and shifting by `visualViewport.offsetTop` makes the
+        overlay track what is actually on screen. Then `bottom: 0` means "just above the keyboard",
+        a `dvh` maximum is measured against the space that exists, and the browser's own scrolling
+        is compensated exactly rather than resisted.
+
+        On Android, where the layout viewport resizes for the keyboard, height already equals
+        `innerHeight` and offsetTop is 0 — so this changes nothing there and costs nothing.
+      */}
       <motion.div
         style={{
           position: 'fixed',
           top: 0,
-          bottom: 0,
           left: 0,
           right: 0,
+          height: viewport.height,
+          transform: `translateY(${viewport.offsetTop}px)`,
           overflow: 'hidden',
           pointerEvents: 'none',
           zIndex,
@@ -618,6 +643,20 @@ const SheetContainer = forwardRef<any, SheetContainerProps>(({
    * `dvh` is the layout viewport and does not shrink for a keyboard. That is fine. It is the
    * content that has to move, not the sheet.
    */
+  /*
+   * `100%` here is the VISIBLE rectangle, because that is what the overlay is now sized to.
+   *
+   * So a declared `92dvh` is clamped to the space that actually exists rather than to the layout
+   * viewport, which does not shrink for a keyboard. That is what lets the content scroller reach
+   * its own bottom with a keyboard up: previously the sheet extended behind the keyboard, so the
+   * last part of a form was in a region that could not be scrolled to because it was not on screen.
+   *
+   * Composed with `min()` rather than replacing the declared value — a limit nobody asked for is a
+   * bug, which is how the last attempt at this broke search-viewer and selection-viewer.
+   */
+  const clamp = (value: string | number) =>
+    `min(${typeof value === 'number' ? `${value}px` : value}, 100%)`;
+
   if (detent === 'default') {
     containerStyle.height = 'calc(100% - env(safe-area-inset-top) - 34px)';
   } else if (detent === 'full') {
@@ -625,8 +664,19 @@ const SheetContainer = forwardRef<any, SheetContainerProps>(({
     containerStyle.maxHeight = '100%';
   } else {
     containerStyle.height = 'auto';
-    if (maxHeight) containerStyle.maxHeight = maxHeight;
+    if (maxHeight) containerStyle.maxHeight = clamp(maxHeight);
     if (minHeight) containerStyle.minHeight = minHeight;
+  }
+
+  /*
+   * A style-declared maximum gets the same clamp.
+   *
+   * search-viewer and selection-viewer set theirs through `style`, not the prop, and a sheet that
+   * asks for 90dvh while the keyboard leaves 45% of the screen must still fit on screen — it is
+   * the CONTENT that scrolls, not the sheet that overflows.
+   */
+  if (style?.maxHeight !== undefined) {
+    containerStyle.maxHeight = clamp(style.maxHeight as string | number);
   }
 
   const mergedRef = useCallback((node: HTMLDivElement | null) => {

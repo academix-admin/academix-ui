@@ -3,37 +3,59 @@ import { render, waitFor } from '@testing-library/react';
 import { Sheet } from '../src/index';
 
 /**
- * The sheet must stay put when the keyboard reveals a field.
+ * The sheet is drawn against the VISIBLE rectangle, not the layout viewport.
  *
- * iOS brings a focused field into view by SCROLLING THE LAYOUT VIEWPORT. For a field in the page
- * that is correct; for one in a sheet it is not, because the sheet lives in a fixed overlay and
- * goes up with the page, taking its top off the screen.
+ * Two browser behaviours make those differ, and a sheet that ignores the difference gets both of
+ * the faults that were reported from a phone:
  *
- * Reported exactly: the first field in a form behaves perfectly — it is already above the keyboard,
- * so nothing needs to scroll — while the second and third push the sheet's top out of view.
+ *   A soft keyboard shrinks the visual viewport but not the layout viewport, so a bottom-anchored
+ *   sheet extends BEHIND the keyboard. Its last fields are on the page but not on the display, and
+ *   no amount of scrolling reaches them.
  *
- * jsdom has no keyboard, but the browser behaviour being corrected is just "something set
- * window.scrollY". That is straightforward to simulate, which makes this the one part of the
- * keyboard story that can be tested away from a device.
+ *   iOS lifts a focused field by scrolling the visual viewport within the layout viewport, which
+ *   drags a `position: fixed` overlay — the whole sheet — off the top of the screen.
+ *
+ * The overlay therefore takes its height from `visualViewport.height` and shifts by
+ * `visualViewport.offsetTop`. Both are absorbed: the sheet is simply drawn where the visible area
+ * is. An earlier attempt reset `window.scrollTo(0, 0)` on every viewport event instead, which
+ * produced the right numbers and felt like the sheet wrestling with the phone.
  */
 
-const realScrollTo = window.scrollTo;
+const listeners = new Set<() => void>();
 
-let scrollY = 0;
+function setViewport(height: number, offsetTop: number) {
+  (window.visualViewport as any).height = height;
+  (window.visualViewport as any).offsetTop = offsetTop;
+  listeners.forEach((fn) => fn());
+}
 
 beforeEach(() => {
-  scrollY = 0;
-  Object.defineProperty(window, 'scrollY', { configurable: true, get: () => scrollY });
-  // @ts-expect-error test stub
-  window.scrollTo = (_x: number, y: number) => {
-    scrollY = y ?? 0;
-    window.dispatchEvent(new Event('scroll'));
-  };
+  listeners.clear();
+  // jsdom has no visualViewport at all.
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: {
+      height: 800,
+      offsetTop: 0,
+      addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+      removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+    },
+  });
 });
 
 afterEach(() => {
-  window.scrollTo = realScrollTo;
+  delete (window as any).visualViewport;
 });
+
+/*
+ * The overlay is PORTALED to document.body, so it is not under the render container. Identify it
+ * by the two things only it has: fixed position and pointer-events off (it is a pass-through
+ * layer; the container inside it takes the pointer events back).
+ */
+const overlay = (): HTMLElement | null =>
+  ([...document.body.querySelectorAll<HTMLElement>('div')].find(
+    (el) => el.style.position === 'fixed' && el.style.pointerEvents === 'none',
+  ) ?? null);
 
 const renderSheet = () =>
   render(
@@ -48,36 +70,41 @@ const renderSheet = () =>
     </Sheet>
   );
 
-describe('Sheet keyboard anchoring', () => {
-  it('undoes a page scroll made while a field inside the sheet has focus', async () => {
-    const view = renderSheet();
-    const field = await view.findByLabelText('third');
+describe('Sheet viewport tracking', () => {
+  it('shrinks to the visible area when a keyboard opens', async () => {
+    renderSheet();
 
-    field.focus();
+    // A keyboard takes roughly 45% of an 800px screen.
+    setViewport(440, 0);
 
-    // What iOS does a moment after focus: scrolls the page to lift the field above the keyboard,
-    // dragging the fixed overlay — and the sheet's top — up with it.
-    scrollY = 260;
-    window.dispatchEvent(new Event('scroll'));
-
-    await waitFor(() => expect(window.scrollY).toBe(0));
+    await waitFor(() => {
+      const el = overlay();
+      expect(el?.style.height).toBe('440px');
+    });
   });
 
-  it('leaves the page alone when focus is outside the sheet', async () => {
-    const outside = document.createElement('input');
-    document.body.appendChild(outside);
-
+  it('shifts by the amount the browser scrolled to reveal a field', async () => {
     renderSheet();
-    outside.focus();
 
-    scrollY = 260;
-    window.dispatchEvent(new Event('scroll'));
+    // iOS lifting a field: the visual viewport moves down the page by 260px. Without compensation
+    // the fixed overlay goes up by the same amount and the sheet's top leaves the screen.
+    setViewport(440, 260);
 
-    // A page that scrolls for its own reasons is not the sheet's business. Resetting here would
-    // fight the user on any page that happens to have a sheet mounted.
-    await new Promise((r) => setTimeout(r, 60));
-    expect(window.scrollY).toBe(260);
+    await waitFor(() => {
+      expect(overlay()?.style.transform).toContain('260px');
+    });
+  });
 
-    outside.remove();
+  it('returns to full height when the keyboard closes', async () => {
+    renderSheet();
+
+    setViewport(440, 260);
+    await waitFor(() => expect(overlay()?.style.height).toBe('440px'));
+
+    setViewport(800, 0);
+    await waitFor(() => {
+      expect(overlay()?.style.height).toBe('800px');
+      expect(overlay()?.style.transform).toContain('0px');
+    });
   });
 });
