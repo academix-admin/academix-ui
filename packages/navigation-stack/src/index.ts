@@ -75,7 +75,7 @@ export { popStackToRoot } from './core/registry';
 // Keyboard-safe page layout primitives (Flutter-style). Opt-in + non-breaking:
 // pages that don't use these render exactly as before.
 export { ColumnBody, RowBody, Scaffold } from './bodies';
-export type { BodyProps, ScaffoldProps } from './bodies';
+export type { AppBarBehavior, BodyProps, ScaffoldProps } from './bodies';
 
 // Keyboard / viewport-inset primitives for a keyboard-safe app shell.
 export { useViewportInsets, ViewportInsetsProvider, useResizeToAvoidKeyboard } from './keyboard';

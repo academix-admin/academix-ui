@@ -95,9 +95,25 @@ export function RowBody({ children, className, style, id }: BodyProps) {
   );
 }
 
+export type AppBarBehavior = 'pinned' | 'scroll';
+
 export interface ScaffoldProps {
-  /** Pinned top bar (e.g. a `<Header position="static" />`). Never scrolls. */
+  /** Top bar (e.g. a `<Header position="static" />`). Pinned unless `appBarBehavior` says otherwise. */
   appBar?: React.ReactNode;
+  /**
+   * How the app bar behaves as the body scrolls.
+   *
+   * - `'pinned'` (default) — it stays. Right for a screen you read, where the title is a
+   *   permanent label for what you are looking at.
+   * - `'scroll'` — it travels with the content, one-to-one, and comes back as you scroll up.
+   *   Right for a screen with its own sticky furniture beneath it: a toolbar or filter row cannot
+   *   take the top of the screen while a pinned bar is already standing there.
+   *
+   * The bar is laid OVER the body rather than removed from the column, and the body is padded by
+   * its height — so nothing jumps at the moment the behaviour takes effect, and content genuinely
+   * passes underneath it instead of being clipped short.
+   */
+  appBarBehavior?: AppBarBehavior;
   /** Pinned bottom bar (rides above the keyboard). Never scrolls. */
   bottomBar?: React.ReactNode;
   /** Page body. Wrapped in a ColumnBody scroll region unless `scroll={false}`. */
@@ -126,21 +142,48 @@ export interface ScaffoldProps {
  */
 export function Scaffold({
   appBar,
+  appBarBehavior = 'pinned',
   bottomBar,
   children,
   scroll = true,
   bodyClassName,
   bodyStyle,
 }: ScaffoldProps) {
+  /*
+   * A travelling bar is simply the first thing in the scroll body.
+   *
+   * It scrolls because it IS content — which is the smoothest possible version of this, and the
+   * only one that cannot drift out of step with the page. The finger moves the page; the bar is on
+   * the page.
+   *
+   * An earlier attempt laid the bar over the body with a transform driven by a scroll listener.
+   * That worked visually and was wrong in two ways that matter. It needed a wrapper element, and
+   * the wrapper stopped ColumnBody being a direct child of the page — which is how this stack
+   * identifies the scroll container, so anything subscribing to page scroll (a bottom bar that
+   * autohides, a floating action that steps aside for it) went silent. And measuring the bar to
+   * reserve its space meant a ResizeObserver writing a fractional height back into the layout it
+   * was measuring, which never settles.
+   *
+   * Structure unchanged, no measuring, no listener: the bar moves at exactly the speed of the
+   * page, and a `position: sticky` element after it still pins to the top of the scrollport once
+   * the bar has gone.
+   */
+  const travels = appBarBehavior === 'scroll' && appBar != null && scroll;
+
   return (
     <>
-      {appBar != null && (
+      {appBar != null && !travels && (
         <div className="navstack-scaffold__bar" style={{ flex: '0 0 auto', position: 'relative', zIndex: 2 }}>
           {appBar}
         </div>
       )}
       {scroll ? (
         <ColumnBody className={bodyClassName} style={bodyStyle}>
+          {travels && (
+            <div className="navstack-scaffold__bar navstack-scaffold__bar--travels" style={{ flex: '0 0 auto' }}>
+              {appBar}
+            </div>
+          )}
           {children}
         </ColumnBody>
       ) : (
