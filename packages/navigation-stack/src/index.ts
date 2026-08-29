@@ -26,6 +26,8 @@ export {
   useInfiniteScroll,
   useInfiniteScrollObserver,
   usePullToRefresh,
+  scrollIntoViewBelow,
+  useScrollIntoViewBelow,
 } from './scroll';
 export type {
   UseScrollEventsHandlers,
@@ -34,6 +36,8 @@ export type {
   UseInfiniteScrollObserverOptions,
   UsePullToRefreshOptions,
   PullToRefreshState,
+  ScrollIntoViewOptions,
+  ScrollIntoViewResult,
 } from './scroll';
 export { useSwipeBack } from './gestures/swipe-back';
 

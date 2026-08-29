@@ -883,3 +883,156 @@ export function useUnifiedScrollRestoration(
   }, [stackSnapshot, api, groupContext, enabled]);
 }
 
+// ─── Bringing something to rest, beneath whatever is pinned above it ────────────────────────
+
+export interface ScrollIntoViewOptions {
+  /**
+   * What the target must come to rest UNDER.
+   *
+   * A sticky toolbar, a filter row, a tab strip — passed as the element itself, a getter, or a
+   * plain number of pixels. Measured while the scroll runs rather than once at the start, because
+   * pinned chrome is exactly the kind of thing that changes height as the page moves.
+   */
+  below?: HTMLElement | (() => HTMLElement | null) | number;
+  /** How long the glide takes. Default 320ms. `0` lands immediately. */
+  duration?: number;
+  /**
+   * Stop if the person scrolls for themselves. Default true.
+   *
+   * Their touch beats anything the app wanted, always — this exists to finish a job nobody
+   * interrupted, not to fight a thumb.
+   */
+  yieldToUser?: boolean;
+}
+
+export type ScrollIntoViewResult = 'settled' | 'interrupted' | 'unavailable';
+
+/**
+ * Scroll an element to rest just beneath the page's pinned chrome — and actually land there.
+ *
+ * `scrollIntoView` cannot do this reliably, and the reasons are worth stating because they look
+ * like flakiness in an app and are not:
+ *
+ *   IT IS A REQUEST, NOT A GUARANTEE. A phone still carrying momentum from the flick that got you
+ *   here cancels a smooth scroll outright. The page stops halfway and nothing reports it, so the
+ *   same tap appears to work sometimes and do nothing other times.
+ *
+ *   IT MEASURES ONCE. Anything that changes height while the scroll runs — a sticky bar swapping
+ *   its contents, an image arriving, a list re-rendering — leaves it aiming at a position that no
+ *   longer means what it meant.
+ *
+ *   IT SCROLLS EVERY ANCESTOR. Centring something inside a horizontal strip also nudges the page
+ *   vertically, which quietly cancels any vertical scroll starting at the same moment.
+ *
+ * This re-measures on every frame and drives the container itself, so the destination is allowed
+ * to move while it travels and the glide simply follows it. Nothing has to be corrected afterwards
+ * — there is no jump to hide, because it was never aimed at a stale number.
+ *
+ * The container is resolved from the target: the nearest ancestor that actually scrolls, which in
+ * a Scaffold page is the ColumnBody. Pass one explicitly when the element is not inside it.
+ */
+export function scrollIntoViewBelow(
+  target: HTMLElement | null,
+  options: ScrollIntoViewOptions & { container?: HTMLElement | null } = {},
+): Promise<ScrollIntoViewResult> {
+  const { below, duration = 320, yieldToUser = true, container } = options;
+
+  if (!target || typeof window === 'undefined') return Promise.resolve('unavailable');
+
+  const scroller = container ?? findScrollParent(target);
+  if (!scroller) return Promise.resolve('unavailable');
+
+  const clearance = () => {
+    if (typeof below === 'number') return below;
+    const el = typeof below === 'function' ? below() : below;
+    return el ? el.getBoundingClientRect().height : 0;
+  };
+
+  /** How far the target currently is from where it should be. Re-read every frame. */
+  const remaining = () =>
+    target.getBoundingClientRect().top - scroller.getBoundingClientRect().top - clearance();
+
+  return new Promise<ScrollIntoViewResult>((resolve) => {
+    const start = performance.now();
+    let frame = 0;
+    let done = false;
+
+    const finish = (result: ScrollIntoViewResult) => {
+      if (done) return;
+      done = true;
+      if (frame) cancelAnimationFrame(frame);
+      if (yieldToUser) {
+        scroller.removeEventListener('wheel', interrupted);
+        scroller.removeEventListener('touchstart', interrupted);
+        scroller.removeEventListener('pointerdown', interrupted);
+      }
+      resolve(result);
+    };
+
+    const interrupted = () => finish('interrupted');
+
+    if (yieldToUser) {
+      scroller.addEventListener('wheel', interrupted, { passive: true });
+      scroller.addEventListener('touchstart', interrupted, { passive: true });
+      scroller.addEventListener('pointerdown', interrupted, { passive: true });
+    }
+
+    if (duration <= 0) {
+      scroller.scrollTop = Math.max(0, scroller.scrollTop + remaining());
+      finish('settled');
+      return;
+    }
+
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const left = remaining();
+
+      // Close enough that another frame would only shimmer.
+      if (Math.abs(left) < 1 || elapsed >= duration) {
+        scroller.scrollTop = Math.max(0, scroller.scrollTop + left);
+        finish('settled');
+        return;
+      }
+
+      /*
+       * Ease toward a destination that is re-read each frame.
+       *
+       * Deliberately not a pre-computed curve between two fixed points: the whole reason this
+       * exists is that the destination moves. Taking a share of what is LEFT each frame gives the
+       * same softness and cannot end up somewhere stale.
+       */
+      const progress = elapsed / duration;
+      const ease = 1 - Math.pow(1 - progress, 3);
+      scroller.scrollTop = Math.max(0, scroller.scrollTop + left * Math.max(ease, 0.12));
+      frame = requestAnimationFrame(step);
+    };
+
+    frame = requestAnimationFrame(step);
+  });
+}
+
+/** The nearest ancestor that genuinely scrolls vertically. */
+function findScrollParent(node: HTMLElement): HTMLElement | null {
+  let el: HTMLElement | null = node.parentElement;
+  while (el) {
+    const overflow = getComputedStyle(el).overflowY;
+    if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/**
+ * The hook form, bound to a page.
+ *
+ * Returns a function you can call from a handler — the common case being "a control in the pinned
+ * bar was touched, put the thing it acts on back where it can be seen".
+ */
+export function useScrollIntoViewBelow() {
+  return useCallback(
+    (target: HTMLElement | null, options?: ScrollIntoViewOptions & { container?: HTMLElement | null }) =>
+      scrollIntoViewBelow(target, options),
+    [],
+  );
+}
+
