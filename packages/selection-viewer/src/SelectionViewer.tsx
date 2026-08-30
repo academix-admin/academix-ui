@@ -93,12 +93,27 @@ type CancelButtonProps = {
   position?: "left" | "right";
   style?: React.CSSProperties;
   onClick?: () => void;
+  /**
+   * What a screen reader calls it. Defaults to "Close".
+   *
+   * A button whose only content is an icon has no accessible name at all, so it was announced as
+   * just "button" — the one control that dismisses the sheet, and nothing said so.
+   */
+  ariaLabel?: string;
 };
 
 type LayoutProps = {
   gapBetweenHandleAndTitle?: string;
   gapBetweenTitleAndSearch?: string;
   gapBetweenSearchAndContent?: string;
+  /**
+   * How far the rows are set in from the sides. Defaults to `16px`, matching the search box.
+   *
+   * The content had no inset while everything above it had 16px, so a list ran flush into the
+   * sides of the screen under a search box that did not. Pass `0px` for rows that should reach
+   * the edges.
+   */
+  contentPadding?: string;
   backgroundColor?: string;
   handleColor?: string;
   handleWidth?: string;
@@ -150,6 +165,33 @@ const getStyles = (id: string) => `
   width: 100%;
 }
 
+/*
+ * The close button, with a target a thumb can find.
+ *
+ * It sat at right: 0, top: 8 with no padding at all, so the icon was flush against the sheet's
+ * edge and the only thing that could be tapped was the glyph itself — a target well under half
+ * what a finger needs, in the corner of the screen where a thumb is least accurate. Inset by 4px
+ * and padded out to 44px square, so the icon still reads as sitting in the corner while the
+ * hittable area reaches the edges.
+ *
+ * The cancelButton.style prop is still spread last at the call site, so a consumer that was
+ * overriding any of this keeps overriding it. (No backticks in here: this whole block lives
+ * inside a template literal, and one would end the string.)
+ */
+#${id} .selection-viewer-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  border: none;
+  background-color: transparent;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
 #${id} .selection-viewer-drag-handle {
   height: 5px;
   border-radius: 3px;
@@ -190,11 +232,20 @@ const getStyles = (id: string) => `
   width: 100%;
 }
 
+/*
+ * The rows, set in from the edges like everything else in the sheet.
+ *
+ * The title and the search box have carried a 16px margin from the start; the content had none, so
+ * a list of cards ran flush into the sides of the screen while the search box above it did not.
+ * The layoutProp.contentPadding option overrides it for a consumer that wants its rows edge to
+ * edge. (No backticks: this block is inside a template literal.)
+ */
 #${id} .selection-viewer-content {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   flex: 1;
   min-height: 0;
+  box-sizing: border-box;
 }
 
 #${id} .selection-viewer-content.vertical {
@@ -647,12 +698,12 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
               {/* Cancel button left */}
               {cancelButton?.position === "left" && (
                 <button
+                  aria-label={cancelButton.ariaLabel || "Close"}
+                  className="selection-viewer-cancel"
                   style={{
                     position: "absolute",
-                    left: "0px",
-                    top: "8px",
-                    border: "none",
-                    backgroundColor: "transparent",
+                    left: "4px",
+                    top: "4px",
                     ...cancelButton.style
                   }}
                   onClick={cancelButton.onClick || onClose}
@@ -676,12 +727,12 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
               {/* Cancel button right */}
               {cancelButton?.position === "right" && (
                 <button
+                  aria-label={cancelButton.ariaLabel || "Close"}
+                  className="selection-viewer-cancel"
                   style={{
                     position: "absolute",
-                    right: "0px",
-                    top: "8px",
-                    border: "none",
-                    backgroundColor: "transparent",
+                    right: "4px",
+                    top: "4px",
                     ...cancelButton.style
                   }}
                   onClick={cancelButton.onClick || onClose}
@@ -773,6 +824,15 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
               paddingBottom: keyboardHeight > 0
                 ? `${keyboardHeight + 16}px`
                 : '16px',
+              /*
+               * Set in from the edges, like everything else in the sheet.
+               *
+               * The title and the search box have carried 16px from the start and the content had
+               * none, so a list of rows ran flush into the sides of the screen under a search box
+               * that did not. Overridable for rows that genuinely want the full width.
+               */
+              paddingLeft: layoutProp?.contentPadding ?? '16px',
+              paddingRight: layoutProp?.contentPadding ?? '16px',
             }}
           >
             {/* Show children first, then loading at bottom */}
