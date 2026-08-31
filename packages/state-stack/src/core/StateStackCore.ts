@@ -391,6 +391,51 @@ export class StateStackCore {
 
   // ── Clear helpers ─────────────────────────────────────────────────────────
 
+  /**
+   * Mark every key in a scope as needing a fresh load, WITHOUT throwing away what it holds.
+   *
+   * The missing middle between "leave it alone" and `clearScope`. A write elsewhere makes cached
+   * data stale; the screens holding it should re-read on their next demand and, until that lands,
+   * go on showing the last good answer.
+   *
+   * `clearScope` is the only tool that existed for this, and it deletes: the value goes, the demand
+   * flag goes with it, and every screen holding that scope blanks and re-fetches from nothing. A
+   * consumer that wanted "refetch, don't blank" had to choose between a blank screen and a cache
+   * that never refreshed — because `demand()` returns early once a key is demanded, so simply
+   * telling the screen to load again does nothing.
+   *
+   * Keeps: the value, the persisted copy, the history, the TTL timer.
+   * Clears: the demanded flag, so the next `demand()` runs its loader.
+   *
+   * Additive and non-breaking: nothing calls it unless it asks for it, and `clearScope` is
+   * untouched for the cases that genuinely must forget — signing out, or switching account.
+   */
+  invalidateScope(scope: string) {
+    const keys = new Set<string>();
+
+    const sm = this.stacks.get(scope);
+    if (sm) for (const key of sm.keys()) keys.add(key);
+
+    /*
+     * Keys that were demanded but never landed a value are in `demandedKeys` and not in `stacks`.
+     * They are precisely the ones mid-flight or failed, and precisely the ones that must be
+     * allowed to run again.
+     */
+    for (const ik of this.demandedKeys) {
+      const [ks, k] = this.parseSubKey(ik);
+      if (ks === scope) keys.add(k);
+    }
+
+    for (const key of keys) {
+      const ik = this.subKey(scope, key);
+      this.demandedKeys.delete(ik);
+      this.loadedKeys.delete(ik);
+      // Hydration is deliberately left alone: the value is still here, so a screen that has it
+      // must not be told it is waiting for one.
+      this.notify(scope, key);
+    }
+  }
+
   async clearScope(scope: string, removePersist = true) {
     const sm = this.stacks.get(scope);
     const storage = getDefaultStorage();

@@ -51,6 +51,8 @@ export const StateStack = {
   // Bound core methods — no anonymous wrappers so call sites get correct `this`.
   clearKey: coreInstance.clearKey.bind(coreInstance),
   clearScope: coreInstance.clearScope.bind(coreInstance),
+  /** Stale, but keep it — see `StateStackCore.invalidateScope`. */
+  invalidateScope: coreInstance.invalidateScope.bind(coreInstance),
   clearByPathname: coreInstance.clearByPathname.bind(coreInstance),
   clearCurrentPath: (removePersist = true) => {
     if (typeof window !== 'undefined') {
