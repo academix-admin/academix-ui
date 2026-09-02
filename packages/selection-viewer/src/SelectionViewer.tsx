@@ -852,11 +852,25 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
                     {loadingProp?.view}
                   </div>
                 )}
-                {/* Composed mode: a Column/Row descendant reports its own state, which can only ever be
-                    "empty"/"error" here since the child count > 0 branch is unconditional on a literal
-                    <Column> being present. Layer the outer view alongside the (visually empty) children
-                    rather than replacing them — a Column/Row must stay mounted to keep reporting. */}
-                {isComposed && selectionState === "empty" && (
+                {/*
+                  Shown ALONGSIDE the children, not instead of them.
+
+                  This was guarded on composed mode — a Column/Row descendant reporting its own
+                  state — on the reasoning that only a composed sheet can have children and be
+                  empty at the same time. That is not true of the commonest arrangement there is:
+                  a consumer that wraps its rows in a single container. `React.Children.count` is
+                  then 1 whether the container holds fifty rows or none, so the empty branch below
+                  never ran and the sheet showed a blank white screen — at the exact moment
+                  somebody had searched for something that is not there, which is when the empty
+                  state is the only useful thing on screen.
+
+                  Layered rather than substituted, for the reason the composed case already had:
+                  a child that reports its own state must stay mounted to go on reporting. A
+                  consumer whose `selectionState` says "empty" is asserting there is nothing to
+                  show, so drawing its own view beside visually-empty children is what it asked
+                  for.
+                */}
+                {selectionState === "empty" && (
                   <div
                     className="selection-viewer-no-results"
                     style={{
@@ -873,7 +887,7 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
                     )}
                   </div>
                 )}
-                {isComposed && selectionState === "error" && (
+                {selectionState === "error" && (
                   <div
                     className="selection-viewer-error"
                     style={{
