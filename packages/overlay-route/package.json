@@ -1,23 +1,24 @@
 {
-  "name": "@academix-admin/dialog-viewer",
-  "version": "0.3.0",
-  "description": "Imperative React dialogs — alert, confirm and destructive — with a controller hook.",
+  "name": "@academix-admin/overlay-route",
+  "version": "0.1.0",
+  "description": "Give a sheet, picker or dialog its own history entry, so the platform's back gesture closes the overlay rather than the page under it.",
   "keywords": [
     "react",
-    "dialog",
-    "modal",
-    "alert",
-    "confirm",
-    "imperative"
+    "overlay",
+    "sheet",
+    "history",
+    "back-button",
+    "back-gesture",
+    "url-fragment"
   ],
   "license": "MIT",
   "author": "Academix",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/academix-admin/academix-ui.git",
-    "directory": "packages/dialog-viewer"
+    "directory": "packages/overlay-route"
   },
-  "homepage": "https://github.com/academix-admin/academix-ui/tree/main/packages/dialog-viewer#readme",
+  "homepage": "https://github.com/academix-admin/academix-ui/tree/main/packages/overlay-route#readme",
   "bugs": {
     "url": "https://github.com/academix-admin/academix-ui/issues"
   },
@@ -57,18 +58,18 @@
     "react-dom": ">=18.0.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "jsdom": "^25.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "rimraf": "^6.0.1",
     "tsup": "^8.3.5",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   },
   "publishConfig": {
     "access": "public"
-  },
-  "dependencies": {
-    "@academix-admin/overlay-route": "^0.1.0"
   }
 }

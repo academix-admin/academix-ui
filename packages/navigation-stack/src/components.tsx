@@ -4,11 +4,13 @@ import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, u
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry, type RegistryEntry } from './core/registry';
-import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState, nextSerial } from './core/persistence';
+import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
+import { writeHistoryEntry } from './core/history-writer';
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
 import { useSwipeBack } from './gestures/swipe-back';
 import { subscribeOverlays, getOverlayStore, notifyOverlays, clampOffset } from './overlay/registry';
+import { settleOverlayFragment } from './overlay/hash';
 
 let _groupStyleMountCount = 0;
 // Rendered components: loaders, transitions, error boundary, group + main stack.
@@ -564,13 +566,41 @@ export function GroupNavigationStack({
       url.searchParams.set('group', nextStackId);
       const newHref = url.toString();
       if (window.location.href === newHref) return;
-      // Spread the existing state so `navStack` (and any foreign keys) survive — this is a tab
-      // change, not a navigation, and must not blank the entry's own record of its stacks.
-      window.history.replaceState(
-        { ...(window.history.state ?? {}), group: nextStackId, axSerial: nextSerial() },
-        "",
-        newHref,
-      );
+
+      /*
+       * A NEW SERIAL MUST BE DECLARED, or the entry log loses its place.
+       *
+       * This write restamps the current entry with a fresh serial. The log is keyed by serial, so
+       * an unrecorded restamp leaves the log naming an entry that no longer answers to that name:
+       * `findBackDeltaForDepth` can no longer find where it is standing, returns null, and every
+       * pop from then on silently falls back to counting the stack's own entries — the very
+       * approximation the log exists to replace. Worse, the next write cannot find its predecessor
+       * either, so it treats the log as untrustworthy and resets it to a single record.
+       *
+       * The visible failure, reported against a tab bar: Stock one page deep, Count one page deep,
+       * tap Stock while already on Stock — and the app lands on COUNT, because "one entry back"
+       * was Count's entry, not Stock's root. Two tabs and one page each is the smallest case, so
+       * this is not an exotic arrangement.
+       *
+       * Captured before the write, because `history.state` describes the NEW entry afterwards.
+       */
+      /*
+        Declared like every other write, and for the reason this whole mechanism exists: this
+        restamps the entry with a fresh serial, and the log is keyed by serial. An undeclared
+        restamp renames the entry out from under the log, which then cannot find where it is
+        standing — so every later pop falls back to counting, and the count is right about the
+        number and wrong about whose entries it counted. The shop pressed Back on one tab and
+        arrived on another; two tabs one page deep each is enough.
+
+        The nav param is carried across unchanged, and truthfully: a tab change moves no stack, so
+        this entry stands exactly where it did.
+      */
+      writeHistoryEntry({
+        mode: 'replace',
+        href: newHref,
+        navParam: url.searchParams.get('nav'),
+        state: { group: nextStackId },
+      });
     } catch (e) { /* URL/history can throw in exotic embedders; a tab change is not worth crashing */ }
   }
 
@@ -1104,6 +1134,23 @@ export default function NavigationStack(props: {
     setInitialized(true);
   }, [id, entry, navLink, groupContext, groupStackId]);
 
+
+  /*
+    SETTLE AN OVERLAY THE URL STILL NAMES, once, after the first frames.
+
+    overlay-route's own hook schedules this too, but only when an overlay component is MOUNTED —
+    and after a reload the sheet's component may not be. A picker lives inside the page it belongs
+    to; come back on a different tab and nothing renders it, so nothing would ever notice that the
+    URL is still naming it and that the shop is standing on its entry. The next Back is then spent
+    closing a sheet that was never drawn.
+
+    This library is already overlay-route's history writer, so being its "the app is running now"
+    signal is part of the same integration rather than knowledge of somebody else's UI. Idempotent:
+    a dozen stacks mounting queue one settle, and anything on screen has claimed its name by then.
+  */
+  useEffect(() => {
+    if (syncHistory) settleOverlayFragment();
+  }, [syncHistory]);
 
   useEffect(() => {
     const currentRegEntry = getRegistry().get(id);

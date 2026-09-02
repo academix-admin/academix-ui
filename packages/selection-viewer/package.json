@@ -1,7 +1,7 @@
 {
   "name": "@academix-admin/selection-viewer",
-  "version": "0.4.1",
-  "description": "Imperative React selection sheet \u2014 search + pick from a list \u2014 with a controller hook, built on @academix-admin/modal-sheet.",
+  "version": "0.5.0",
+  "description": "Imperative React selection sheet — search + pick from a list — with a controller hook, built on @academix-admin/modal-sheet.",
   "keywords": [
     "react",
     "selection",
@@ -55,7 +55,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@academix-admin/modal-sheet": "^0.1.0"
+    "@academix-admin/modal-sheet": "^0.1.0",
+    "@academix-admin/overlay-route": "^0.1.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

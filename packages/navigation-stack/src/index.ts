@@ -93,7 +93,28 @@ export {
   setInFragment,
   readOverlayFragment,
   writeOverlayFragment,
+  closeUnrestoredOverlay,
+  settleOverlayFragment,
+  resetOverlaySettle,
+  claimOverlay,
+  releaseOverlay,
+  isOverlayClaimed,
+  overlayClaims,
+  resetOverlayClaims,
+  /**
+   * Give any overlay its own history entry, so the platform's Back closes the SHEET rather than the
+   * page under it. Re-exported from `@academix-admin/overlay-route`, which is where it lives so
+   * that an app wanting a back-closable sheet does not have to take a router with it. Importing it
+   * from here also registers this library's ledger behind it, so the overlay's entry is counted by
+   * every pop.
+   */
+  useOverlayRoute,
 } from './overlay/hash';
+export {
+  /** Ledger health and teardown, for devtools and tests. */
+  getPopHealth,
+  resetNavigationLedgers,
+} from './core/persistence';
 export type { ParsedFragment } from './overlay/hash';
 export {
   registerOverlayFactory,
@@ -109,6 +130,10 @@ export { hasNativeBackGesture } from './gestures/swipe-back';
 // Dev-only inspector on window.__NAV_STACK__ (mirrors state-stack's __STATE_STACK__).
 // Installed at import time so it is present before any app code runs -- Playwright's
 // addInitScript can set window.__NAV_STACK_DEVTOOLS__ = true to force it on in a prod build.
+/**
+ * Overlay routing: a sheet gets a history entry, so the platform's Back closes the SHEET rather
+ * than the page under it. Works with any overlay, whoever drew it.
+ */
 export { navDevtools, installNavDevtools, devtoolsEnabled } from './devtools';
 export type { NavEvent, NavSnapshot, NavEntrySnapshot } from './devtools';
 export { NavigationDevtools } from './devtools-ui';

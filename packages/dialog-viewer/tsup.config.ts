@@ -19,6 +19,6 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   outExtension({ format }) { return { js: format === 'cjs' ? '.cjs' : '.js' }; },
   dts: true, sourcemap: true, clean: true, treeshake: true, splitting: false,
-  external: ['react', 'react-dom', 'react/jsx-runtime'],
+  external: ['react', 'react-dom', 'react/jsx-runtime', '@academix-admin/overlay-route'],
   onSuccess: () => preserveUseClient('dist'),
 });

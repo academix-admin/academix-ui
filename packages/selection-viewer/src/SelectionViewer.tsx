@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Sheet } from "@academix-admin/modal-sheet";
+import { useOverlayRoute } from '@academix-admin/overlay-route';
 
 // ==================== Aggregation (Row/Column) ====================
 // Independent from @academix-admin/search-viewer's equivalent (Library Charter: packages stay
@@ -127,6 +128,20 @@ type SelectionViewerProps = {
   isOpen: boolean;
   backDrop?: boolean;
   onClose: () => void;
+  /**
+   * Give this overlay its own history entry under this name, so the platform's own Back (and the
+   * iOS edge-swipe, and Android's gesture) closes the OVERLAY rather than the page under it.
+   *
+   * Off by default, because it changes what the back gesture does and no existing consumer asked
+   * for that. Without it, Back with this open closes it AND leaves the page behind it: measured in
+   * a real shop, the gesture walked straight out of a half-built sale.
+   *
+   * The name must be unique among overlays that can be open together, or they mistake each other's
+   * entry. Make it STABLE across page loads and the overlay can also come back after a refresh —
+   * see `useOverlayRoute` in `@academix-admin/overlay-route`, which this uses and which any
+   * component can use directly.
+   */
+  historyRoute?: string;
   titleProp: TitleProps;
   searchProp?: SearchProps;
   loadingProp?: LoadingProps;
@@ -435,6 +450,7 @@ const useModalKeys = (isOpen: boolean, onClose: () => void, containerId: string)
 const SelectionViewer: React.FC<SelectionViewerProps> = ({
   id: providedId,
   isOpen,
+  historyRoute,
   backDrop = true,
   onClose,
   titleProp,
@@ -457,6 +473,19 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
   selectionState: selectionStateProp = "initial",
   closeThreshold = 0.2,
 }) => {
+
+  /*
+   * THE BACK GESTURE CLOSES THIS, NOT THE PAGE UNDER IT.
+   *
+   * Only when the consumer named a route: `useOverlayRoute` is a no-op with an empty name, and an
+   * overlay that never asked for a history entry must not acquire one, or Back starts meaning
+   * something different in an app that did not opt in.
+   *
+   * The capability lives in its own package rather than here, so that an app wanting a
+   * back-closable sheet does not have to take a router with it — and so that a navigation library
+   * can supply the history writing without either package importing the other.
+   */
+  useOverlayRoute(historyRoute ?? '', Boolean(historyRoute) && isOpen, onClose);
   const [id] = useState(() => providedId || `selection-${Math.random().toString(36).substring(2, 11)}`);
   const [searchValue, setSearchValue] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);

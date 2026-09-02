@@ -26,7 +26,7 @@
  *     `addInitScript`). Never on by default in production.
  */
 import { getRegistry } from './core/registry';
-import { getPushDepth } from './core/persistence';
+import { getPushDepth, getPopHealth } from './core/persistence';
 import { getOverlayStore } from './overlay/registry';
 import { readOverlayFragment } from './overlay/hash';
 import type { NavParams, StackEntry } from './types';
@@ -176,6 +176,16 @@ export const navDevtools = {
       byStack: depth,
       url: typeof window !== 'undefined' ? window.location.href : '',
       overlayFragment: readOverlayFragment(),
+      /*
+       * Whether pops are being ANSWERED or GUESSED.
+       *
+       * The count-based fallback is silent by design and correct as a fallback, which is how an
+       * app can run for weeks with the entry log disabled and nothing looking wrong — until an
+       * interleaving makes the count land on another tab. `fellBackToCounting` climbing on a live
+       * app, or `logKnowsWhereItIs: false` outside the moments just after a reload, means a
+       * history write somewhere is not declaring itself.
+       */
+      pops: getPopHealth(),
     };
   },
 

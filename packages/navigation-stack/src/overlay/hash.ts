@@ -1,112 +1,61 @@
 /**
- * Overlay state lives in the URL fragment, not the query string.
+ * Overlay routing, provided by `@academix-admin/overlay-route`, with this library's ledger behind
+ * it.
  *
- * WHY THE FRAGMENT
- *  - A fragment write never round-trips to the server, so an overlay opening cannot trigger a
- *    server render the way a query-param change can.
- *  - Page state (`?nav=`) and ephemeral overlay state stay cleanly separated: reading one never
- *    requires parsing the other.
- *  - Each open becomes a real history entry, which is what lets the platform's own back gesture
- *    close an overlay — so our swipe-back only has to cover platforms with no native gesture,
- *    instead of competing with one.
+ * ## Why the capability lives in another package
  *
- * WHY IT IS NOT JUST `location.hash = ...`
- * The fragment is not ours. `#section-3` deep links, docs anchors and `scrollIntoView` targets are
- * ordinary site behaviour, and stomping the whole fragment would break them. This codec owns
- * exactly ONE `&`-separated segment (`ax=…`) and passes every other segment through untouched, in
- * its original order and position.
+ * A sheet needing its own history entry is not a navigation-stack problem — it is every app's
+ * problem, including apps with no navigation library at all. Keeping it here would have meant that
+ * anyone who wanted a back-closable bottom sheet had to take a router with it, and that the four
+ * viewer packages in this project could only have the capability by depending on this one.
  *
- * The parse/build pair is pure so the awkward cases — foreign-only, ours-only, both in either
- * order, removal, values containing `&`/`=` — are testable without a DOM.
+ * ## What this file adds
+ *
+ * The one thing only this library can: an overlay's entry is a real history entry, and every pop
+ * here asks the entry log which entry it wants, because `history.go(-n)` counts positions in the
+ * browser's single global list. An entry the log has never heard of leaves every later pop short by
+ * one — measured, in an app using both: one picker opened anywhere in a journey and a Back press
+ * landed on another tab's page with that picker's fragment restored into the URL.
+ *
+ * So this registers our writer with overlay-route on import. Neither package imports the other's
+ * internals; they meet at one function. An app using overlay-route WITHOUT this library still gets
+ * a working back gesture — it simply has no ledger to join.
  */
+import { setHistoryWriter } from '@academix-admin/overlay-route';
+import { writeHistoryEntry } from '../core/history-writer';
 
-/** The single fragment segment this package owns. */
-export const OVERLAY_FRAGMENT_KEY = 'ax';
+setHistoryWriter(({ mode, href, state }) => {
+  writeHistoryEntry({
+    mode,
+    href,
+    /*
+     * Carried across unchanged, and truthfully: an overlay opening moves no stack, so this entry
+     * stands exactly where the one before it did. A depth lookup steps over it — right, it is not
+     * a target — while it still counts towards the distance a `go(-n)` has to travel.
+     */
+    navParam:
+      typeof window === 'undefined'
+        ? null
+        : new URL(window.location.href).searchParams.get('nav'),
+    state,
+  });
+});
 
-export type ParsedFragment = {
-  /** Decoded value of our segment, or null when absent. */
-  ours: string | null;
-  /** Every other segment, verbatim and in original order. */
-  foreign: string[];
-};
-
-export function parseFragment(raw: string | null | undefined): ParsedFragment {
-  const s = (raw ?? '').replace(/^#/, '');
-  if (!s) return { ours: null, foreign: [] };
-
-  const foreign: string[] = [];
-  let ours: string | null = null;
-
-  for (const seg of s.split('&')) {
-    if (!seg) continue;
-    if (seg === OVERLAY_FRAGMENT_KEY || seg.startsWith(`${OVERLAY_FRAGMENT_KEY}=`)) {
-      // Last one wins, matching how query params are normally treated.
-      const eq = seg.indexOf('=');
-      const rawVal = eq === -1 ? '' : seg.slice(eq + 1);
-      try {
-        ours = decodeURIComponent(rawVal);
-      } catch {
-        ours = rawVal; // malformed percent-encoding: take it literally rather than throw
-      }
-    } else {
-      foreign.push(seg);
-    }
-  }
-
-  return { ours, foreign };
-}
-
-/**
- * Rebuild a fragment. Foreign segments keep their order and come first, so a plain `#section`
- * link still looks like `#section` to anything that reads it.
- * Returns '' (not '#') when empty, so the caller can drop the fragment entirely.
- */
-export function buildFragment(ours: string | null, foreign: string[]): string {
-  const segs = [...foreign];
-  if (ours != null && ours !== '') {
-    segs.push(`${OVERLAY_FRAGMENT_KEY}=${encodeURIComponent(ours)}`);
-  }
-  return segs.join('&');
-}
-
-/** Replace only our segment in a fragment string, leaving everything else alone. */
-export function setInFragment(raw: string | null | undefined, ours: string | null): string {
-  const { foreign } = parseFragment(raw);
-  return buildFragment(ours, foreign);
-}
-
-// ---------------------------------------------------------------------------
-// DOM wrappers
-// ---------------------------------------------------------------------------
-
-export function readOverlayFragment(): string | null {
-  if (typeof window === 'undefined') return null;
-  return parseFragment(window.location.hash).ours;
-}
-
-/**
- * Write our fragment segment.
- *
- * `push` creates a history entry, which is what makes the platform back gesture close the overlay.
- * `replace` is for corrections that should not be independently reversible (e.g. syncing after the
- * overlay was closed by other means).
- *
- * Uses pushState/replaceState rather than assigning `location.hash`, because assigning always
- * pushes — there would be no way to express a replace, and it would also fire hashchange.
- */
-export function writeOverlayFragment(ours: string | null, mode: 'push' | 'replace' = 'push'): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const url = new URL(window.location.href);
-    const next = setInFragment(url.hash, ours);
-    url.hash = next; // URL drops the '#' by itself when next is ''
-    const href = url.toString();
-    if (href === window.location.href) return;
-    // Same reasoning as core/persistence.ts: a PUSH starts a new entry and must not inherit
-    // another consumer's state, or their markers appear to belong to it.
-    if (mode === 'push') window.history.pushState({ axOverlay: ours }, '', href);
-    else window.history.replaceState({ ...(window.history.state ?? {}), axOverlay: ours }, '', href);
-  } catch {
-    /* URL parsing/history can throw in exotic embedders; overlay state is not worth crashing for */
-  }
-}
+export {
+  OVERLAY_FRAGMENT_KEY,
+  parseFragment,
+  buildFragment,
+  setInFragment,
+  readOverlayFragment,
+  writeOverlayFragment,
+  closeUnrestoredOverlay,
+  settleOverlayFragment,
+  resetOverlaySettle,
+  claimOverlay,
+  releaseOverlay,
+  isOverlayClaimed,
+  overlayClaims,
+  resetOverlayClaims,
+  useOverlayRoute,
+} from '@academix-admin/overlay-route';
+export type { ParsedFragment } from '@academix-admin/overlay-route';

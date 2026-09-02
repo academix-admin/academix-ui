@@ -1,5 +1,6 @@
 import type { NavParams, NavigationMap, ParsedStack, StackEntry } from '../types';
-import { setInFragment } from '../overlay/hash';
+import { setInFragment } from '@academix-admin/overlay-route';
+import { writeHistoryEntry } from './history-writer';
 import { NAV_STACK_VERSION, STACK_SEPARATOR, STORAGE_TTL_MS } from '../constants';
 import type { GroupNavigationContextType } from './contexts';
 // Stack persistence, URL/param encoding and uid helpers.
@@ -298,6 +299,30 @@ const _entryDepths = new Map<string, number[]>();
  */
 let _serial = 0;
 
+/**
+ * Which DOCUMENT LOAD issued a serial.
+ *
+ * The counter above restarts at 0 on every page load, but history entries outlive the document
+ * that wrote them — so after a reload, entry 3 from before and entry 3 from after answer to the
+ * same name, and a log keyed by serial cannot tell them apart. Going Back onto a pre-reload entry
+ * then made the log believe it was standing somewhere it was not, and hand out a delta with
+ * confidence. That is the exact failure this whole mechanism exists to prevent, arriving by the
+ * back door.
+ *
+ * A per-load token makes an old entry UNRECOGNISABLE rather than misrecognised, which is the
+ * useful outcome: `currentSerial()` returns null, the delta lookup declines to answer, and the
+ * caller falls back to counting. Sometimes short is recoverable; confidently wrong is not.
+ *
+ * Not a timestamp — two loads inside the same millisecond are ordinary — and not persisted, which
+ * is the point: a new document must get a new one.
+ */
+const _epoch = Math.random().toString(36).slice(2, 10);
+
+/** The current document's epoch. Exposed for devtools and tests, not part of the navigation API. */
+export function currentEpoch(): string {
+  return _epoch;
+}
+
 export function nextSerial(): number {
   _serial += 1;
   return _serial;
@@ -311,6 +336,12 @@ export type AxHistoryState = {
   group?: string;
   /** Generation of this entry. */
   axSerial: number;
+  /**
+   * Document load that issued `axSerial`. Absent on entries written before this existed, and on
+   * entries from a previous load of an older build — both of which are correctly treated as
+   * "not ours to number".
+   */
+  axEpoch?: string;
 };
 
 /** Read our slice of an entry's state, if this entry was written by us. */
@@ -319,7 +350,7 @@ export function readAxState(state: unknown): AxHistoryState | null {
   const s = state as Partial<AxHistoryState>;
   if (typeof s.axSerial !== 'number') return null;      // not ours, or written before serials
   if (typeof s.navStack !== 'string' && s.navStack !== null) return null;
-  return { navStack: s.navStack ?? null, group: s.group, axSerial: s.axSerial };
+  return { navStack: s.navStack ?? null, group: s.group, axSerial: s.axSerial, axEpoch: s.axEpoch };
 }
 
 export function getPushDepth(stackId: string): number {
@@ -403,7 +434,17 @@ function depthOfStackIn(navParam: string | null, stackId: string): number {
 
 export function currentSerial(): number | null {
   if (typeof window === 'undefined') return null;
-  return readAxState(window.history.state)?.axSerial ?? null;
+  const ax = readAxState(window.history.state);
+  if (!ax) return null;
+  /*
+   * A serial from another load is not a serial we can use.
+   *
+   * `readAxState` still hands back the navStack — that is how Back after a refresh restores the
+   * page, and it stays truthful whoever wrote it. Only the IDENTITY question is refused, because
+   * only identity is what the log keys on.
+   */
+  if (ax.axEpoch !== _epoch) return null;
+  return ax.axSerial;
 }
 
 /**
@@ -516,6 +557,25 @@ export function reconcileLedgerToDepth(stackId: string, previousDepth: number, n
   }
 }
 
+/**
+ * Clear every ledger this module keeps, in one call.
+ *
+ * There are four — the entry log, the push counts, the depths each entry was recorded at, and the
+ * pop health — and they describe one thing between them, which is a design smell worth naming.
+ * Until they are one structure, the danger is resetting SOME of them: a test that cleared the log
+ * but not the push counts inherited the previous test's depth and travelled the right distance for
+ * the wrong reason, passing against a library that still had the bug in it. A test that cannot
+ * fail is worse than no test.
+ *
+ * `stackIds` because the per-stack ledgers are keyed and a Map cannot be emptied for stacks it has
+ * never heard of; pass the ids under test, or none to clear only the global ones.
+ */
+export function resetNavigationLedgers(stackIds: string[] = []): void {
+  resetEntryLog();
+  resetPopHealth();
+  for (const id of stackIds) resetPushDepth(id);
+}
+
 export function resetPushDepth(stackId: string): void {
   _pushDepth.delete(stackId);
   _entryDepths.delete(stackId);
@@ -529,6 +589,49 @@ export function resetPushDepth(stackId: string): void {
  * restored URL and finds it identical, so the rebuild is a no-op (see the isEqual guard in
  * components.tsx). That is what keeps programmatic pop and browser-back from double-popping.
  */
+/**
+ * How the pop mechanism is actually doing, for devtools.
+ *
+ * `named` counted the pops the entry log could justify; `counted` the ones that fell back. The
+ * ratio is the health of the whole thing: the fallback is correct but approximate, and a running
+ * app that keeps taking it has a history writer somewhere that is not declaring its entries.
+ */
+const _health = {
+  named: 0,
+  counted: 0,
+  lastCountedAt: null as null | { stackId: string; targetDepth: number; knewPosition: boolean },
+};
+
+export function getPopHealth() {
+  return {
+    ...(_health.lastCountedAt ? { lastFallback: { ..._health.lastCountedAt } } : {}),
+    namedByLog: _health.named,
+    fellBackToCounting: _health.counted,
+    /**
+     * Whether the log contains the entry we are actually standing on — the precondition for
+     * naming a pop's target instead of counting.
+     *
+     * Asked of the LOG, not of the entry. A first version read `currentSerial() !== null`, which
+     * only says the entry was written by this document; wiping the log left it reporting true
+     * while the log knew nothing at all. Both halves have to hold.
+     *
+     * False is normal right after a reload, and a defect at any other time: something wrote a
+     * history entry without recording it.
+     */
+    logKnowsWhereItIs: (() => {
+      const cur = currentSerial();
+      return cur !== null && _entryLog.some((e) => e.serial === cur);
+    })(),
+    entriesRecorded: _entryLog.length,
+  };
+}
+
+export function resetPopHealth(): void {
+  _health.named = 0;
+  _health.counted = 0;
+  _health.lastCountedAt = null;
+}
+
 export function consumeHistoryEntries(stackId: string, requested: number, targetDepth?: number): number {
   if (typeof window === "undefined" || requested <= 0) return 0;
   const available = getPushDepth(stackId);
@@ -544,16 +647,101 @@ export function consumeHistoryEntries(stackId: string, requested: number, target
   let n = counted;
   if (typeof targetDepth === 'number') {
     const targeted = findBackDeltaForDepth(stackId, targetDepth);
-    if (targeted !== null && targeted > 0) n = targeted;
+    if (targeted !== null && targeted > 0) {
+      n = targeted;
+      _health.named += 1;
+    } else {
+      /*
+       * COUNTED, NOT NAMED — and worth saying out loud.
+       *
+       * Falling back is the right behaviour: a delta the log cannot justify is worse than one that
+       * is sometimes short. What was wrong was doing it in silence. Two writers stopped declaring
+       * themselves to the log and every pop in the app quietly took this branch for weeks, looking
+       * exactly like a working system until the day the interleaving made the count land on
+       * another tab.
+       *
+       * After a reload this branch is honest and expected (the log is empty and the browser's
+       * entries are not). A running app that is taking it repeatedly has a writer that is not
+       * declaring itself, and `__NAV_STACK__.debug()` now says so.
+       */
+      _health.counted += 1;
+      _health.lastCountedAt = {
+        stackId,
+        targetDepth,
+        // Same question `logKnowsWhereItIs` answers, recorded at the moment it mattered: was the
+        // log able to see where it was standing, or had something written an entry behind its back?
+        knewPosition: (() => {
+          const cur = currentSerial();
+          return cur !== null && _entryLog.some((e) => e.serial === cur);
+        })(),
+      };
+    }
   }
 
   _pushDepth.set(stackId, Math.max(0, available - counted));
   try {
     window.history.go(-n);
+    clearOverlayFragmentOnArrival();
   } catch {
     return 0;
   }
   return n;
+}
+
+/**
+ * A POP LANDS WITH NOTHING OPEN ON TOP OF IT.
+ *
+ * A push already clears the fragment, and for the same reason: the page being arrived at has no
+ * sheet open, and `#ax=…` riding along tells every overlay that its own id is still on top. A pop
+ * could not obey that rule, because it does not write the URL at all — the browser restores the
+ * target entry's, fragment included, and that entry was written at a moment when something WAS
+ * open over it.
+ *
+ * Seen in store-manager: tapping an already-active tab returned to that tab's first page carrying
+ * `#ax=sell:picker` — a picker belonging to a different tab, named in the URL of a page that has
+ * no picker.
+ *
+ * Only for pops WE performed. A browser Back onto such an entry is the platform's own gesture
+ * meaning "put me back where I was", sheet included, and rewriting that would be taking something
+ * away from the user. So this arms itself for exactly one arrival, and disarms on a timer if that
+ * arrival never comes (a `go` the browser declined, a page torn down mid-flight).
+ */
+function clearOverlayFragmentOnArrival(): void {
+  if (typeof window === 'undefined') return;
+
+  let done = false;
+  const disarm = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('popstate', onArrive);
+    clearTimeout(timer);
+  };
+
+  function onArrive() {
+    disarm();
+    try {
+      const url = new URL(window.location.href);
+      const stripped = setInFragment(url.hash, null);
+      // `setInFragment` returns the fragment without a leading '#'; compare like for like.
+      if (stripped === url.hash.replace(/^#/, '')) return;   // nothing of ours was there
+      url.hash = stripped;
+      /*
+       * A replace, and recorded, because every write must declare itself to the log — an
+       * unrecorded restamp is the exact fault that made pops land on the wrong tab.
+       */
+      writeHistoryEntry({
+        mode: 'replace',
+        href: url.toString(),
+        navParam: url.searchParams.get('nav'),
+        state: { axOverlay: null },
+      });
+    } catch {
+      /* a tidy-up is never worth breaking a navigation for */
+    }
+  }
+
+  const timer = setTimeout(disarm, 1500);
+  window.addEventListener('popstate', onArrive);
 }
 
 export function updateNavQueryParamForStack(
@@ -614,46 +802,43 @@ export function updateNavQueryParamForStack(
       // Captured BEFORE the write: afterwards history.state describes the new entry.
       const prevSerial = currentSerial();
       if (mode === 'push') {
-        // One pushState only. Calling it twice (as the replace path does for groups) would create
-        // two entries for a single navigation, so back would need two presses to move one page.
-        const serial = nextSerial();
-        // NOT spread from the previous entry.
-        //
-        // A push creates a NEW history entry, and the browser itself gives a real navigation a
-        // fresh null state. Copying the previous entry's state forward made every other consumer's
-        // marker look as though it belonged here too — a bottom sheet that had written
-        // `{ smSheet: id }` before a page was pushed saw its own id on the pushed entry, concluded
-        // the entry was its own, and called history.back() as it closed. The page that had just
-        // been pushed was silently thrown away.
-        //
-        // `replace` below still merges, and must: that is the SAME entry, so another consumer's
-        // state on it is still theirs.
-        window.history.pushState(
-          { navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: serial },
-          "",
-          newHref,
-        );
-        recordWrittenEntry(prevSerial, serial, newParam, 'push', current);
+        /*
+         * One entry per navigation, and its state is NOT spread from the previous one.
+         *
+         * The browser gives a real navigation a fresh null state, and copying the previous entry's
+         * forward made every other consumer's marker look as though it belonged here too — a
+         * bottom sheet that had written its own id before a page was pushed saw that id on the
+         * pushed entry, concluded the entry was its own, and called history.back() as it closed.
+         * The page that had just been pushed was silently thrown away. `replace` below still
+         * merges, and must: that is the SAME entry, so another consumer's state on it is theirs.
+         */
+        writeHistoryEntry({
+          mode: 'push',
+          href: newHref,
+          navParam: newParam,
+          state: { group: groupContext ? groupStackId : undefined },
+        });
         _pushDepth.set(stackId, getPushDepth(stackId) + 1);
         // Ledger the stack depth this entry represents, so a later pop gives back the right count
         // even when one navigation moved several levels.
         if (typeof depthForLedger === 'number') recordEntryDepth(stackId, depthForLedger);
       } else {
-        // ONE replaceState carrying both fields, matching the push branch above.
-        //
-        // This used to write twice — `{ group }` then `{ navStack }` — and the second call
-        // REPLACES state wholesale rather than merging, so `group` was silently dropped. Pushed
-        // entries carried { navStack, group } while replaced entries carried only { navStack }, so
-        // the same logical position had two different state shapes depending on how it was reached.
-        // Anything branching on `event.state.group` during popstate therefore behaved differently
-        // for the same page.
-        const serial = nextSerial();
-        window.history.replaceState(
-          { ...(window.history.state ?? {}), navStack: newParam, group: groupContext ? groupStackId : undefined, axSerial: serial },
-          "",
-          newHref,
-        );
-        recordWrittenEntry(prevSerial, serial, newParam, 'replace');
+        /*
+         * One write carrying both fields.
+         *
+         * This used to write twice — `{ group }` then `{ navStack }` — and the second call
+         * REPLACES state wholesale rather than merging, so `group` was silently dropped. Pushed
+         * entries carried { navStack, group } while replaced entries carried only { navStack }, so
+         * the same logical position had two different state shapes depending on how it was
+         * reached, and anything branching on `event.state.group` during popstate behaved
+         * differently for the same page.
+         */
+        writeHistoryEntry({
+          mode: 'replace',
+          href: newHref,
+          navParam: newParam,
+          state: { group: groupContext ? groupStackId : undefined },
+        });
       }
     }
   } catch (e) {
@@ -669,11 +854,20 @@ export function removeNavQueryParamForStack(stackId: string, groupContext: Group
     url.searchParams.delete('nav');
 
 
-    const newHref = url.toString();
-    if (window.location.href !== newHref) {
-      if (groupContext) window.history.replaceState({ group: null }, "", newHref);
-      window.history.replaceState({ navStack: null }, "", newHref);
-    }
+    /*
+     * ONE write, not two, and declared like every other.
+     *
+     * It used to write twice — `{ group: null }` then `{ navStack: null }` — and the second
+     * replaceState replaces state wholesale rather than merging, so the first was pointless. Worse,
+     * neither declared itself to the entry log, so tearing a stack down quietly renamed the entry
+     * the log thought it was standing on and every pop after it fell back to counting.
+     */
+    writeHistoryEntry({
+      mode: 'replace',
+      href: url.toString(),
+      navParam: null,
+      state: { group: groupContext ? null : undefined },
+    });
   } catch (e) {
   }
 }

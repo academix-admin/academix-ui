@@ -29,6 +29,6 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   splitting: false,
-  external: ['react', 'react-dom', 'react/jsx-runtime', 'motion', 'motion/react'],
+  external: ['react', 'react-dom', 'react/jsx-runtime', '@academix-admin/overlay-route', 'motion', 'motion/react'],
   onSuccess: () => preserveUseClient('dist'),
 });

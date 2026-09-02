@@ -5,6 +5,7 @@ under the `@academix-admin` scope.
 
 | Package | Description |
 | --- | --- |
+| [`@academix-admin/overlay-route`](./packages/overlay-route) | A sheet, picker or dialog gets its own history entry, so the platform's Back closes the OVERLAY rather than the page under it — plus reopening after a reload, and a one-function seam a navigation library fills so its pop ledger counts the entry. No dependencies. |
 | [`@academix-admin/navigation-stack`](./packages/navigation-stack) | Client-side navigation stack — transitions, swipe-back, scroll restoration, nested stacks, DI and a request/response bus. |
 | [`@academix-admin/state-stack`](./packages/state-stack) | Framework-agnostic cross-tab state — IndexedDB persistence, BroadcastChannel sync, undo/redo, atoms and route-scoped demand state. |
 | [`@academix-admin/scroll-date-picker`](./packages/scroll-date-picker) | iOS-style wheel/scroll date picker with magnifier, quick-date shortcuts and theming. Zero deps beyond React. |
@@ -23,6 +24,7 @@ under the `@academix-admin` scope.
 ```
 academix-ui/
 ├── packages/
+│   ├── overlay-route/      # @academix-admin/overlay-route
 │   ├── navigation-stack/   # @academix-admin/navigation-stack
 │   └── state-stack/        # @academix-admin/state-stack
 ├── package.json            # npm workspaces root
