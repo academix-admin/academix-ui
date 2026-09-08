@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/dialog-viewer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Imperative React dialogs — alert, confirm and destructive — with a controller hook.",
   "keywords": [
     "react",

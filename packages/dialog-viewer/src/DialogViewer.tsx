@@ -20,6 +20,24 @@ interface DialogLayoutProps {
   borderRadius?: string;
   margin?: string;
   titleColor?: string;
+  /**
+   * The rest of the dialog's colours, so it can belong to the app it is opened in.
+   *
+   * Every one of these defaults to what this package has always drawn, so a consumer that passes
+   * none sees no change. They exist because the buttons were iOS blue and red whatever the app
+   * around them looked like: a shop whose every other button is deep green got a bright blue OK,
+   * which reads as something else's dialog and makes people hesitate before pressing it.
+   *
+   * Handed over rather than read from CSS variables, because this package is app-agnostic and has
+   * no business knowing what an app calls its colours.
+   */
+  messageColor?: string;
+  primaryColor?: string;
+  primaryTextColor?: string;
+  secondaryColor?: string;
+  secondaryTextColor?: string;
+  dangerColor?: string;
+  dangerTextColor?: string;
 }
 
 interface DialogViewerProps {
@@ -61,7 +79,7 @@ interface DialogViewerProps {
 }
 
 // ==================== Styles ====================
-const getStyles = (id: string) => `
+const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
 #${id}.dialog-overlay {
   position: fixed;
   inset: 0;
@@ -108,7 +126,7 @@ const getStyles = (id: string) => `
 #${id} .dialog-title {
   font-size: 18px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: ${layoutProp?.titleColor || '#1a1a1a'};
   margin: 0;
 }
 
@@ -122,7 +140,7 @@ const getStyles = (id: string) => `
 
 #${id} .dialog-message {
   font-size: 14px;
-  color: #666;
+  color: ${layoutProp?.messageColor || '#666'};
   text-align: center;
   line-height: 1.5;
   margin: 0;
@@ -159,25 +177,26 @@ const getStyles = (id: string) => `
 }
 
 #${id} .dialog-button-primary {
-  background-color: #007AFF;
-  color: white;
+  background-color: ${layoutProp?.primaryColor || '#007AFF'};
+  color: ${layoutProp?.primaryTextColor || 'white'};
 }
 
 #${id} .dialog-button-primary:hover {
-  background-color: #0051D5;
+  filter: brightness(0.92);
 }
 
 #${id} .dialog-button-secondary {
-  background-color: #f0f0f0;
-  color: #1a1a1a;
+  background-color: ${layoutProp?.secondaryColor || '#f0f0f0'};
+  color: ${layoutProp?.secondaryTextColor || '#1a1a1a'};
 }
 
 #${id} .dialog-button-secondary:hover {
-  background-color: #e0e0e0;
+  filter: brightness(0.94);
 }
 
 #${id} .dialog-button-danger {
-  background-color: #FF3B30;
+  background-color: ${layoutProp?.dangerColor || '#FF3B30'};
+  color: ${layoutProp?.dangerTextColor || 'white'};
   color: white;
 }
 
@@ -265,21 +284,31 @@ const getStyles = (id: string) => `
 `;
 
 // ==================== Hook to inject CSS per instance ====================
-const useInjectStyles = (id: string) => {
+const useInjectStyles = (id: string, layoutProp?: DialogLayoutProps) => {
+  /*
+   * Re-injected when the colours change, not only when the id does.
+   *
+   * The sheet used to be written once and left, so an app that switches theme mid-session kept the
+   * first theme's dialog until a reload. Keyed on the colours themselves rather than on the object,
+   * because `layoutProp` is nearly always a fresh literal and depending on it would rewrite the
+   * stylesheet on every render.
+   */
+  const key = JSON.stringify(layoutProp ?? {});
+
   useEffect(() => {
     const styleId = `dialog-viewer-styles-${id}`;
-    if (document.getElementById(styleId)) return;
+    document.getElementById(styleId)?.remove();
 
     const styleTag = document.createElement("style");
     styleTag.id = styleId;
-    styleTag.innerHTML = getStyles(id);
+    styleTag.innerHTML = getStyles(id, layoutProp);
     document.head.appendChild(styleTag);
 
     return () => {
-      const tag = document.getElementById(styleId);
-      if (tag) document.head.removeChild(tag);
+      document.getElementById(styleId)?.remove();
     };
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, key]);
 };
 
 // ==================== DialogViewer Component ====================
@@ -327,7 +356,7 @@ const DialogViewer = React.forwardRef<any, DialogViewerProps>(({
   const hasBeenOpened = useRef(false);
   if (isOpen) hasBeenOpened.current = true;
 
-  useInjectStyles(id);
+  useInjectStyles(id, layoutProp);
 
   // Sync external customView prop only when not controlled internally
   useEffect(() => {
