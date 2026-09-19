@@ -1063,14 +1063,14 @@ export default function NavigationStack(props: {
         snapshotBuffer: [],
         parentId: parentApi?.id || null,
         childIds: new Set(),
-        navLink,
+        navLink: mergedNavLink,
         lifecycleHandlers: new Map(),
         currentState: 'active',
         lastActiveEntry: undefined,
       };
       registry.set(id, regEntry);
     } else {
-      regEntry.navLink = navLink;
+      regEntry.navLink = mergedNavLink;
       regEntry.parentId = parentApi?.id || null;
     }
 
@@ -1090,7 +1090,7 @@ export default function NavigationStack(props: {
 
           if (ourTokens.length > 0) {
             regEntry.stack = ourTokens.map(t => {
-              const resolvedKey = decodeStackPath(navLink, t.code) || (t.code.startsWith('k:') ? (() => {
+              const resolvedKey = decodeStackPath(mergedNavLink, t.code) || (t.code.startsWith('k:') ? (() => {
                 try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
               })() : t.code);
               return {
@@ -1120,7 +1120,7 @@ export default function NavigationStack(props: {
 
     // Final fallback: Use initial entry
     const { key, params } = parseRawKey(entry);
-    if (!navLink[key]) {
+    if (!mergedNavLink[key]) {
       console.error(`Entry route "${key}" not found in navLink`);
       return;
     }
@@ -1132,7 +1132,7 @@ export default function NavigationStack(props: {
     setStackSnapshot([...regEntry.stack]);
     if (persist) writePersistedStack(id, regEntry.stack);
     setInitialized(true);
-  }, [id, entry, navLink, groupContext, groupStackId]);
+  }, [id, entry, mergedNavLink, groupContext, groupStackId]);
 
 
   /*
@@ -1157,12 +1157,12 @@ export default function NavigationStack(props: {
     if (!currentRegEntry || !groupContext || !groupStackId) return;
     const active = groupContext.isActiveStack(groupStackId);
     if ((syncHistory || currentRegEntry.historySyncEnabled) && active) {
-      const localPath = buildUrlPath([{ navLink, stack: currentRegEntry.stack }]);
+      const localPath = buildUrlPath([{ navLink: mergedNavLink, stack: currentRegEntry.stack }]);
       updateNavQueryParamForStack(id, localPath, groupContext, groupStackId);
     } else if (!(syncHistory || currentRegEntry.historySyncEnabled)) {
       removeNavQueryParamForStack(id, groupContext, groupStackId)
     }
-  }, [id, navLink, syncHistory, groupContext?.getCurrent]);
+  }, [id, mergedNavLink, syncHistory, groupContext?.getCurrent]);
 
   useEffect(() => {
     const unsub = api.subscribe((stack) => {
@@ -1255,7 +1255,7 @@ export default function NavigationStack(props: {
       const ourSlice = tokenized[0] || [];
 
       const newStack = ourSlice.map(t => {
-        const resolvedKey = decodeStackPath(navLink, t.code) || (t.code.startsWith('k:') ? (() => {
+        const resolvedKey = decodeStackPath(mergedNavLink, t.code) || (t.code.startsWith('k:') ? (() => {
           try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
         })() : t.code);
         return {
@@ -1288,7 +1288,7 @@ export default function NavigationStack(props: {
       }
       if (autoDispose && !groupContext) api.dispose();
     };
-  }, [id, navLink, syncHistory, autoDispose, api, persist, groupContext]);
+  }, [id, mergedNavLink, syncHistory, autoDispose, api, persist, groupContext]);
 
   const lastLen = useRef(stackSnapshot.length);
 
