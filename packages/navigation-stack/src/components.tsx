@@ -1089,12 +1089,12 @@ export default function NavigationStack(props: {
           const ourTokens = tokenizedStacks[0] || [];
 
           if (ourTokens.length > 0) {
-            regEntry.stack = ourTokens.map(t => {
+            regEntry.stack = ourTokens.map((t, i) => {
               const resolvedKey = decodeStackPath(mergedNavLink, t.code) || (t.code.startsWith('k:') ? (() => {
                 try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
               })() : t.code);
               return {
-                uid: generateCompositeUid(id, groupContext, groupStackId, resolvedKey, t.params),
+                uid: generateCompositeUid(id, groupContext, groupStackId, resolvedKey, t.params, i),
                 key: resolvedKey,
                 params: t.params
               } as StackEntry;
@@ -1135,7 +1135,7 @@ export default function NavigationStack(props: {
       return;
     }
     regEntry.stack = [{
-      uid: generateCompositeUid(id, groupContext, groupStackId, key, params),
+      uid: generateCompositeUid(id, groupContext, groupStackId, key, params, 0),
       key,
       params
     }];
@@ -1272,12 +1272,12 @@ export default function NavigationStack(props: {
       const tokenized = parseUrlPathIntoStacks(ourPath);
       const ourSlice = tokenized[0] || [];
 
-      const newStack = ourSlice.map(t => {
+      const newStack = ourSlice.map((t, i) => {
         const resolvedKey = decodeStackPath(mergedNavLink, t.code) || (t.code.startsWith('k:') ? (() => {
           try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
         })() : t.code);
         return {
-          uid: generateCompositeUid(id, groupContext, groupStackId, resolvedKey, t.params),
+          uid: generateCompositeUid(id, groupContext, groupStackId, resolvedKey, t.params, i),
           key: resolvedKey,
           params: t.params,
         };
