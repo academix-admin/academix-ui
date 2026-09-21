@@ -28,8 +28,11 @@ async function settle(ms = 120) {
 describe('readAxState', () => {
   it('accepts our shape and rejects anything else', () => {
     expect(readAxState({ navStack: 's:1.a1', axSerial: 4 })).toEqual({
-      navStack: 's:1.a1', group: undefined, axSerial: 4,
+      // `axPushed` is false unless the entry says otherwise: an entry we cannot prove we pushed is
+      // one we must not step back from.
+      navStack: 's:1.a1', group: undefined, axSerial: 4, axEpoch: undefined, axPushed: false,
     });
+    expect(readAxState({ navStack: 's:1.a1', axSerial: 4, axPushed: true })?.axPushed).toBe(true);
     expect(readAxState(null)).toBeNull();
     expect(readAxState(undefined)).toBeNull();
     expect(readAxState('a string')).toBeNull();

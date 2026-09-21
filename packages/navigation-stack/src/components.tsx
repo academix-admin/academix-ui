@@ -1242,9 +1242,17 @@ export default function NavigationStack(props: {
         currentRegEntry.lastAppliedSerial = axState.axSerial;
       }
 
-      const navPathCombined = axState
-        ? axState.navStack
-        : new URLSearchParams(window.location.search).get('nav');
+      /*
+       * An EMPTY record is not an answer — fall back to the URL.
+       *
+       * An entry can carry ax state whose `navStack` is empty: the stack was unmounted while
+       * standing on it (our own teardown clears the param), or something else rewrote it. Reading
+       * that as "this entry had no pages" sent Back and Forward to the root — a page the user never
+       * asked for — while the URL beside it still said exactly where they were.
+       */
+      const fromEntry = axState?.navStack ? axState.navStack : null;
+      const navPathCombined =
+        fromEntry ?? new URLSearchParams(window.location.search).get('nav');
       if (!navPathCombined) { restoreToRoot(); return; }
 
       const map = parseCombinedNavParam(navPathCombined);

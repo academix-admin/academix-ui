@@ -22,6 +22,7 @@ import {
   currentEpoch,
   currentSerial,
   nextSerial,
+  readAxState,
   recordWrittenEntry,
 } from './persistence';
 
@@ -80,7 +81,24 @@ export function writeHistoryEntry({ mode, href, navParam, state }: HistoryWrite)
    * the log lost its place at every sheet. The caller already tells us the nav param for the log's
    * sake; there is no case where the entry should disagree with it.
    */
-  const ax = { navStack: navParam, axSerial: serial, axEpoch: currentEpoch() };
+  /*
+   * `axPushed` — did WE create this entry, rather than paint over one we were handed?
+   *
+   * It outlives the document, and that is the point. After a reload the in-memory ledger is empty,
+   * so a pop could not tell "there is an entry of ours behind this one" from "this is the only
+   * entry there is" (a pasted link, a new tab) — and chose the safe-looking option, replacing the
+   * current entry. That silently overwrote the entry the user had just come back from, so Forward
+   * had nothing to return to. A pushed entry always has something behind it; a replaced one may not.
+   *
+   * A push that is later replaced in place stays pushed: the entry behind it is still there.
+   */
+  const wasPushed = readAxState(window.history.state)?.axPushed === true;
+  const ax = {
+    navStack: navParam,
+    axSerial: serial,
+    axEpoch: currentEpoch(),
+    axPushed: mode === 'push' ? true : wasPushed,
+  };
 
   if (mode === 'push') {
     window.history.pushState({ ...(state ?? {}), ...ax }, '', href);

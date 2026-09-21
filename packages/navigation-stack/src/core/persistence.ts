@@ -332,6 +332,8 @@ export function nextSerial(): number {
 export type AxHistoryState = {
   /** Combined `stackId:path|stackId:path` for EVERY stack — the same string as `?nav=`. */
   navStack: string | null;
+  /** True when this library created the entry with pushState — so an entry sits behind it. */
+  axPushed?: boolean;
   /** Active group stack id, when inside a group. */
   group?: string;
   /** Generation of this entry. */
@@ -350,7 +352,13 @@ export function readAxState(state: unknown): AxHistoryState | null {
   const s = state as Partial<AxHistoryState>;
   if (typeof s.axSerial !== 'number') return null;      // not ours, or written before serials
   if (typeof s.navStack !== 'string' && s.navStack !== null) return null;
-  return { navStack: s.navStack ?? null, group: s.group, axSerial: s.axSerial, axEpoch: s.axEpoch };
+  return {
+    navStack: s.navStack ?? null,
+    group: s.group,
+    axSerial: s.axSerial,
+    axEpoch: s.axEpoch,
+    axPushed: s.axPushed === true,
+  };
 }
 
 export function getPushDepth(stackId: string): number {
@@ -630,6 +638,36 @@ export function resetPopHealth(): void {
   _health.named = 0;
   _health.counted = 0;
   _health.lastCountedAt = null;
+}
+
+/**
+ * Was the entry we are standing on pushed by this library — in THIS document or an earlier one?
+ *
+ * The epoch is deliberately not consulted. Identity (which entry is which) cannot cross a reload,
+ * but "there is an entry behind this one" can: the browser kept it.
+ */
+export function currentEntryWasPushed(): boolean {
+  if (typeof window === 'undefined') return false;
+  return readAxState(window.history.state)?.axPushed === true;
+}
+
+/**
+ * Give back the ONE entry we are standing on, when the ledger cannot account for it.
+ *
+ * Only after a reload: the entries are still in the browser, but the log that named them went with
+ * the previous document. One at a time, because each step lands on an entry that answers the same
+ * question about itself — never a count this document cannot check.
+ */
+export function stepBackOneAdoptedEntry(): number {
+  if (typeof window === 'undefined') return 0;
+  if (!currentEntryWasPushed()) return 0;
+  try {
+    window.history.go(-1);
+    clearOverlayFragmentOnArrival();
+  } catch {
+    return 0;
+  }
+  return 1;
 }
 
 export function consumeHistoryEntries(stackId: string, requested: number, targetDepth?: number): number {

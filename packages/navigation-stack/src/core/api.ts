@@ -4,7 +4,7 @@ import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from '
 import { _currentPageUidByStack } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
-import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, reconcileLedgerToDepth, resetPushDepth, getPushDepth, recordEntryDepth, takeEntriesAboveDepth } from './persistence';
+import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, stepBackOneAdoptedEntry, reconcileLedgerToDepth, resetPushDepth, getPushDepth, recordEntryDepth, takeEntriesAboveDepth } from './persistence';
 import { recordNavEvent } from '../devtools';
 import { globalObjectRegistry } from '../di/object-registry';
 import { getOverlayStore, notifyOverlays, disposeOverlays, clampOffset, type OverlayEntryRec } from '../overlay/registry';
@@ -138,6 +138,15 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
             takeEntriesAboveDepth(id, stackCopy.length),
             stackCopy.length,
           );
+          /*
+           * Nothing in the ledger, but the browser still has the entry: a reload, mid-stack.
+           *
+           * Without this the URL write below replaced the entry we are standing on — the one the
+           * user had just arrived at — so the browser's Forward led nowhere and the entries behind
+           * described a stack that no longer matched. Adopting it steps back through the browser,
+           * exactly as a pop before the reload would have.
+           */
+          if (consumed === 0) consumed = stepBackOneAdoptedEntry();
         } else if (!isReplaceFamily && (grew || actionType === 'pushAndPopUntil' || actionType === 'pushAndReplace')) {
           mode = 'push';
         }
