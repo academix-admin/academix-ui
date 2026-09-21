@@ -660,6 +660,12 @@ const _adoptable = new Map<string, number>();
  * leaves the site. One entry per level above the root is what growing the stack wrote.
  */
 export function noteAdoptableEntries(stackId: string, depth: number, pushed: boolean): void {
+  /*
+   * ONCE PER DOCUMENT. The rebuild it is called from runs again whenever the stack re-initialises,
+   * and by then the entry may have been written over — asking a second time answered "not pushed"
+   * and set the count back to nothing, which is the same failure by a slower route.
+   */
+  if (_adoptable.has(stackId)) return;
   _adoptable.set(stackId, pushed ? Math.max(0, depth - 1) : 0);
 }
 
