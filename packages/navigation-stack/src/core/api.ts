@@ -146,7 +146,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
            * described a stack that no longer matched. Adopting it steps back through the browser,
            * exactly as a pop before the reload would have.
            */
-          if (consumed === 0) consumed = stepBackOneAdoptedEntry();
+          if (consumed === 0) consumed = stepBackOneAdoptedEntry(id, stackCopy.length);
         } else if (!isReplaceFamily && (grew || actionType === 'pushAndPopUntil' || actionType === 'pushAndReplace')) {
           mode = 'push';
         }

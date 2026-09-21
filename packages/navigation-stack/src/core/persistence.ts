@@ -587,6 +587,7 @@ export function resetNavigationLedgers(stackIds: string[] = []): void {
 export function resetPushDepth(stackId: string): void {
   _pushDepth.delete(stackId);
   _entryDepths.delete(stackId);
+  _adoptable.delete(stackId);
 }
 
 /**
@@ -641,32 +642,56 @@ export function resetPopHealth(): void {
 }
 
 /**
- * Was the entry we are standing on pushed by this library — in THIS document or an earlier one?
+ * Entries this document did not write but may still give back: the ones behind us after a reload.
  *
- * The epoch is deliberately not consulted. Identity (which entry is which) cannot cross a reload,
- * but "there is an entry behind this one" can: the browser kept it.
+ * COUNTED AT MOUNT, not asked for at pop time. `axPushed` says an entry has something behind it and
+ * outlives the document — but it does not survive another library writing over the entry, and
+ * Next's app router does exactly that on arrival (through state-stack's history patch), leaving the
+ * entry with no state of ours at all. Asked later, a pop saw "not pushed" and replaced the entry it
+ * was standing on, which is the bug this exists to fix. Read once, while the answer is still there.
  */
-export function currentEntryWasPushed(): boolean {
-  if (typeof window === 'undefined') return false;
-  return readAxState(window.history.state)?.axPushed === true;
+const _adoptable = new Map<string, number>();
+
+/**
+ * How many entries behind us belong to a previous load of this stack.
+ *
+ * Called when a stack is rebuilt from the URL. `pushed` is that entry's own word for whether we
+ * created it; a deep link or a fresh tab says no, and nothing is adopted — stepping back from there
+ * leaves the site. One entry per level above the root is what growing the stack wrote.
+ */
+export function noteAdoptableEntries(stackId: string, depth: number, pushed: boolean): void {
+  _adoptable.set(stackId, pushed ? Math.max(0, depth - 1) : 0);
+}
+
+/** For devtools and tests. */
+export function getAdoptableEntries(stackId: string): number {
+  return _adoptable.get(stackId) ?? 0;
 }
 
 /**
- * Give back the ONE entry we are standing on, when the ledger cannot account for it.
+ * Give back ONE entry we did not write, when the ledger cannot account for it.
  *
- * Only after a reload: the entries are still in the browser, but the log that named them went with
- * the previous document. One at a time, because each step lands on an entry that answers the same
- * question about itself — never a count this document cannot check.
+ * Two things have to agree: this stack has an adoptable entry left over from before the reload, and
+ * the URL we are standing on describes a DEEPER stack than the one we are popping to — that is what
+ * makes this entry the deeper page rather than the one we are about to draw.
  */
-export function stepBackOneAdoptedEntry(): number {
+export function stepBackOneAdoptedEntry(stackId: string, targetDepth: number): number {
   if (typeof window === 'undefined') return 0;
-  if (!currentEntryWasPushed()) return 0;
+  const left = _adoptable.get(stackId) ?? 0;
+  if (left <= 0) return 0;
+
+  const nav =
+    readAxState(window.history.state)?.navStack ||
+    new URLSearchParams(window.location.search).get('nav');
+  if (depthOfStackIn(nav, stackId) <= targetDepth) return 0;
+
   try {
     window.history.go(-1);
     clearOverlayFragmentOnArrival();
   } catch {
     return 0;
   }
+  _adoptable.set(stackId, left - 1);
   return 1;
 }
 

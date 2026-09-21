@@ -4,7 +4,7 @@ import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, u
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry, type RegistryEntry } from './core/registry';
-import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
+import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, noteAdoptableEntries, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
 import { writeHistoryEntry } from './core/history-writer';
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
@@ -1099,6 +1099,16 @@ export default function NavigationStack(props: {
                 params: t.params
               } as StackEntry;
             });
+            /*
+              * Entries from a previous load: counted now, while this entry still carries our mark.
+              * Another library writing over it later (Next's router does) must not be able to make
+              * a pop think there is nothing behind it.
+              */
+            noteAdoptableEntries(
+              id,
+              regEntry.stack.length,
+              readAxState(window.history.state)?.axPushed === true,
+            );
             setStackSnapshot([...regEntry.stack]);
             setInitialized(true);
             return;

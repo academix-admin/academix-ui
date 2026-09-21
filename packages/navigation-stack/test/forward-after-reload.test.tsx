@@ -78,6 +78,47 @@ describe('Back and Forward across a reload', () => {
     expect(window.location.href, 'and on c’s own URL').toBe(urlAtC);
   });
 
+  it('keeps stepping back when another library blanks the entry state', async () => {
+    /*
+     * What Next's app router does on arrival, through state-stack's history patch: replaceState
+     * with its own object, so our mark on that entry is gone. Asked at pop time, the answer would
+     * be "not pushed" and the pop would overwrite the entry it stood on — which is how the chain
+     * broke on the second Back in the real app.
+     */
+    const first = render(<App />);
+    await settle();
+    const api = getRegistry().get('s')!.api!;
+    for (const k of ['b', 'c']) {
+      await act(async () => {
+        await api.push(k);
+      });
+      await settle();
+    }
+    const urlAtC = window.location.href;
+    const after = await reload(first, urlAtC, window.history.state);
+
+    await act(async () => {
+      await after.pop();
+    });
+    await settle(400);
+    expect(after.getStack().map((e) => e.key)).toEqual(['a', 'b']);
+
+    // Somebody else paints over this entry.
+    window.history.replaceState({ someOtherLib: true }, '', window.location.href);
+
+    await act(async () => {
+      await after.pop();
+    });
+    await settle(400);
+    expect(after.getStack().map((e) => e.key), 'popped to the root').toEqual(['a']);
+
+    await act(async () => {
+      window.history.forward();
+    });
+    await settle(600);
+    expect(after.getStack().map((e) => e.key), 'and forward still works').toEqual(['a', 'b']);
+  });
+
   it('a deep link with nothing behind it is not walked out of', async () => {
     // One entry, written by `replace` — a pasted link, or a new tab. There is no entry behind it,
     // and stepping back would leave the site.
