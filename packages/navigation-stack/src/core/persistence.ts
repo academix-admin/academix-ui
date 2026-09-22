@@ -26,14 +26,6 @@ export function generateStableUid(key: string, params?: NavParams): string {
 }
 
 /**
- * Entries created in this document, so two of them are never the same entry.
- *
- * Not persisted and not meant to be: everything keyed by a uid — the rendered page, its scroll
- * container, its transition, its cached instance — lives for as long as the document does.
- */
-let _entrySeq = 0;
-
-/**
  * A uid identifies an ENTRY, not a page.
  *
  * It used to be a hash of the route and its params, which made the same page pushed twice into the
@@ -42,10 +34,18 @@ let _entrySeq = 0;
  * one key, and the scroll container, the transition and the cached instance were shared between
  * them too.
  *
- * `at` gives a DETERMINISTIC uid for a stack being rebuilt (from the URL, where no uid is carried):
- * the entry's position, which is unique within a stack and the same on every rebuild. A new entry
- * takes the next number in this document instead, so removing an entry BELOW it — a trimmed stack,
- * `pushAndPopUntil` — does not rename it and force its page to remount.
+ * `at` is the entry's POSITION in its stack, which is unique within it and — this is the point —
+ * the same every time that stack is rebuilt. Everything keyed by a uid is a fact about one entry
+ * that must survive being rebuilt: its scroll position above all.
+ *
+ * A counter was tried here first and broke exactly that. A tab switch unmounts the stack that is
+ * leaving; coming back rebuilds it from the URL, where no uid is carried — so every entry was
+ * renamed, and every page the shop had scrolled through opened at the top again. Reported straight
+ * away, because it is the difference between an app and a website.
+ *
+ * The cost is the other way round: removing an entry BELOW another renames it (a trimmed stack,
+ * `pushAndPopUntil`), and that page remounts. That is rare, and it costs a remount rather than the
+ * thing somebody notices every time they change tabs.
  */
 export function generateCompositeUid(
   stackId: string,
@@ -59,7 +59,7 @@ export function generateCompositeUid(
     ? `${groupContext.getGroupId()}:${groupStackId}`
     : 'root:root';
   const pageUid = generateStableUid(key, params);
-  const own = typeof at === 'number' ? `at${at}` : `e${(_entrySeq += 1)}`;
+  const own = typeof at === 'number' ? `at${at}` : 'at?';
   return `${groupStackKey}:${pageUid}:${own}`;
 }
 

@@ -56,4 +56,5 @@ describe('the same page pushed twice', () => {
     expect(screen.getByText('customer'), 'the page below is drawn').toBeTruthy();
     warn.mockRestore();
   });
+
 });

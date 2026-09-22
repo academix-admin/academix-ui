@@ -316,7 +316,8 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
         const { key, params: p } = parseRawKey(rawKey, params);
 
         const newEntry: StackEntry = {
-          uid: generateCompositeUid(id, groupContext, groupStackId, key, p),
+          // The place it is about to take, so a rebuild of this stack names it the same way.
+          uid: generateCompositeUid(id, groupContext, groupStackId, key, p, regEntry.stack.length),
           key,
           params: p,
           metadata
@@ -362,7 +363,8 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     async replace(rawKey, params, metadata) {
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
+        const at = Math.max(0, regEntry.stack.length - 1);
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, at), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
 
         // Before replace lifecycle
@@ -578,7 +580,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     async pushAndPopUntil(rawKey, predicate, params, metadata) {
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, regEntry.stack.length), key, params: p, metadata };
 
         const previousStack = regEntry.stack.slice();
         const lastTop = regEntry.stack[regEntry.stack.length - 1];
@@ -641,7 +643,8 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     async pushAndReplace(rawKey, params, metadata) {
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
+        const at = Math.max(0, regEntry.stack.length - 1);
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, at), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
 
         // Before replace lifecycle
@@ -684,7 +687,8 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     async go(rawKey, params, metadata) {
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p), key, params: p, metadata };
+        const at = Math.max(0, regEntry.stack.length - 1);
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, at), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
 
         // Before replace lifecycle (go is essentially a replace)
