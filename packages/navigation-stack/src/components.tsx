@@ -856,6 +856,25 @@ function OverlayHost({ api, stack }: { api: NavStackAPI; stack: StackEntry[] }) 
   );
 }
 
+/**
+ * IS THIS STACK THE ONE ON SCREEN?
+ *
+ * In a group of tabs, only one stack is shown at a time; the others stay mounted and hidden. A page
+ * that acts on its own — offering a screen, starting a scan, asking a question — has to know which,
+ * and `api.isActiveStack()` is NOT that question: it answers whether the stack syncs history, which
+ * is true of every tab at once. A consumer reading it as "my tab is showing" pushes a page over
+ * whatever the person is actually looking at (reported in store-manager: the till offered its count
+ * screen on top of the Money tab during start-up, and that entry then swallowed a Back press).
+ *
+ * Outside a group there is only one stack, so the answer is yes.
+ */
+export function useIsActiveStack(): boolean {
+  const group = useGroupNavigation();
+  const stackId = useGroupStackId();
+  if (!group || !stackId) return true;
+  return group.isActiveStack(stackId);
+}
+
 export default function NavigationStack(props: {
   id: string;
   navLink: NavigationMap;

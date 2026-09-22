@@ -69,7 +69,7 @@ export {
   useComponentsByTag,
 } from './hooks';
 
-export { NavigationErrorBoundary, GroupNavigationStack, getGroupOverlay } from './components';
+export { NavigationErrorBoundary, GroupNavigationStack, getGroupOverlay, useIsActiveStack } from './components';
 export { default, default as NavigationStack } from './components';
 
 // Imperative helper to pop a stack (by id) to its root from outside the React tree — used by
