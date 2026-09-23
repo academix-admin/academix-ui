@@ -45,6 +45,7 @@ export {
   isBrowser,
   safeWindow,
   useNav,
+  useNavOptional,
   useLocation,
   useOverlayEntry,
   useIsTop,

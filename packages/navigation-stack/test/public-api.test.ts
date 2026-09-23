@@ -32,6 +32,7 @@ const PUBLIC_EXPORTS = [
 
   // Navigating, and knowing where you are
   'useNav',
+  'useNavOptional',
   'useLocation',
   'useIsTop',
   'usePageLifecycle',

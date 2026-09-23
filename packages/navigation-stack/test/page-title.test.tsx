@@ -8,7 +8,7 @@ import React from 'react';
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { cleanup, act, render } from '@testing-library/react';
 import { renderInStack } from '../src/testing';
-import NavigationStack, { GroupNavigationStack, useNav } from '../src/index';
+import NavigationStack, { GroupNavigationStack, useNav, useNavOptional } from '../src/index';
 
 afterEach(() => cleanup());
 beforeEach(() => { document.title = 'The app'; });
@@ -22,6 +22,33 @@ function Named({ name }: { name: string }) {
 const Stock = () => <Named name="Stock" />;
 const Product = () => <Named name="Gulder 60cl" />;
 const Untitled = () => <p>no name</p>;
+
+describe('useNavOptional', () => {
+  it('is null outside a stack, so a shared shell can name a page where there is one', () => {
+    // A page shell reused on a marketing screen and on a till: useNav() throws there, which is right
+    // for a page and wrong for a shell.
+    let seen: unknown = 'not run';
+    function Shell() {
+      const nav = useNavOptional();
+      seen = nav;
+      nav?.title('ignored');
+      return <p>shell</p>;
+    }
+    render(<Shell />);
+    expect(seen).toBeNull();
+  });
+
+  it('is the stack inside one, and names the calling page', async () => {
+    function Shell() {
+      const nav = useNavOptional();
+      nav?.title('Named by a shell');
+      return <p>shell</p>;
+    }
+    const { settle } = renderInStack(<Shell />);
+    await settle();
+    expect(document.title).toBe('Named by a shell');
+  });
+});
 
 describe('nav.title', () => {
   it('names the page, and the browser shows it', async () => {

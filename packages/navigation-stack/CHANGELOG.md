@@ -1,5 +1,27 @@
 # @academix-admin/navigation-stack
 
+## 1.2.0
+
+### Minor Changes
+
+- `useNavOptional()` — the stack around this component, or `null` when there is none.
+
+  Found by a real consumer the hour after `nav.title()` shipped. store-manager names pages from one
+  shared shell used by 54 of them — which is the whole point, one edit rather than fifty-four — but
+  that same shell also renders on a marketing screen outside any stack, where `useNav()` throws.
+
+  Throwing is right for a page: a page without a stack is a bug. It is wrong for a shell, which
+  legitimately lives on both sides of the boundary.
+
+  ```tsx
+  const nav = useNavOptional();
+  nav?.title(title);   // names the page where there is one, does nothing where there is not
+  ```
+
+  `useNav()` is now the same binding with the throw kept, so both give a page-bound `title` and
+  neither can drift from the other.
+
+
 ## 1.1.0
 
 ### Minor Changes

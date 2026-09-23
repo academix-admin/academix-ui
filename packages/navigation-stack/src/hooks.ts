@@ -77,21 +77,42 @@ export function useOverlayEntry(
  *   const nav = useNav<RouteKeys<typeof routes>>();
  * Omitting it keeps the previous `string` behaviour.
  */
-export function useNav<K extends string = string>(): NavStackAPI<K> {
-  const context = useContext(NavContext);
-  /*
-   * Which page is asking. Everything else on the api is about the STACK and needs no such thing;
-   * `title` is about the CALLER, so that a page can name itself while something else is on top and
-   * have that name come back when the stack pops to it.
-   */
-  const pageUid = useContext(CurrentPageContext);
+/**
+ * The stack around this component, or null when there is none.
+ *
+ * For a component that is shared between pages IN a stack and screens outside one — a page shell, a
+ * header, anything an app reuses on a marketing page and a till. `useNav()` throws there, which is
+ * right for a page (a page without a stack is a bug) and wrong for a shell (a shell without a stack
+ * is Tuesday).
+ *
+ * ```tsx
+ * const nav = useNavOptional();
+ * nav?.title(title);          // names the page where there is one, does nothing where there is not
+ * ```
+ */
+export function useNavOptional<K extends string = string>(): NavStackAPI<K> | null {
+  return useNavBinding() as unknown as NavStackAPI<K> | null;
+}
 
-  const bound = useMemo(() => {
-    if (!context || !pageUid) return context;
-    // Memoised on the page, not rebuilt per render: `usePageLifecycle(nav, …)` takes the api as a
-    // dependency, and a fresh object every render would re-register its handlers every render.
+/** Shared by both: the api, bound to the page that is asking. */
+function useNavBinding(): NavStackAPI | null {
+  const context = useContext(NavContext);
+  const pageUid = useContext(CurrentPageContext);
+  return useMemo(() => {
+    if (!context) return null;
+    if (!pageUid) return context;
     return { ...context, title: (next: string, uid?: string) => context.title(next, uid ?? pageUid) };
   }, [context, pageUid]);
+}
+
+export function useNav<K extends string = string>(): NavStackAPI<K> {
+  /*
+   * Bound to the page that is asking, because `title` is about the CALLER: a page can name itself
+   * while something else is on top, and that name comes back when the stack pops to it. Memoised on
+   * the page — `usePageLifecycle(nav, …)` takes the api as a dependency, and a fresh object every
+   * render would re-register its handlers every render.
+   */
+  const bound = useNavBinding();
 
   if (!bound) throw new Error("useNav must be used within a NavigationStack");
   // The context is stored untyped (one context serves every stack); the cast applies the caller's
