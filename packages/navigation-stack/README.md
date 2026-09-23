@@ -23,6 +23,53 @@ native mobile navigator, in the browser.
 > separating the navigation MODEL from the browser plumbing — what is done, what is deliberately not
 > started, and the one product decision that makes the rest worth doing.
 
+## Why this, and when not to
+
+**Try it before reading further:** [two tabs that remember where you were](https://stackblitz.com/github/academix-admin/academix-ui/tree/main/examples/two-tabs)
+— open a product, open its history, scroll a long way down, switch tabs, come back. The whole
+argument is in those four steps and it does not survive being described.
+
+This is not a router. A router maps a URL to a screen, and rebuilds that screen when you return to
+it. This is a **stack**: an ordered list of pages you push onto and pop off, one per tab, each
+keeping what it had. The difference shows up as the things people notice on a phone and miss on the
+web — a tab you left three pages deep is still three pages deep, a list you scrolled is still
+scrolled, and the platform's Back button pops rather than travelling to the previous address.
+
+### Use this if
+
+- Your app is **app-shaped**: tabs, deep flows, screens people return to. A till, a dashboard, an
+  admin tool, anything installed to a home screen.
+- **Losing someone's place is a bug**, not a cosmetic annoyance.
+- You want the platform's back gesture and the browser's Back button to mean *pop*.
+
+### Do not use this if
+
+- Your pages are **documents**: a marketing site, a blog, a catalogue. Routes are correct there, and
+  a stack is the wrong model. Use Next's router or React Router.
+- You need **file-based routing, server components or data loaders**. This does not have them and is
+  not trying to; it runs inside whatever router you already have.
+- **SEO matters for the screens in question.** A stack is client-side; its pages are not crawlable.
+- You want a large community, a long release history and many maintainers. Two apps use this. Both
+  belong to the same author.
+
+### Against the alternatives, honestly
+
+| | What it is better at | What this is better at |
+|---|---|---|
+| **React Router / Next App Router** | File-based routes, loaders, SSR, RSC, an enormous community, SEO | Per-tab memory, scroll restored per entry, Back that pops, a URL that carries a whole stack rather than one page |
+| **TanStack Router** | Type-safe params and search, loaders, devtools, real maintenance | The same: it is a router, and the difference is the model, not the polish |
+| **React Navigation** | The same stack model, far more mature | It runs on native. Its web support is not a serious answer |
+
+### On data
+
+`state-stack` is a sibling package, not a replacement for a fetching library. If you are happy with
+React Query or SWR, keep them: they are better at requests, mutations and devtools than this is, and
+they are not trying to solve the same problem. What `state-stack` adds is **place** — a value that
+survives a cold start, a scope a write can invalidate, and a rule that a failed read never blanks a
+screen that already has an answer.
+
+Use both. They compose.
+
 ## Install
 
 ```bash
@@ -53,11 +100,14 @@ function HomePage() {
   );
 }
 
-function DetailsPage({ params }: { params?: { id: number } }) {
+// Params are SPREAD onto the page, so each arrives as its own prop. (There is no `params`
+// prop — a page written as `({ params })` receives undefined. `useLocation()?.params` is the
+// other way to read them.)
+function DetailsPage({ id }: { id?: number }) {
   const nav = useNav();
   return (
     <div>
-      <h1>Details #{params?.id}</h1>
+      <h1>Details #{id}</h1>
       <button onClick={() => nav.pop()}>Back</button>
     </div>
   );

@@ -51,8 +51,13 @@ export const PaymentStack = () => (
 
 ## 2. Navigate and pass params
 
-Params travel with the route key; the target page reads them from its `params`
-prop.
+Params travel with the route key. A page reads them either from `useLocation()`
+or as ordinary props — they are SPREAD onto the page component, so a param named
+`transactionId` arrives as a prop of that name.
+
+> There is no `params` prop. Earlier versions of this page showed one, and it has
+> never existed: `<Component {...params} />` is what the stack renders. A page
+> written as `({ params })` silently receives `undefined`.
 
 ```tsx
 'use client';
@@ -71,14 +76,21 @@ function PaymentPage() {
   );
 }
 
-function ViewTransactionPage({ params }: { params?: { transactionId: string } }) {
+// As props — each param is its own prop.
+function ViewTransactionPage({ transactionId }: { transactionId?: string }) {
   const nav = useNav();
   return (
     <>
-      <h1>Transaction {params?.transactionId}</h1>
+      <h1>Transaction {transactionId}</h1>
       <button onClick={() => nav.pop()}>Back</button>
     </>
   );
+}
+
+// Or from the location, which is what a page with several params tends to prefer.
+function ViewTransactionPageAlt() {
+  const id = useLocation()?.params?.transactionId as string | undefined;
+  return <h1>Transaction {id}</h1>;
 }
 ```
 
@@ -148,12 +160,12 @@ function TransactionsPage() {
 // Consumer page — read it back
 import { useObject } from '@academix-admin/navigation-stack';
 
-function DetailPage({ params }: { params?: { id: string } }) {
+function DetailPage({ id }: { id?: string }) {
   const result = useObject<(id: string) => Transaction | undefined>(
     'getTransactionById',
     { global: true, scope: 'payment-transactions' },
   );
-  const txn = result.isProvided ? result.getter()(params!.id) : undefined;
+  const txn = result.isProvided ? result.getter()(id!) : undefined;
   return <pre>{JSON.stringify(txn, null, 2)}</pre>;
 }
 ```

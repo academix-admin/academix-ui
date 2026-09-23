@@ -1,5 +1,28 @@
 # @academix-admin/navigation-stack
 
+## 0.20.1
+
+### Patch Changes
+
+- Documentation, and one documented API that never existed.
+
+  **There is no `params` prop.** The README quick start and two EXAMPLES entries showed a page
+  written as `({ params })`, and the stack renders `<Component {...params} />` — so a page written
+  the documented way silently receives `undefined`. It is the first thing anybody does with a
+  navigation library, and it was wrong in the first code block on the page. Params arrive as their
+  own props, or through `useLocation()?.params`. Found by building the example below and watching
+  it not work.
+
+  **A runnable example**, at `examples/two-tabs` and openable in StackBlitz: two tabs, each with its
+  own stack, where leaving a tab three pages deep and scrolled and then coming back returns you to
+  exactly that. Its `verify.mjs` drives the built app and asserts each claim, including that the
+  scroll position comes back to the same pixel.
+
+  **A "why this, and when not to" section**, saying plainly who should not use this — documents,
+  SEO, file-based routing, server components — and what React Router, TanStack Router and React
+  Navigation each do better.
+
+
 ## 0.20.0
 
 ### Minor Changes
