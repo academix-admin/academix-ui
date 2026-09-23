@@ -1,5 +1,26 @@
 # @academix-admin/navigation-stack
 
+## 0.19.2
+
+### Patch Changes
+
+- A page the app pushes itself still animates, after the platform brought the last one.
+
+  `browserDrivenChange` says "the arrival being reconciled is already on screen — iOS's edge-swipe or
+  Android's Back drew it — so mount it at rest rather than sliding it in over the platform's own
+  animation". The reconciler consumed it only on the pass that ADDS an entry, and a popstate does not
+  always add one: arriving back on a page still being rendered out leaves nothing to add, the pass
+  returns early, and the flag stays set. It is per-stack and long-lived, so the next page the app
+  pushed itself mounted at rest — appearing instantly, with no transition, for no reason anybody
+  could reproduce.
+
+  It is cleared now at the action lock, which every programmatic navigation goes through and a
+  popstate does not: that clears what is stale without ever clearing what is true.
+
+  Also here: `generateCompositeUid` no longer takes a stack id it never read, and the uid rule takes
+  the group as a value (`GroupRef`) rather than the live group context, so it can be tested as
+  inputs in, string out.
+
 ## 0.13.0
 
 ### Minor Changes
