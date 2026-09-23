@@ -1113,7 +1113,7 @@ export default function NavigationStack(props: {
                 try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
               })() : t.code);
               return {
-                uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i),
+                uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i),
                 key: resolvedKey,
                 params: t.params
               } as StackEntry;
@@ -1154,7 +1154,7 @@ export default function NavigationStack(props: {
       return;
     }
     regEntry.stack = [{
-      uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, key, params, 0),
+      uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, key, params, 0),
       key,
       params
     }];
@@ -1296,7 +1296,7 @@ export default function NavigationStack(props: {
           try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
         })() : t.code);
         return {
-          uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i),
+          uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i),
           key: resolvedKey,
           params: t.params,
         };

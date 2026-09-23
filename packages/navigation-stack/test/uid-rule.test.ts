@@ -18,28 +18,28 @@ const page = (key: string, params?: Record<string, unknown>) => generateStableUi
 
 describe('a uid names a place', () => {
   it('is group, stack, page and position', () => {
-    expect(generateCompositeUid('s', { id: 'main' }, 'sell', 'customer', { id: '7' }, 2)).toBe(
+    expect(generateCompositeUid({ id: 'main' }, 'sell', 'customer', { id: '7' }, 2)).toBe(
       `main:sell:${page('customer', { id: '7' })}:at2`,
     );
   });
 
   it('says root:root when there is no group at all', () => {
-    expect(generateCompositeUid('s', null, null, 'home')).toBe(`root:root:${page('home')}:at?`);
+    expect(generateCompositeUid(null, null, 'home')).toBe(`root:root:${page('home')}:at?`);
   });
 
   it('but a group that has not named itself is NOT the same as no group', () => {
     // The distinction `GroupRef` exists to keep: `null` is "no group", `{ id: null }` is "a group,
     // still unnamed". Collapsing them would rename every entry in a group the moment it was named,
     // and every page the shop had scrolled would reopen at the top.
-    const unnamed = generateCompositeUid('s', { id: null }, 'sell', 'home', undefined, 0);
-    const none = generateCompositeUid('s', null, 'sell', 'home', undefined, 0);
+    const unnamed = generateCompositeUid({ id: null }, 'sell', 'home', undefined, 0);
+    const none = generateCompositeUid(null, 'sell', 'home', undefined, 0);
     expect(unnamed).not.toBe(none);
     expect(unnamed).toBe(`null:sell:${page('home')}:at0`);
   });
 
   it('tells two copies of one page apart, by where they are', () => {
-    const first = generateCompositeUid('s', { id: 'main' }, 'people', 'empties', undefined, 1);
-    const again = generateCompositeUid('s', { id: 'main' }, 'people', 'empties', undefined, 3);
+    const first = generateCompositeUid({ id: 'main' }, 'people', 'empties', undefined, 1);
+    const again = generateCompositeUid({ id: 'main' }, 'people', 'empties', undefined, 3);
     expect(first).not.toBe(again);
   });
 
@@ -47,7 +47,7 @@ describe('a uid names a place', () => {
     // A tab switch unmounts the stack that leaves; coming back rebuilds it from the URL, carrying
     // no uid. Position is what makes the rebuilt entry the same entry — a counter here is what
     // broke scroll restoration once already.
-    const built = () => generateCompositeUid('s', { id: 'main' }, 'stock', 'product', { id: '9' }, 4);
+    const built = () => generateCompositeUid({ id: 'main' }, 'stock', 'product', { id: '9' }, 4);
     expect(built()).toBe(built());
   });
 });
@@ -55,20 +55,20 @@ describe('a uid names a place', () => {
 describe('a uid read back from storage', () => {
   it('is kept when it already names one entry', () => {
     const mine = 'main:sell:uid_123:at2';
-    expect(ensureCompositeUid(mine, 's', { id: 'main' }, 'sell', 'home', undefined, 2)).toBe(mine);
+    expect(ensureCompositeUid(mine, { id: 'main' }, 'sell', 'home', undefined, 2)).toBe(mine);
   });
 
   it('is regenerated when it only names a page', () => {
     // Three segments is a uid written before uids were per-entry: a stack holding two of the same
     // page would carry it twice, and React would render both under one key.
     const old = 'main:sell:uid_123';
-    expect(ensureCompositeUid(old, 's', { id: 'main' }, 'sell', 'home', undefined, 2)).toBe(
+    expect(ensureCompositeUid(old, { id: 'main' }, 'sell', 'home', undefined, 2)).toBe(
       `main:sell:${page('home')}:at2`,
     );
   });
 
   it('and is generated from scratch when there is none', () => {
-    expect(ensureCompositeUid(undefined, 's', null, null, 'home', undefined, 0)).toBe(
+    expect(ensureCompositeUid(undefined, null, null, 'home', undefined, 0)).toBe(
       `root:root:${page('home')}:at0`,
     );
   });

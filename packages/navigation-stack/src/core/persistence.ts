@@ -35,6 +35,11 @@ export function generateStableUid(key: string, params?: NavParams): string {
  * one key, and the scroll container, the transition and the cached instance were shared between
  * them too.
  *
+ * There is no STACK id in it, and there does not need to be: a uid only has to name one entry
+ * WITHIN its stack. Each stack keeps its own renders, its own page cache and its own storage key
+ * (`navstack:<id>`), and scroll restoration adds `standalone:<id>` itself. The parameter used to be
+ * taken and never read.
+ *
  * `at` is the entry's POSITION in its stack, which is unique within it and — this is the point —
  * the same every time that stack is rebuilt. Everything keyed by a uid is a fact about one entry
  * that must survive being rebuilt: its scroll position above all.
@@ -49,7 +54,6 @@ export function generateStableUid(key: string, params?: NavParams): string {
  * thing somebody notices every time they change tabs.
  */
 export function generateCompositeUid(
-  stackId: string,
   group: GroupRef,
   groupStackId: string | null,
   key: string,
@@ -67,7 +71,6 @@ export function generateCompositeUid(
 // Ensure UID is composite format - upgrade old non-composite UIDs if needed
 export function ensureCompositeUid(
   uid: string | undefined,
-  stackId: string,
   group: GroupRef,
   groupStackId: string | null,
   key: string,
@@ -82,7 +85,7 @@ export function ensureCompositeUid(
   if (uid && uid.split(':').length >= 4) {
     return uid;
   }
-  return generateCompositeUid(stackId, group, groupStackId, key, params, at);
+  return generateCompositeUid(group, groupStackId, key, params, at);
 }
 
 export function parseRawKey(raw: string, params?: NavParams) {
@@ -118,7 +121,7 @@ export function readPersistedStack(id: string, groupContext: GroupNavigationCont
       return null;
     }
     return parsed.entries.map((p, i) => {
-      const compositeUid = ensureCompositeUid(p.uid, id, group, groupStackId, p.key, p.params, i);
+      const compositeUid = ensureCompositeUid(p.uid, group, groupStackId, p.key, p.params, i);
       return { uid: compositeUid, key: p.key, params: p.params, metadata: p.metadata };
     });
   } catch (e) {
