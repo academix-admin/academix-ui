@@ -25,7 +25,7 @@ async function preserveUseClient(dir = 'dist') {
 }
 
 export default defineConfig({
-  entry: { index: 'src/index.ts', playwright: 'src/playwright.ts' },
+  entry: { index: 'src/index.ts', devtools: 'src/devtools-ui.tsx', playwright: 'src/playwright.ts' },
   format: ['esm', 'cjs'],
   outExtension({ format }) {
     return { js: format === 'cjs' ? '.cjs' : '.js' };

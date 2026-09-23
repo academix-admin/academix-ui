@@ -1,5 +1,31 @@
 # @academix-admin/navigation-stack
 
+## 0.20.0
+
+### Minor Changes
+
+- Two packaging defects, found by measuring the published artefact rather than reading the source.
+
+  **`sideEffects: false` was not true.** The entry installs the dev inspector on import
+  (`src/index.ts` calls `_installNavDevtools()`), which is a side effect — and a package that tells
+  a bundler it has none is telling it that dropping any module is safe. The behaviour that follows
+  is undefined and consumer-specific, which is the worst kind of bug to receive: it appears in
+  somebody else's build, not in ours. The field now names the entry files, so the side effect is
+  declared and every other module stays tree-shakeable.
+
+  **The inspector's UI shipped to everyone.** `NavigationDevtools` is a full React panel, bundled
+  into the main entry whether an app ever opens it or not. It now has its own entry point:
+
+  ```ts
+  import { NavigationDevtools } from '@academix-admin/navigation-stack/devtools';
+  ```
+
+  The barrel still exports it, so nothing breaks — which also means the main bundle has NOT shrunk
+  yet. Measured, so the plan rests on a number rather than a guess: removing the barrel re-export
+  takes the main entry from **42.1 KB to 38.9 KB gzipped**. That removal is a breaking change and
+  belongs at 1.0. Consumers should move to the subpath now so it costs nothing then.
+
+
 ## 0.19.2
 
 ### Patch Changes

@@ -283,6 +283,11 @@ anchor — remembering which element was at the top — which this does not do.
 
 ## Devtools
 
+> Import the panel from its own entry point, so an app that never opens it does not carry its UI:
+> `import { NavigationDevtools } from '@academix-admin/navigation-stack/devtools';`
+> The main barrel still exports it, and will stop at 1.0.
+
+
 In any non-production build, the library installs `window.__NAV_STACK__` — a JSON-safe inspector
 you can use from the browser console.
 
