@@ -1,5 +1,30 @@
 # @academix-admin/state-stack
 
+## 0.4.0
+
+### Minor Changes
+
+- `useInvalidation(scope, fn)` — re-read when a scope goes stale, for screens that own their loader.
+
+  `invalidateScope` marks a scope's keys stale while keeping their values, which reaches every
+  `useDemandState` consumer: the next `demand()` runs. It reached nothing that fetches for itself —
+  a paginated list, an infinite scroll, a read assembled from several calls — because those own the
+  loader and the package cannot call it.
+
+  So consumers cleared the scope instead, and clearing is a different thing wearing the same coat:
+  it empties what is on screen. Reported twice from a real shop — saving one product blanked the
+  whole stock list, and LEAVING a customer's account blanked the people list behind it, with nothing
+  written at all. Both are one page deleting another page's data in the name of freshness.
+
+  The listener registry lives in the core beside the invalidation it listens for; `useInvalidation`
+  is its React binding. Listeners are told AFTER the flags are cleared, or a re-read would be
+  refused as already-demanded. Additive: nothing happens unless somebody subscribes, so every
+  existing caller of `invalidateScope` behaves exactly as before.
+
+  Also here: the README now lists `useDemandState`'s real options — `deps`, `revalidateOnMount`,
+  `revive`, the `clearOn*` family, and that **`persist` defaults to `true`** — and mentions
+  `useDemandResource`, which has been exported and undocumented since 0.3.0.
+
 ## 0.2.2
 
 ### Patch Changes

@@ -38,6 +38,7 @@ const PUBLIC_EXPORTS = [
   // Asking for data, and holding it
   'useDemandState',
   'useDemandResource',
+  'useInvalidation',
   'isEmptyValue',
 
   // Local state that is not fetched
@@ -59,6 +60,7 @@ const FACADE_KEYS = [
   'init',
   'createStateStack',
   'useDemandState',
+  'useInvalidation',
   'useAtom',
   'useComputed',
   'useToggle',
@@ -89,6 +91,7 @@ const CORE_METHODS = [
   'isDemanded', 'markDemanded', 'clearDemanded', 'resetDemand',
   'isHydrated', 'markHydrated', 'subscribeToHydration',
   'runDemandOperation', 'debug', 'dispose',
+  'onInvalidate',
 ];
 
 /*

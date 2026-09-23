@@ -23,6 +23,7 @@ export { useDemandState, isEmptyValue } from './hooks/useDemandState';
 export type { DemandSetOptions } from './hooks/useDemandState';
 export { useDemandResource } from './hooks/useDemandResource';
 export type { DemandResource, DemandResourceOptions, DemandStatus } from './hooks/useDemandResource';
+export { useInvalidation } from './hooks/useInvalidation';
 export { useAtom } from './hooks/useAtom';
 export { useComputed, useToggle, useList } from './hooks/local-hooks';
 

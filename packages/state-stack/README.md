@@ -33,6 +33,8 @@ npm install react react-dom
 | `useToggle(initial)` / `useList(initial)` | Local | No | Ergonomic local state |
 | `useDemandState(initial, opts)` | Route (default) or custom | Optional | Per-page state, persistence, undo/redo, TTL |
 | `createStateStack(blueprints)` | Custom scope | Optional | Redux-like typed stores with methods + middleware |
+| `useDemandResource(loader, opts)` | Route or custom | Optional | The same read, with `status` / `error` handled for you |
+| `useInvalidation(scope, fn)` | Custom scope | — | Re-read when something says that scope went stale |
 
 ## `useDemandState` — route-scoped persistent state
 
@@ -67,6 +69,28 @@ Returns a tuple: `[value, load, set, controls]`.
 
 State is scoped to the current route by default (`route:<pathname>`). Provide an
 explicit `scope` to share across routes, or configure route resolution (below).
+
+### Options
+
+| Option | Default | What it does |
+|---|---|---|
+| `key` | route-derived | Names the value. One key is one shape — two hooks sharing a key must agree on it. |
+| `scope` | `route:<pathname>` | Groups keys, so one write can invalidate a family of them. |
+| `persist` | **`true`** | Keeps the value on the device (IndexedDB → localStorage). It is ON unless you turn it off. |
+| `deps` | `[]` | Changing these re-runs the loader, like a `useEffect` dependency list. |
+| `revalidateOnMount` | `true` | Whether a fresh mount re-runs the loader. `false` is "load once": a remount — navigating back, a cold start — reuses the stored value. `deps` changes and TTL expiry still reload. |
+| `revive` | — | Rebuild the stored value on hydration, e.g. turning flattened JSON back into class instances. A throw keeps the raw value. |
+| `ttl` | — | How long the value stays fresh, in milliseconds. |
+| `storage` | the configured default | Which adapter holds it. |
+| `historyDepth` | — | How many steps of undo/redo to keep. |
+| `clearOnUnmount` | `false` | Drop the value when the component goes away. |
+| `clearOnBack` | `false` | Drop it when the route is left backwards. |
+| `clearOnZeroSubscribers` | `false` | Drop it once nothing is reading it. |
+
+`set(value, { override: true })` writes even when the value is "empty" (null, `[]`, `{}`, an empty
+Map or Set). Without it, an empty value does NOT overwrite a non-empty stored one — so a loader whose
+fetch failed or was blocked cannot wipe what is already on screen. Use `override` for a deliberate
+reset.
 
 ## Atoms & derived state
 
@@ -111,6 +135,34 @@ function Cart() {
 `useStack('cart', …)` returns `{ cart, cart$, __meta }` — the state, its method
 object (each method returns a `Promise<void>`), and metadata
 (`undo`, `redo`, `canUndo`, `canRedo`, `clear`, `clearByScope`, `isHydrated`).
+
+## Saying something changed — `useInvalidation`
+
+```tsx
+import { StateStack, useInvalidation } from '@academix-admin/state-stack';
+
+function StockList() {
+  const [page, loadPage] = usePagedProducts();          // a loader this screen owns
+  useInvalidation('catalog', () => loadPage.reload());  // re-read when the catalogue changes
+  …
+}
+
+// Anywhere a write happens:
+StateStack.core.invalidateScope('catalog');
+```
+
+`invalidateScope` marks every key in a scope as stale while KEEPING its value, so `useDemandState`
+consumers re-read on their next demand. `useInvalidation` is the other half, for screens that own
+their loader — a paginated list, an infinite scroll, a read assembled from several calls — which
+nothing else can call.
+
+**This is not `clearScope`.** Clearing deletes the values, so a write in one place empties a list
+somewhere else and whoever was reading it loses their place. Clear only when the data must not be
+seen again — signing out, or switching account. Everything else is staleness, and the answer to
+staleness is to read again while keeping what is on screen.
+
+A `null` scope subscribes to nothing, so a screen that does not know its scope yet can call the hook
+unconditionally.
 
 ## The `StateStack` façade
 

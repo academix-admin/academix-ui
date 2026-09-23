@@ -5,6 +5,7 @@ import { atomStore } from './core/AtomStore';
 import { _globalConfig, initStateStack, getDefaultStorage } from './config';
 import { createStateStack } from './hooks/createStateStack';
 import { useDemandState } from './hooks/useDemandState';
+import { useInvalidation } from './hooks/useInvalidation';
 import { useAtom } from './hooks/useAtom';
 import { useComputed, useToggle, useList } from './hooks/local-hooks';
 import { indexedDBAdapter } from './storage/indexeddb';
@@ -42,6 +43,7 @@ export const StateStack = {
   init: initStateStack,
   createStateStack,
   useDemandState,
+  useInvalidation,
   useAtom,
   useComputed,
   useToggle,

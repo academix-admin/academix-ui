@@ -44,6 +44,11 @@ export class StateStackCore {
   >();
   private pendingUpdates = new Map<string, Promise<unknown>>();
   private scopeSubscriberCounts = new Map<string, number>();
+  /**
+   * "Tell me when this scope goes stale" — see `onInvalidate`. Separate from `subscribers`, which
+   * is per KEY and only reaches what is holding that key's value.
+   */
+  private invalidationListeners = new Map<string, Set<() => void>>();
   private autoClearScopes = new Set<string>();
   private storageEventListenerAttached = false;
   private broadcastChannel?: BroadcastChannel;
@@ -410,6 +415,38 @@ export class StateStackCore {
    * Additive and non-breaking: nothing calls it unless it asks for it, and `clearScope` is
    * untouched for the cases that genuinely must forget — signing out, or switching account.
    */
+  /**
+   * RUN THIS AGAIN WHEN THE SCOPE GOES STALE.
+   *
+   * `subscribe` is per key and reaches whatever holds that key's value, which is enough for a
+   * screen built out of `useDemandState`. It is not enough for anything that fetches for itself —
+   * a paginated list, an infinite scroll, a derived read — because those own their loader and
+   * nothing here knows to call it.
+   *
+   * Without this the only way to make such a screen re-read was to DELETE the scope, and deleting
+   * is not staleness: it empties lists that are on screen, belonging to pages that were not even
+   * written to. Consumers built the missing half themselves; it belongs here, beside the
+   * invalidation it listens for.
+   *
+   * Returns the unsubscribe. Best-effort and synchronous: a screen that is not mounted hears
+   * nothing, which is right — it reads fresh when it mounts.
+   */
+  onInvalidate(scope: string, fn: () => void): () => void {
+    let set = this.invalidationListeners.get(scope);
+    if (!set) {
+      set = new Set();
+      this.invalidationListeners.set(scope, set);
+    }
+    set.add(fn);
+
+    return () => {
+      const current = this.invalidationListeners.get(scope);
+      if (!current) return;
+      current.delete(fn);
+      if (current.size === 0) this.invalidationListeners.delete(scope);
+    };
+  }
+
   invalidateScope(scope: string) {
     const keys = new Set<string>();
 
@@ -434,6 +471,17 @@ export class StateStackCore {
       // must not be told it is waiting for one.
       this.notify(scope, key);
     }
+
+    /*
+     * And anything that fetches for itself. AFTER the flags are cleared, or a listener that
+     * re-reads would find the scope still marked as demanded and do nothing.
+     *
+     * Copied before iterating: a listener may unsubscribe itself as it runs. Nothing happens here
+     * unless somebody asked, so every existing caller of `invalidateScope` behaves exactly as it
+     * did.
+     */
+    const listeners = this.invalidationListeners.get(scope);
+    if (listeners) for (const fn of [...listeners]) fn();
   }
 
   async clearScope(scope: string, removePersist = true) {
