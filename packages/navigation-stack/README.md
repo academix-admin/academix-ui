@@ -99,6 +99,9 @@ export default function App() {
 | `componentTags` | `Record<string, NavigationMap>` | `{}` | Tag-organized component registries. |
 | `className` / `style` | — | — | Applied to the stack container. |
 | `onExitStack` | `() => void` | — | Called when the root is popped. |
+| `historyPush` | `boolean` | `true` | Whether a push writes a real browser history entry, so the platform's Back and the edge-swipe step through the stack. `false` overwrites the current entry instead. Only meaningful with `syncHistory`. |
+| `redirect` | `RedirectFn` | — | Runs BEFORE guards on every `push` / `replace` / `go` and on deep links. Return a target to send the navigation elsewhere, or `null` to let it through. See below. |
+| `routeOptions` | `Record<string, { redirect?: RedirectFn }>` | — | The same thing per route, for when only one page needs it. |
 
 ## Navigation API (`useNav()`)
 
@@ -168,6 +171,84 @@ const ok = await nav.sendRequest<string, boolean>('confirm', 'Delete item?');
 | `useSwipeBack(...)` | Low-level swipe-back binding. |
 | `useUnifiedScrollRestoration(...)` | Low-level scroll restoration control. |
 | `useComponentsByTag(tag)` | Retrieve components registered under a tag. |
+| `useIsActiveStack()` | Whether THIS stack is the one on screen. In a group, only one tab is — so a screen that pushes on its own (an alert, a gate) asks this first, or it pushes onto whichever tab the person is actually looking at. |
+| `useOverlayRoute(...)` | Give a sheet or dialog its own history entry, so the platform's Back closes the SHEET rather than the page under it. |
+| `useViewportInsets()` / `useResizeToAvoidKeyboard()` | Keyboard and safe-area insets. |
+| `popStackToRoot(id)` | Pop a stack to its root from OUTSIDE React — what a tab bar calls when the active tab is tapped again. |
+
+### Lists that page, and pull-to-refresh
+
+```tsx
+useInfiniteScroll({ onLoadMore, hasMore, loading });   // scroll position
+useInfiniteScrollObserver({ onLoadMore, hasMore });    // IntersectionObserver
+usePullToRefresh({ onRefresh });                       // returns { pulling, distance, refreshing }
+useScrollEvents({ onScroll, onReachEnd, onReachTop });
+scrollIntoViewBelow(el, opts) / useScrollIntoViewBelow()  // scroll something clear of a pinned bar
+```
+
+These live here rather than in a list library because they need the stack: a page that is not on top
+must not react to a scroll it cannot see, and a restored page must not fire "reached the end" while
+it is being put back where it was.
+
+## Redirects — deciding before the page exists
+
+```tsx
+<NavigationStack
+  id="main"
+  navLink={routes}
+  entry="home"
+  redirect={({ to, action, stackSnapshot, location }) => {
+    if (to.key === 'account' && !session) return 'login';
+    if (to.key === 'checkout' && cart.isEmpty) return { key: 'cart', params: { why: 'empty' } };
+    return null;                       // let it through
+  }}
+/>
+```
+
+Runs before guards, on `push`, `replace`, `go` and on a deep link arriving through the URL. Returning
+a target redirects; returning `null` or `undefined` allows the navigation as it stands. Chains are
+resolved with a hop limit of five, and exceeding it fails the navigation with
+`{ ok: false, reason: 'redirect-loop' }` rather than looping.
+
+Use `routeOptions` when one route needs it rather than the whole stack:
+
+```tsx
+routeOptions={{ account: { redirect: () => (session ? null : 'login') } }}
+```
+
+## A keyboard-safe page — `Scaffold`
+
+A page is a column: a bar that stays, a body that scrolls, and a bar at the bottom that rides above
+the keyboard instead of being buried by it.
+
+```tsx
+import { Scaffold, ColumnBody, RowBody } from '@academix-admin/navigation-stack';
+
+<Scaffold
+  appBar={<Header position="static" title="Stock" />}
+  bottomBar={<PayButton />}
+>
+  {rows.map((r) => <Row key={r.id} {...r} />)}
+</Scaffold>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `appBar` | `ReactNode` | — | Top bar. |
+| `appBarBehavior` | `'pinned' \| 'scroll'` | `'pinned'` | `'pinned'` stays put — right for a screen you read. `'scroll'` travels with the content and returns as you scroll up — right for a screen with its own sticky toolbar beneath, which cannot share the top with a pinned bar. The bar is laid OVER the body and the body padded by its height, so nothing jumps. |
+| `bottomBar` | `ReactNode` | — | Pinned bottom bar. Rides above the keyboard, never scrolls. |
+| `scroll` | `boolean` | `true` | Wrap `children` in a `ColumnBody`. Set `false` to supply your own body — a `RowBody`, for instance. |
+| `bodyClassName` / `bodyStyle` | — | — | On the scroll body. Put the page's theme-variant class here so its CSS custom properties are in scope for the content. |
+
+`ColumnBody` and `RowBody` are the scroll regions themselves, for pages that lay themselves out.
+
+### Keyboard and viewport insets
+
+```tsx
+useViewportInsets();                    // publish the keyboard/safe-area insets as CSS variables
+<ViewportInsetsProvider>…</ViewportInsetsProvider>
+useResizeToAvoidKeyboard({ enabled });  // shrink the page instead of letting the keyboard cover it
+```
 
 ## Nested & group stacks
 
