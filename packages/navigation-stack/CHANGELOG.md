@@ -1,5 +1,30 @@
 # @academix-admin/navigation-stack
 
+## 0.21.0
+
+### Minor Changes
+
+- `renderInStack` — testing a page the way it is used, from `@academix-admin/navigation-stack/testing`.
+
+  A page built on this library cannot be rendered on its own: `useNav`, `useIsTop`,
+  `usePageLifecycle` and the scroll helpers all need a stack above them. The usual workaround is to
+  mock `useNav`, which proves the page called a function and lets through every failure worth
+  catching — the wrong page arrives, the stack does not pop, a param is lost.
+
+  `renderInStack` puts a real stack around the page and hands back the same API the app uses, plus
+  `stack()` and `settle()`. Each render gets its own stack id, because the registry is
+  process-global and outlives `cleanup()` — two tests sharing an id share a stack, and that failure
+  reads as "passes alone, fails in the suite". `forgetStack(id)` is there for a test that passes its
+  own id.
+
+  `@testing-library/react` is an optional peer dependency and is never bundled: an app that does not
+  import this entry point never needs it.
+
+  [TESTING.md](./TESTING.md) covers the shape of a test, the options, that trap, params and
+  lifecycle. Every example in it is run by `test/testing-helper.test.tsx` rather than asserted on a
+  documentation page — which is how the `params` prop managed to be wrong until 0.20.1.
+
+
 ## 0.20.1
 
 ### Patch Changes

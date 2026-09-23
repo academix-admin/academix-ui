@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/navigation-stack",
-  "version": "0.20.1",
+  "version": "0.21.0",
   "description": "A powerful client-side navigation stack for React: transitions, swipe-back, scroll restoration, lazy pages, nested/group navigation, dependency injection and a request/response bus.",
   "keywords": [
     "react",
@@ -32,6 +32,7 @@
   "files": [
     "dist",
     "README.md",
+    "TESTING.md",
     "EXAMPLES.md",
     "LICENSE",
     "DEVTOOLS.md"
@@ -51,6 +52,16 @@
       }
     },
     "./package.json": "./package.json",
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
+    },
     "./devtools": {
       "import": {
         "types": "./dist/devtools.d.ts",
@@ -82,8 +93,14 @@
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit"
   },
   "peerDependencies": {
+    "@testing-library/react": ">=14.0.0",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@testing-library/react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

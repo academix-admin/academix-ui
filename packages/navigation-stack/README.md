@@ -16,6 +16,9 @@ native mobile navigator, in the browser.
 
 > Zero runtime dependencies beyond React. `react` / `react-dom` are peer deps.
 
+> 🧪 **[Testing pages that live in a stack →](./TESTING.md)** — `renderInStack` puts a real stack
+> around a page, so a test pushes and pops the way a person does instead of mocking `useNav`.
+
 > 📖 **[More real-world examples →](./EXAMPLES.md)** — lifecycle, DI, nested
 > stacks, request/response and more, adapted from a production app.
 

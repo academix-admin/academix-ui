@@ -25,7 +25,12 @@ async function preserveUseClient(dir = 'dist') {
 }
 
 export default defineConfig({
-  entry: { index: 'src/index.ts', devtools: 'src/devtools-ui.tsx', playwright: 'src/playwright.ts' },
+  entry: {
+    index: 'src/index.ts',
+    devtools: 'src/devtools-ui.tsx',
+    testing: 'src/testing.tsx',
+    playwright: 'src/playwright.ts',
+  },
   format: ['esm', 'cjs'],
   outExtension({ format }) {
     return { js: format === 'cjs' ? '.cjs' : '.js' };
@@ -35,7 +40,8 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   splitting: false,
-  external: ['react', 'react-dom', 'react/jsx-runtime'],
+  // @testing-library/react belongs to the CONSUMER's test run, never in our bundle.
+  external: ['react', 'react-dom', 'react/jsx-runtime', '@testing-library/react'],
   // devtools' debug() blob reports the version; injecting it here keeps it from drifting behind
   // the package, which it silently had been.
   define: { __NAVSTACK_VERSION__: JSON.stringify(pkg.version) },

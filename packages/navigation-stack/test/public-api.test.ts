@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest';
 import * as api from '../src/index';
 import * as playwrightApi from '../src/playwright';
 import * as devtoolsApi from '../src/devtools-ui';
+import * as testingApi from '../src/testing';
 
 /** Values, components and hooks: importable at runtime. `default` is `NavigationStack`. */
 const PUBLIC_EXPORTS = [
@@ -116,7 +117,10 @@ const PUBLIC_EXPORTS = [
 /** The inspector entry point, `@academix-admin/navigation-stack/devtools`. */
 const DEVTOOLS_EXPORTS = ['NavigationDevtools', 'default'].sort();
 
-/** The test-helper entry point, `@academix-admin/navigation-stack/playwright`. */
+/** The unit-test entry point, `@academix-admin/navigation-stack/testing`. */
+const TESTING_EXPORTS = ['renderInStack', 'forgetStack'].sort();
+
+/** The Playwright entry point, `@academix-admin/navigation-stack/playwright`. */
 const PLAYWRIGHT_EXPORTS = ['installNavDevtools', 'navStack', 'navStackIds'].sort();
 
 /** Names each side has that the other does not — a far more useful failure than "not equal". */
@@ -229,6 +233,11 @@ describe('the public API', () => {
     // still re-exports it, which is why the main bundle has not shrunk yet — see the CHANGELOG.
     const actual = Object.keys(devtoolsApi).sort();
     expect(drift(actual, DEVTOOLS_EXPORTS)).toEqual({ added: [], removed: [] });
+  });
+
+  it('exports exactly what is written down for /testing', () => {
+    const actual = Object.keys(testingApi).sort();
+    expect(drift(actual, TESTING_EXPORTS)).toEqual({ added: [], removed: [] });
   });
 
   it('ships the stack as both a default and a name, and they are the same thing', () => {
