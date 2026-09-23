@@ -78,7 +78,7 @@ describe('params in a segment', () => {
 describe('a stack as a path', () => {
   it('names the route, the identity, and then the page', () => {
     const stack = [entry('stock_page'), entry('product_page', { id: 7 }, 'Gulder 60cl')];
-    expect(buildPath(stack, navLink)).toBe('/stock/product/7~gulder-60cl');
+    expect(buildPath(stack, navLink)).toBe('/stock/product/gulder-60cl~7');
   });
 
   it('leaves the words off where there is no identity to decorate', () => {
@@ -116,7 +116,7 @@ describe('reading it back', () => {
       entry('product_page', { id: '7' }, 'Gulder 60cl'),
       entry('history_page'),
     ];
-    expect(buildPath(stack, navLink)).toBe('/stock/product/7~gulder-60cl/history');
+    expect(buildPath(stack, navLink)).toBe('/stock/product/gulder-60cl~7/history');
     const { entries } = roundTrip(stack);
     expect(entries.map((e) => e.key)).toEqual(['stock_page', 'product_page', 'history_page']);
   });
@@ -124,8 +124,8 @@ describe('reading it back', () => {
   it('IGNORES the words, so renaming a page does not change where it goes', () => {
     // The whole reason identity lives in the params: a title is translated, shortened and corrected,
     // and none of that may alter what a link opens.
-    const { entries } = parsePath('/product/7~gulder-60cl', navLink, { product_page: 'id' });
-    const renamed = parsePath('/product/7~gulder-600ml-bottle', navLink, { product_page: 'id' });
+    const { entries } = parsePath('/product/gulder-60cl~7', navLink, { product_page: 'id' });
+    const renamed = parsePath('/product/gulder-600ml-bottle~7', navLink, { product_page: 'id' });
     expect(entries).toEqual(renamed.entries);
   });
 
@@ -153,6 +153,30 @@ describe('reading it back', () => {
     expect(soleParamNamesOf(stack)).toEqual({ product_page: 'productId' });
     const { entries } = parsePath(buildPath(stack, navLink), navLink, soleParamNamesOf(stack));
     expect(entries[0].params).toEqual({ productId: 'abc' });
+  });
+
+  it('a UUID stays whole, and the words still come first', () => {
+    /*
+     * The case that decided the order. A uuid is 36 characters, so identity-first opens every URL
+     * with noise and a search result truncates the tail — losing exactly the words worth showing.
+     * The uuid's own dashes are safe here because a slug is [a-z0-9-] and can never hold a ~.
+     */
+    const uuid = '2d6ab81c-0e67-4bcd-ae22-38160f0f1965';
+    const stack = [entry('product_page', { id: uuid }, 'Gulder 60cl')];
+
+    const path = buildPath(stack, navLink);
+    expect(path).toBe(`/product/gulder-60cl~${uuid}`);
+    expect(path.indexOf('gulder')).toBeLessThan(path.indexOf(uuid));
+
+    const { entries } = parsePath(path, navLink, soleParamNamesOf(stack));
+    expect(entries).toEqual([{ key: 'product_page', params: { id: uuid } }]);
+  });
+
+  it('a UUID with no name is still just the identity', () => {
+    const uuid = '2d6ab81c-0e67-4bcd-ae22-38160f0f1965';
+    const stack = [entry('product_page', { id: uuid })];
+    expect(buildPath(stack, navLink)).toBe(`/product/${uuid}`);
+    expect(parsePath(buildPath(stack, navLink), navLink).entries[0].params).toEqual({ id: uuid });
   });
 
   it('falls back to id when nothing remembers', () => {

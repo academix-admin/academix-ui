@@ -5,11 +5,15 @@
  * are not looking at, and wrong for the one you are: a person cannot read it, a crawler cannot index
  * it, and a link pasted into a message tells the person receiving it nothing.
  *
- *     /stock/product/7~gulder-60cl
- *      │     │       │ └─ the page's own title: for people and crawlers, ignored when read back
- *      │     │       └─── the params: the identity
- *      │     └─────────── the route key, slugified
- *      └───────────────── the page underneath
+ *     /stock/product/gulder-60cl~2d6ab81c-0e67-4bcd-ae22-38160f0f1965
+ *      │     │       │           └─ the params: the identity
+ *      │     │       └───────────── the page's own title, from nav.title()
+ *      │     └───────────────────── the route key, slugified
+ *      └─────────────────────────── the page underneath
+ *
+ * THE WORDS COME FIRST, and that is about ids being uuids as often as they are numbers. Put the
+ * identity first and a real URL opens with thirty-six characters of noise before the only part a
+ * person reads — and a search result truncates the tail, so the keywords are exactly what is lost.
  *
  * The words ride WITH the identity rather than in a segment of their own, because a segment of
  * their own cannot be told apart from the first segment of a NESTED stack — both are simply
@@ -83,8 +87,10 @@ export function encodeParams(params: NavParams): string | null {
 /** The reverse, given the names the single-param form leaves out. */
 export function decodeParams(segment: string, soleParamName?: string): NavParams {
   if (!segment) return undefined;
-  // Everything after the first ~ is the words, which mean nothing on the way back.
-  segment = segment.split('~')[0];
+  // The words come first; the identity is everything after the first ~. A slug is [a-z0-9-] only,
+  // so it can never contain one, which is what makes this unambiguous with a uuid on the other side.
+  const tilde = segment.indexOf('~');
+  if (tilde >= 0) segment = segment.slice(tilde + 1);
   if (!segment) return undefined;
   if (segment.includes('=')) {
     const out: Record<string, string> = {};
@@ -140,7 +146,7 @@ export function buildPath(stack: StackEntry[], navLink: NavigationMap): string {
        * never ambiguous.
        */
       const title = entry.metadata?.title ? slugify(entry.metadata.title) : '';
-      out.push(title && title !== routeSlug ? `${params}~${title}` : params);
+      out.push(title && title !== routeSlug ? `${title}~${params}` : params);
     }
   }
 
