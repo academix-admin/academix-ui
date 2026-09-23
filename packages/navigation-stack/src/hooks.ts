@@ -79,10 +79,24 @@ export function useOverlayEntry(
  */
 export function useNav<K extends string = string>(): NavStackAPI<K> {
   const context = useContext(NavContext);
-  if (!context) throw new Error("useNav must be used within a NavigationStack");
+  /*
+   * Which page is asking. Everything else on the api is about the STACK and needs no such thing;
+   * `title` is about the CALLER, so that a page can name itself while something else is on top and
+   * have that name come back when the stack pops to it.
+   */
+  const pageUid = useContext(CurrentPageContext);
+
+  const bound = useMemo(() => {
+    if (!context || !pageUid) return context;
+    // Memoised on the page, not rebuilt per render: `usePageLifecycle(nav, …)` takes the api as a
+    // dependency, and a fresh object every render would re-register its handlers every render.
+    return { ...context, title: (next: string, uid?: string) => context.title(next, uid ?? pageUid) };
+  }, [context, pageUid]);
+
+  if (!bound) throw new Error("useNav must be used within a NavigationStack");
   // The context is stored untyped (one context serves every stack); the cast applies the caller's
   // key union. Purely a compile-time narrowing — no runtime behaviour changes.
-  return context as unknown as NavStackAPI<K>;
+  return bound as unknown as NavStackAPI<K>;
 }
 
 export function useIsTop(): boolean {

@@ -211,6 +211,29 @@ export type NavStackAPI<K extends string = string> = {
    */
   pushLocation: (location: string) => Promise<boolean | NavActionResult>;
 
+  // ============ The page's name ============
+
+  /**
+   * NAME THIS PAGE. Sets the browser's title while the page is on top, and puts the name on the
+   * history entry so the back/forward list reads like the app rather than like one URL repeated.
+   *
+   * ```tsx
+   * const nav = useNav();
+   * nav.title(product ? `${product.name} · Stock` : 'Stock');
+   * ```
+   *
+   * Called through `useNav()`, it names the page that called it — including a page that is not on
+   * top, so the right name comes back when the stack pops to it. Called on a bare api (outside a
+   * page) it names whatever is on top.
+   *
+   * Only the ACTIVE stack writes the document title. In a group every tab is mounted at once, so
+   * five stacks each setting it would be five writers of one string, and the winner would be
+   * whichever rendered last.
+   *
+   * Safe to call on every render: setting the same name twice does nothing.
+   */
+  title: (next: string, uid?: string) => void;
+
   // ============ C2: Redirects ============
 
   /** Register a redirect resolver (runs before guards). Returns an unsubscribe. */

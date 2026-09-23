@@ -1,5 +1,37 @@
 # @academix-admin/navigation-stack
 
+## 1.1.0
+
+### Minor Changes
+
+- `nav.title('…')` — a page saying what it is called.
+
+  ```tsx
+  const nav = useNav();
+  nav.title(product ? `${product.name} · Stock` : 'Stock');
+  ```
+
+  The browser's title follows the top of the stack. Called through `useNav()` it names the page that
+  called it — including a page that is not on top — so popping back restores that name without the
+  page re-rendering. `StackEntry.metadata.title` has been in the public type since the beginning and
+  did nothing; this is what it was for.
+
+  **Only the stack on screen writes the document title.** In a group every tab stays mounted, which
+  is what keeps a tab you left three pages deep — so five stacks each setting one string would mean
+  the browser saying "Rewards" while somebody looks at Stock. Whether a stack is the active one is
+  computed during render rather than inside the effect, or a tab becoming active would never re-run
+  it.
+
+  Naming a page takes no lock, runs no guards and writes no history entry. It is not a navigation:
+  it cannot be refused, and it must not queue behind a push.
+
+  **A rebuild no longer forgets what an entry knew.** Found while testing the above, and it was a
+  real defect on its own: rebuilding a stack — from the URL, on a tab switch, from storage — created
+  entries from key and params alone and dropped their metadata. The page does not re-render on the
+  way back (that is the point of keeping tabs mounted), so nothing ever put it back. Both rebuild
+  paths now carry the metadata of any entry whose uid is unchanged.
+
+
 ## 1.0.0
 
 ### Major Changes

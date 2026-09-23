@@ -745,6 +745,35 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       });
     },
 
+    /*
+     * NAME A PAGE. Not a navigation: no lock, no guards, no history entry, no lifecycle.
+     *
+     * Naming the page you are on is not a thing that can be refused or undone, and routing it
+     * through the action lock would mean a title set during a push silently losing to the push.
+     * It replaces the entry rather than mutating it, so the uid is untouched — the renderer keys on
+     * uid, so nothing remounts and no transition is triggered by a page getting a name.
+     */
+    title(next: string, uid?: string) {
+      const stack = regEntry.stack;
+      const i = uid ? stack.findIndex((e) => e.uid === uid) : stack.length - 1;
+      if (i < 0) return;
+
+      const current = stack[i];
+      // Idempotent, because this is called from render bodies: setting the same name does nothing.
+      if (current.metadata?.title === next) return;
+
+      stack[i] = { ...current, metadata: { ...(current.metadata ?? {}), title: next } };
+
+      const copy = stack.slice();
+      regEntry.listeners.forEach((l: StackChangeListener) => {
+        try {
+          l(copy);
+        } catch (e) {
+          console.error('[NavStack] title listener failed:', e);
+        }
+      });
+    },
+
     async replaceParam(newParams: NavParams, merge: boolean = true) {
       return withLock<boolean | NavActionResult>(async () => {
         const currentEntry = regEntry.stack[regEntry.stack.length - 1];

@@ -1108,14 +1108,27 @@ export default function NavigationStack(props: {
           const ourTokens = tokenizedStacks[0] || [];
 
           if (ourTokens.length > 0) {
+            /*
+             * What each entry already knew about itself, kept across the rebuild.
+             *
+             * A rebuild is the same stack DESCRIBED AGAIN — from the URL, on a tab switch or a
+             * restore — not a different one. The URL carries the route and its params and nothing
+             * else, so an entry rebuilt from it used to come back stripped of its metadata, and a
+             * page that had named itself lost that name the moment its tab was left. The page does
+             * not re-render on the way back (that is the point of keeping tabs mounted), so nothing
+             * would ever put it back.
+             */
+            const knownByUid = new Map(regEntry.stack.map((e) => [e.uid, e]));
             regEntry.stack = ourTokens.map((t, i) => {
               const resolvedKey = decodeStackPath(mergedNavLink, t.code) || (t.code.startsWith('k:') ? (() => {
                 try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
               })() : t.code);
+              const uid = generateCompositeUid(toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i);
               return {
-                uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i),
+                uid,
                 key: resolvedKey,
-                params: t.params
+                params: t.params,
+                metadata: knownByUid.get(uid)?.metadata,
               } as StackEntry;
             });
             /*
@@ -1153,10 +1166,17 @@ export default function NavigationStack(props: {
       console.error(`Entry route "${key}" not found in navLink`);
       return;
     }
+    // Re-initialising the SAME stack is not the same as a new one: if this entry was already here,
+    // it keeps what it knew about itself. Without this, a stack that re-initialises — a tab becoming
+    // active again, with nothing in the URL or storage to rebuild from — comes back nameless, and
+    // the page does not re-render to say its name a second time.
+    const entryUid = generateCompositeUid(toGroupRef(groupContext), groupStackId, key, params, 0);
+    const knownEntry = regEntry.stack.find((e) => e.uid === entryUid);
     regEntry.stack = [{
-      uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, key, params, 0),
+      uid: entryUid,
       key,
-      params
+      params,
+      metadata: knownEntry?.metadata,
     }];
     setStackSnapshot([...regEntry.stack]);
     if (persist) writePersistedStack(id, regEntry.stack);
@@ -1417,6 +1437,33 @@ export default function NavigationStack(props: {
   const swipeBackOptions = typeof swipeBack === 'object'
     ? swipeBack
     : { disabled: swipeBack === false };
+
+  /*
+   * THE BROWSER'S TITLE FOLLOWS THE TOP PAGE — but only from the stack that is on screen.
+   *
+   * In a group every tab is mounted at once (that is what keeps a tab you left three pages deep),
+   * so five stacks would be five writers of one string and the last to render would win. Only the
+   * active stack writes, which makes the title as unambiguous as the screen.
+   *
+   * The title a page sets with `nav.title()` lands on its own entry, so popping back to it restores
+   * that name without the page having to do anything. A stack whose top has no name leaves the
+   * document at whatever it was when this stack mounted, rather than at the name of some page that
+   * has since been popped.
+   */
+  const titleBaseline = useRef<string | null>(null);
+  // Computed during RENDER, not inside the effect: whether this stack is the one on screen is a
+  // function call on the group, so an effect that only watched the snapshot would never re-run when
+  // a tab became active — the newly shown stack would keep the previous tab's title.
+  const isActiveStack = groupContext ? groupContext.isActiveStack(groupStackId || '') : true;
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (titleBaseline.current === null) titleBaseline.current = document.title;
+    if (!isActiveStack) return;
+
+    const top = stackSnapshot[stackSnapshot.length - 1];
+    const wanted = top?.metadata?.title ?? titleBaseline.current;
+    if (wanted && document.title !== wanted) document.title = wanted;
+  }, [stackSnapshot, isActiveStack]);
 
   useUnifiedScrollRestoration(api, renders, stackSnapshot, groupContext, groupStackId, enableScrollRestoration);
   useSwipeBack(swipeContainerRef, api, swipeBackOptions);

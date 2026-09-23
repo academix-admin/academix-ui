@@ -262,6 +262,41 @@ These live here rather than in a list library because they need the stack: a pag
 must not react to a scroll it cannot see, and a restored page must not fire "reached the end" while
 it is being put back where it was.
 
+## Naming pages — `nav.title()`
+
+One line in the page, and the browser's title follows the top of the stack:
+
+```tsx
+function ProductPage({ id }: { id?: string }) {
+  const nav = useNav();
+  const product = useProduct(id);
+  nav.title(product ? `${product.name} · Stock` : 'Stock');
+  …
+}
+```
+
+- **It names the page that called it**, not whatever is on top — so a page deep in the stack keeps
+  its name, and popping back to it restores that name without the page re-rendering.
+- **Only the stack on screen writes the document title.** In a group every tab stays mounted, so
+  five stacks setting one string would leave the browser saying "Rewards" while somebody looks at
+  Stock.
+- **Safe to call on every render.** Setting the same name twice does nothing — no re-render, no
+  history write. It takes no lock and runs no guards, because naming a page is not a navigation and
+  must not be refused or queued behind one.
+- **A stack whose top has no name** leaves the title as it was when that stack mounted, rather than
+  keeping the name of a page that has since been popped.
+
+The name lives on the entry, so it survives what the page does not: a tab switch, a restore from the
+URL, a stack rebuilt from storage.
+
+```tsx
+nav.title('Receipt 9AU8B');            // names this page
+nav.title('Stock', someOtherEntryUid); // names another entry, if you have its uid
+```
+
+Why this matters beyond the tab: the browser's back/forward list, shared links, and analytics all
+read the document title. Without it, every screen in the app is one URL with one name.
+
 ## Redirects — deciding before the page exists
 
 ```tsx
