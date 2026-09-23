@@ -268,6 +268,91 @@ Call it once in a client boundary (e.g. a providers component) before rendering
 components that use `useDemandState`. `next` is an optional peer dependency —
 only required if you import this adapter.
 
+## On the server, and on Suspense
+
+### This package is client-only, on purpose
+
+Every file it ships carries `'use client'`. Nothing here runs during a server render, and that is
+not an oversight: what this package holds is **what one device knows** — a value kept in that
+browser's IndexedDB, scoped to where that person is, invalidated by what they did. A server has none
+of those things, and inventing them there is how an app ends up rendering one person's cache to
+somebody else.
+
+What follows from that, in the Next App Router:
+
+- A component using these hooks is a **Client Component**. Importing them into a Server Component
+  makes that boundary a client one, or fails outright for the hooks.
+- **There is no server snapshot to hydrate from**, so there is no hydration mismatch to manage
+  either. The server renders the tree with no value; the client's first render has `null` too, and
+  the stored value arrives immediately after.
+- **`persist` is a browser store.** IndexedDB with a localStorage fallback. Neither exists on the
+  server, and neither is consulted there.
+
+```tsx
+'use client';
+import { useDemandResource } from '@academix-admin/state-stack';
+```
+
+### Wiring route scoping in Next
+
+State is scoped to the current route by default. Tell it how to find the route once, at the top:
+
+```tsx
+'use client';
+import { initStateStack } from '@academix-admin/state-stack';
+import { useNextPathname, connectNextRouter } from '@academix-admin/state-stack/next';
+
+initStateStack({ storagePrefix: 'myapp', usePathname: useNextPathname });
+connectNextRouter();
+```
+
+### If the server already has the data
+
+Fetch it on the server, pass it in as a prop, and seed the client's copy rather than reading twice:
+
+```tsx
+'use client';
+function Screen({ initial }: { initial: Row[] }) {
+  const rows = useDemandResource<Row[]>(fetchRows, { key: 'rows', scope: 'catalog' });
+  useEffect(() => { if (!rows.loaded) rows.setData(initial); }, [rows.loaded]);
+  …
+}
+```
+
+The read still happens, and the server's copy is what somebody sees until it lands.
+
+### These hooks do not suspend
+
+`useDemandState` and `useDemandResource` never throw a promise. There is no suspense mode, and that
+is a decision rather than a gap.
+
+Suspending means *show nothing until the data is ready* — the component is replaced by a fallback.
+That is the exact behaviour this package exists to prevent. A screen that already has an answer must
+keep showing it while a newer one is fetched; a screen whose refresh failed must keep what it has and
+say so. A suspending read cannot express either, because from the outside both look like "not
+ready".
+
+So branch on what you are given:
+
+```tsx
+const rows = useDemandResource<Row[]>(fetchRows, { key: 'rows', scope: 'catalog' });
+
+if (!rows.loaded) return rows.error ? <Failed say={rows.error} retry={rows.refetch} /> : <Loading />;
+return <List rows={rows.data!} stale={rows.isValidating} />;
+```
+
+`loaded` is "there is something true to show". `isValidating` is "and a newer answer is on its way" —
+which is a badge, not a spinner that replaces the screen.
+
+**Suspense is still the right tool for code**, and composes with this normally: a lazily loaded page
+inside a `<Suspense>` boundary is waiting for a *module*, not for an answer, and nothing on screen is
+being taken away.
+
+```tsx
+const Settings = lazy(() => import('./settings-page'));
+<Suspense fallback={<Skeleton />}><Settings /></Suspense>
+```
+
 ## Storage adapters
 
 `indexedDBAdapter`, `browserStorageAdapter`, `defaultStorageAdapter` (IndexedDB

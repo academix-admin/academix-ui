@@ -1,5 +1,32 @@
 # @academix-admin/state-stack
 
+## 0.5.1
+
+### Patch Changes
+
+- Documentation: what happens on a server, and why nothing here suspends.
+
+  **Client-only, on purpose.** Every file this package ships carries `'use client'`, so nothing runs
+  during a server render. That is not an oversight — what it holds is what ONE DEVICE knows: a value
+  in that browser's IndexedDB, scoped to where that person is, invalidated by what they did. A server
+  has none of those, and inventing them there is how an app renders one person's cache to somebody
+  else. The README now says so, with what follows: client components, no server snapshot and
+  therefore no hydration mismatch to manage, and `persist` being a browser store.
+
+  Also there: wiring route scoping in the Next App Router, and how to seed the client's copy when the
+  server already has the data.
+
+  **These hooks do not suspend, and that is a decision.** Suspending means "show nothing until ready"
+  — the component is replaced by a fallback. That is the exact behaviour this package exists to
+  prevent: a screen with an answer keeps it while a newer one is fetched, and a failed refresh keeps
+  what it has and says so. A suspending read cannot express either, because from outside both look
+  like "not ready". Branch on `loaded` and `isValidating` instead. Suspense remains right for code —
+  a lazily loaded page is waiting for a module, not an answer, and takes nothing off the screen.
+
+  Both documented patterns are RUN, in `test/ssr-seeding.test.tsx`, rather than asserted on a page:
+  the seed shows until the read lands and is then replaced, and rendering the hook throws no promise.
+
+
 ## 0.5.0
 
 ### Minor Changes
