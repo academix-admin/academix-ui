@@ -223,6 +223,22 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     actionLock = true;
     pendingOperations++;
 
+    /*
+     * A NAVIGATION WE ARE MAKING is never one the platform already animated.
+     *
+     * `browserDrivenChange` says "the arrival being reconciled is already on screen — iOS's
+     * edge-swipe or Android's Back drew it — so mount it at rest instead of sliding it in over the
+     * platform's own animation". The reconciler consumes it when it adds an entry, but a popstate
+     * that adds nothing (arriving back on a page still being rendered out) leaves it set, and the
+     * flag is per-stack and long-lived. The next page the app itself pushed then mounted at rest:
+     * no slide, for no reason anybody could reproduce.
+     *
+     * Every programmatic navigation comes through here, and a popstate does not — it writes the
+     * snapshot directly and calls `_notifyExternalStackChange`. So this clears what is stale
+     * without ever clearing what is true.
+     */
+    regEntry.browserDrivenChange = false;
+
     try {
       const result = await fn();
       return result;

@@ -188,10 +188,24 @@ describe('browser-driven navigations are not re-animated', () => {
     });
     await settle(50);
 
-    // Consumed by the reconciler once it has rendered the arrival at rest.
-    const reg = getRegistry().get('s')!;
-    expect(reg.browserDrivenChange, 'the flag should be consumed, not left set').toBeFalsy();
     expect(api.length(), 'the stack still rebuilds').toBe(2);
+
+    /*
+     * The suppression must not OUTLIVE the arrival it was for.
+     *
+     * This used to assert the flag itself here, which is a race: WHICH reconcile pass consumes it
+     * depends on whether the page being left has finished rendering out, so the assertion passed in
+     * a full run and failed when this file ran alone. Worse, it was checking a private field rather
+     * than the thing a shop would notice — so it is checked here on the page instead. A page the
+     * app pushed ITSELF still slides in; one the platform brought does not.
+     */
+    await act(async () => { await api.push('c'); });
+    await settle(50);
+    const pages = document.querySelectorAll('.navstack-page');
+    expect(
+      pages[pages.length - 1].className,
+      'a page we pushed ourselves must still animate',
+    ).toMatch(/nav-(slide|fade)-enter/);
   });
 
   it('a programmatic push is NOT marked browser-driven (it should animate)', async () => {
