@@ -120,7 +120,7 @@ type PublicTypes = [
   StackConfig<unknown>,
   DemandSetOptions,
   DemandResource<unknown>,
-  DemandResourceOptions,
+  DemandResourceOptions<unknown>,
   DemandStatus,
 ];
 

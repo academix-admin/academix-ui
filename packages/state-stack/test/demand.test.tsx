@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import { isEmptyValue, useDemandResource, useDemandState } from '../src/index';
+import { isEmptyValue, StateStack, useDemandResource, useDemandState } from '../src/index';
 import type { StorageAdapter } from '../src/index';
 
 let uid = 0;
@@ -27,94 +27,171 @@ describe('isEmptyValue (empty detection across data shapes)', () => {
 });
 
 describe('useDemandResource', () => {
-  it('idle -> loading -> success with data', async () => {
+  it('starts with nothing, then has an answer', async () => {
     const scope = uniqScope();
     const fetcher = vi.fn(async () => [1, 2, 3]);
     const { result } = renderHook(() =>
-      useDemandResource<number[]>([], fetcher, { key: 'k', scope, persist: false, deps: [] })
+      useDemandResource<number[]>(fetcher, { key: 'k', scope, persist: false, deps: [] })
     );
-    await waitFor(() => expect(result.current.status).toBe('success'));
+
+    // NOTHING, not an empty list. A default rendered before any answer exists is a default a screen
+    // cannot tell from an answer — the whole reason `data` is `T | null` and there is no initial.
+    expect(result.current.data).toBeNull();
+    expect(result.current.loaded).toBe(false);
+
+    await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.data).toEqual([1, 2, 3]);
+    expect(result.current.status).toBe('success');
     expect(result.current.error).toBeNull();
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it('a throwing fetcher with no data yields status "error"', async () => {
+  it('says so in words when a read fails with nothing to show', async () => {
     const scope = uniqScope();
     const fetcher = vi.fn(async () => { throw new Error('boom'); });
     const { result } = renderHook(() =>
-      useDemandResource<number[]>([], fetcher, { key: 'k', scope, persist: false, deps: [] })
+      useDemandResource<number[]>(fetcher, { key: 'k', scope, persist: false, deps: [] })
     );
+
     await waitFor(() => expect(result.current.status).toBe('error'));
-    expect((result.current.error as Error).message).toBe('boom');
-    expect(result.current.data).toEqual([]);
+    expect(result.current.error).toBe('boom');
+    expect((result.current.cause as Error).message).toBe('boom');
+    // Still nothing — a failed read does not invent an empty list.
+    expect(result.current.data).toBeNull();
+    expect(result.current.loaded).toBe(false);
   });
 
-  it('retries the fetcher, then succeeds', async () => {
+  it('falls back to words of our own when the thrown thing says nothing', async () => {
     const scope = uniqScope();
-    const fetcher = vi.fn()
-      .mockRejectedValueOnce(new Error('x'))
-      .mockResolvedValueOnce([9]);
+    const fetcher = vi.fn(async () => { throw {}; });
     const { result } = renderHook(() =>
-      useDemandResource<number[]>([], fetcher, { key: 'k', scope, persist: false, deps: [], retry: 1, retryDelay: 1 })
+      useDemandResource<number[]>(fetcher, {
+        key: 'k', scope, persist: false, deps: [], fallbackMessage: 'That could not be read.',
+      })
     );
-    await waitFor(() => expect(result.current.status).toBe('success'), { timeout: 2000 });
-    expect(result.current.data).toEqual([9]);
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(result.current.error).toBe('That could not be read.'));
   });
 
-  it('refetch re-runs the fetcher and updates data', async () => {
+  it('retries, then succeeds', async () => {
     const scope = uniqScope();
     const fetcher = vi.fn()
-      .mockResolvedValueOnce([1])
-      .mockResolvedValueOnce([1, 2]);
+      .mockRejectedValueOnce(new Error('once'))
+      .mockResolvedValueOnce([4]);
     const { result } = renderHook(() =>
-      useDemandResource<number[]>([], fetcher, { key: 'k', scope, persist: false, deps: [] })
+      useDemandResource<number[]>(fetcher, {
+        key: 'k', scope, persist: false, deps: [], retry: 1, retryDelay: 1,
+      })
+    );
+    await waitFor(() => expect(result.current.data).toEqual([4]));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('refetch really reads again', async () => {
+    // `demand()` returns early on a key it has already served, so a "try again" button built on the
+    // loader alone does nothing. The demanded flag is cleared first.
+    const scope = uniqScope();
+    let n = 0;
+    const fetcher = vi.fn(async () => [++n]);
+    const { result } = renderHook(() =>
+      useDemandResource<number[]>(fetcher, { key: 'k', scope, persist: false, deps: [] })
     );
     await waitFor(() => expect(result.current.data).toEqual([1]));
+
     await act(async () => { await result.current.refetch(); });
-    await waitFor(() => expect(result.current.data).toEqual([1, 2]));
+    await waitFor(() => expect(result.current.data).toEqual([2]));
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps cached data (status success) when a later fetch throws', async () => {
-    const scope = uniqScope();
-    const fetcher = vi.fn()
-      .mockResolvedValueOnce([1, 2, 3])
-      .mockRejectedValueOnce(new Error('later-fail'));
-    const { result } = renderHook(() =>
-      useDemandResource<number[]>([], fetcher, { key: 'k', scope, persist: false, deps: [] })
-    );
-    await waitFor(() => expect(result.current.data).toEqual([1, 2, 3]));
-    await act(async () => { await result.current.refetch(); });
-    // data preserved, still 'success', but error is surfaced
-    expect(result.current.data).toEqual([1, 2, 3]);
-    expect(result.current.status).toBe('success');
-    expect((result.current.error as Error).message).toBe('later-fail');
-  });
-
-  it('keepPreviousData: an empty refetch result does not wipe existing data', async () => {
+  it('keeps what is on screen when a later read throws', async () => {
     const scope = uniqScope();
     const fetcher = vi.fn()
       .mockResolvedValueOnce([5, 6])
-      .mockResolvedValueOnce([]); // e.g. a gate-blocked/failed fetch returning empty
+      .mockRejectedValueOnce(new Error('offline'));
     const { result } = renderHook(() =>
-      useDemandResource<number[]>([], fetcher, { key: 'k', scope, persist: false, deps: [] })
+      useDemandResource<number[]>(fetcher, { key: 'k', scope, persist: false, deps: [] })
     );
     await waitFor(() => expect(result.current.data).toEqual([5, 6]));
+
     await act(async () => { await result.current.refetch(); });
-    expect(result.current.data).toEqual([5, 6]); // kept, not wiped
+    // The last answer stays. Only `error` says the newer one did not arrive.
+    expect(result.current.data).toEqual([5, 6]);
+    expect(result.current.error).toBe('offline');
+    expect(result.current.status).toBe('success');
+    expect(result.current.loaded).toBe(true);
+  });
+
+  it('AN EMPTY ANSWER IS AN ANSWER, and replaces what was there', async () => {
+    /*
+     * This is the reverse of what this hook used to do, on purpose.
+     *
+     * It used to drop an empty refetch result to protect the cache — "keepPreviousData". But the
+     * thing that guard was protecting against is a read that FAILED, and a failed read throws: it
+     * never reaches the commit at all. All the guard could actually catch was a true answer that
+     * happens to be empty, and it threw it away.
+     *
+     * What that means on a shop floor: a customer pays off everything they owe, the screen re-reads,
+     * the answer is an empty history — and the old debts stay on screen. The shop is told it is owed
+     * money that has already been paid.
+     */
+    const scope = uniqScope();
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce([5, 6])
+      .mockResolvedValueOnce([]);
+    const { result } = renderHook(() =>
+      useDemandResource<number[]>(fetcher, { key: 'k', scope, persist: false, deps: [] })
+    );
+    await waitFor(() => expect(result.current.data).toEqual([5, 6]));
+
+    await act(async () => { await result.current.refetch(); });
+    expect(result.current.data).toEqual([]);
+    expect(result.current.loaded).toBe(true);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('holds the read while it is not enabled', async () => {
+    // No account chosen yet, no id yet, nobody signed in yet.
+    const scope = uniqScope();
+    const fetcher = vi.fn(async () => [9]);
+    const { result, rerender } = renderHook(
+      ({ on }: { on: boolean }) =>
+        useDemandResource<number[]>(fetcher, { key: 'k', scope, persist: false, deps: [], enabled: on }),
+      { initialProps: { on: false } },
+    );
+
+    await act(async () => {});
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result.current.data).toBeNull();
+
+    rerender({ on: true });
+    await waitFor(() => expect(result.current.data).toEqual([9]));
+  });
+
+  it('reads again when its scope is invalidated', async () => {
+    // A sale recorded on another till reaches a screen that is already open, without either of them
+    // knowing the other exists.
+    const scope = uniqScope();
+    let n = 0;
+    const fetcher = vi.fn(async () => [++n]);
+    const { result } = renderHook(() =>
+      useDemandResource<number[]>(fetcher, { key: 'k', scope, persist: false, deps: [] })
+    );
+    await waitFor(() => expect(result.current.data).toEqual([1]));
+
+    await act(async () => { StateStack.core.invalidateScope(scope); });
+    await waitFor(() => expect(result.current.data).toEqual([2]));
   });
 
   it('revalidateOnMount:false reuses the cache on remount (loader runs once)', async () => {
     const scope = uniqScope();
     const fetcher = vi.fn(async () => [7]);
     const opts = { key: 'k', scope, persist: false, deps: [], revalidateOnMount: false };
-    const r1 = renderHook(() => useDemandResource<number[]>([], fetcher, opts));
+    const r1 = renderHook(() => useDemandResource<number[]>(fetcher, opts));
     await waitFor(() => expect(r1.result.current.data).toEqual([7]));
     expect(fetcher).toHaveBeenCalledTimes(1);
     r1.unmount();
-    const r2 = renderHook(() => useDemandResource<number[]>([], fetcher, opts));
+
+    const r2 = renderHook(() => useDemandResource<number[]>(fetcher, opts));
     await waitFor(() => expect(r2.result.current.data).toEqual([7]));
     expect(fetcher).toHaveBeenCalledTimes(1); // NOT re-fetched
   });
@@ -123,10 +200,11 @@ describe('useDemandResource', () => {
     const scope = uniqScope();
     const fetcher = vi.fn(async () => [8]);
     const opts = { key: 'k', scope, persist: false, deps: [] };
-    const r1 = renderHook(() => useDemandResource<number[]>([], fetcher, opts));
+    const r1 = renderHook(() => useDemandResource<number[]>(fetcher, opts));
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
     r1.unmount();
-    const r2 = renderHook(() => useDemandResource<number[]>([], fetcher, opts));
+
+    const r2 = renderHook(() => useDemandResource<number[]>(fetcher, opts));
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
     expect(r2.result.current.data).toEqual([8]);
   });

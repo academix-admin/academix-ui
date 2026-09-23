@@ -33,7 +33,7 @@ npm install react react-dom
 | `useToggle(initial)` / `useList(initial)` | Local | No | Ergonomic local state |
 | `useDemandState(initial, opts)` | Route (default) or custom | Optional | Per-page state, persistence, undo/redo, TTL |
 | `createStateStack(blueprints)` | Custom scope | Optional | Redux-like typed stores with methods + middleware |
-| `useDemandResource(loader, opts)` | Route or custom | Optional | The same read, with `status` / `error` handled for you |
+| `useDemandResource(fetcher, opts)` | Route or custom | Optional | A read, with loading, failure, retry and re-reading handled for you |
 | `useInvalidation(scope, fn)` | Custom scope | — | Re-read when something says that scope went stale |
 
 ## `useDemandState` — route-scoped persistent state
@@ -135,6 +135,58 @@ function Cart() {
 `useStack('cart', …)` returns `{ cart, cart$, __meta }` — the state, its method
 object (each method returns a `Promise<void>`), and metadata
 (`undo`, `redo`, `canUndo`, `canRedo`, `clear`, `clearByScope`, `isHydrated`).
+
+## A read — `useDemandResource`
+
+`useDemandState` holds a value and re-runs a loader on demand. What it leaves to every call site is
+the bookkeeping around that: first load or refresh, is there anything to show yet, did it fail, what
+do I tell somebody when it did. That bookkeeping is where the bugs are, so this does it.
+
+```tsx
+const account = useDemandResource<Account>(
+  async ({ signal }) => fetchAccount(id, signal),   // resolves, or THROWS
+  { key: `account:${id}`, scope: 'customer_ledgers', enabled: Boolean(id), retry: 1 },
+);
+
+if (!account.loaded) return account.error ? <Failed say={account.error} retry={account.refetch} /> : <Loading />;
+return <AccountView data={account.data} stale={account.isValidating} />;
+```
+
+| Returns | |
+|---|---|
+| `data` | `T \| null` — the last answer, or `null` if there has never been one |
+| `loaded` | There is an answer to show, possibly an older one while a newer read runs |
+| `loading` / `isValidating` | A read is in flight / in flight with data already on screen |
+| `error` / `cause` | The failure in words, and the thrown thing itself |
+| `refetch()` | Read again, keeping what is shown |
+| `setData(next)` | Write directly — an optimistic update, or a change this device just made |
+
+| Option | Default | |
+|---|---|---|
+| `key` | — | **Required.** Names the value; include every id the read depends on. |
+| `scope` | route | The scope a writer invalidates. This re-reads when anything says that scope changed. |
+| `enabled` | `true` | `false` holds the read — no id yet, nobody signed in yet. |
+| `retry` / `retryDelay` | `0` / `500` | Attempts if the fetcher throws, with a linearly growing delay. |
+| `fallbackMessage` | `'That could not be read.'` | What to say when the thrown thing says nothing useful. |
+| `onSuccess` / `onError` | — | `onError` receives `(message, cause)` — for a screen that opens a dialog. |
+
+Plus everything `useDemandState` takes: `persist`, `ttl`, `deps`, `revalidateOnMount`, `revive`, the
+`clearOn*` family.
+
+### There is no initial value, and that is the point
+
+`data` starts as `null`, not as an empty list or a zero. A default rendered before any answer exists
+is a default a screen cannot tell from an answer: a `0` meaning "we could not ask" looks exactly like
+a `0` meaning "none". That mistake reaches people as stock counts of zero, a customer list reading
+"no customers", and a till claiming something was counted when nothing had been asked. `null` until
+the first real answer is the only shape that cannot lie.
+
+### Resolve or throw, and what each means
+
+- **It threw.** Nothing is committed. Whatever is on screen stays, and `error` says the newer answer
+  did not arrive. A failed refresh never blanks a screen. Retry is `refetch()`.
+- **It resolved.** That is committed — *including an empty answer*. An empty answer is an answer: a
+  customer who has paid everything off has an empty history and must not keep the one from before.
 
 ## Saying something changed — `useInvalidation`
 

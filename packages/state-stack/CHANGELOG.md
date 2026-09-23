@@ -1,5 +1,43 @@
 # @academix-admin/state-stack
 
+## 0.5.0
+
+### Minor Changes
+
+- `useDemandResource` is reshaped to the contract that two dozen real screens proved out. **This
+  changes its signature and its behaviour, and it is safe to do because it had no consumers** —
+  exported since 0.3.0, used by nobody, while the app beside it ran a hand-rolled equivalent.
+
+  **No initial value, and `data` is `T | null`.** It used to require one and return `T`, which reads
+  harmlessly and is not: a screen renders a default before any answer exists, and a default cannot be
+  told apart from an answer. A `0` meaning "we could not ask" looks exactly like a `0` meaning "none"
+  — which reached a real shop as stock counts of zero, a customer list reading "no customers", and a
+  till claiming something was counted when nothing had been asked.
+
+  **An empty answer is an answer.** `keepPreviousData` used to drop an empty refetch result to
+  protect the cache. But the thing it was protecting against is a read that FAILED, and a failed read
+  throws — it never reaches the commit. All the guard could actually catch was a true answer that
+  happens to be empty, and it threw it away: a customer pays off everything they owe, the screen
+  re-reads, the answer is an empty history, and the old debts stay on screen. The option is gone and
+  a resolved value is always committed.
+
+  **`error` is a string you can show somebody**, with `cause` carrying the thrown thing for a caller
+  that wants to decide rather than display. `fallbackMessage` covers a throw that says nothing
+  useful.
+
+  **`enabled: false` holds the read** — no id yet, no account chosen, nobody signed in — and
+  `refetch()` clears the demanded flag before reading, so a "try again" button actually tries again
+  rather than returning the served value.
+
+  Kept from before: `AbortSignal` cancellation, one read at a time, and retry with a linearly growing
+  delay.
+
+  Not added: an explicit invalidation subscription. `useDemandState` already re-runs its loader when
+  its scope is invalidated, and wiring `useInvalidation` in here changed nothing measurable — the
+  test passed with the line deleted and one invalidation caused one read either way. Re-reading on
+  invalidation is this hook's contract and is tested; it is simply not this hook's job to deliver it.
+
+
 ## 0.4.0
 
 ### Minor Changes
