@@ -1,4 +1,4 @@
-import type { NavStackAPI } from '../types';
+import type { GroupRef, NavStackAPI } from '../types';
 // React contexts for navigation + group coordination.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import type { ComponentType, ReactNode, ReactElement } from 'react';
@@ -12,6 +12,16 @@ export type GroupNavigationContextType = {
 
 export const GroupNavigationContext = createContext<GroupNavigationContextType | null>(null);
 export const GroupStackIdContext = createContext<string | null>(null);
+
+/**
+ * The live group, read once, as a value the pure rules can take.
+ *
+ * Read AT THE CALL SITE rather than inside the rule: same synchronous frame, same answer, and the
+ * rule stops needing anything it cannot be handed in a test.
+ */
+export function toGroupRef(groupContext: GroupNavigationContextType | null): GroupRef {
+  return groupContext ? { id: groupContext.getGroupId() } : null;
+}
 
 export function useGroupNavigation() {
   const context = useContext(GroupNavigationContext);

@@ -1,7 +1,7 @@
 import type { GuardFn, MiddlewareFn, NavActionResult, NavParams, NavStackAPI, NavigationMap, ObjectOptions, RedirectFn, RedirectTarget, StackChangeListener, StackEntry } from '../types';
 import { DEFAULT_MAX_STACK_SIZE } from '../constants';
 import { EnhancedLifecycleManager, PageMemoryManager, TransitionManager } from './managers';
-import { _currentPageUidByStack } from './contexts';
+import { _currentPageUidByStack, toGroupRef } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
 import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, stepBackOneAdoptedEntry, reconcileLedgerToDepth, resetPushDepth, getPushDepth, recordEntryDepth, takeEntriesAboveDepth } from './persistence';
@@ -317,7 +317,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
 
         const newEntry: StackEntry = {
           // The place it is about to take, so a rebuild of this stack names it the same way.
-          uid: generateCompositeUid(id, groupContext, groupStackId, key, p, regEntry.stack.length),
+          uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, key, p, regEntry.stack.length),
           key,
           params: p,
           metadata
@@ -364,7 +364,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
         const at = Math.max(0, regEntry.stack.length - 1);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, at), key, params: p, metadata };
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, key, p, at), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
 
         // Before replace lifecycle
@@ -580,7 +580,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     async pushAndPopUntil(rawKey, predicate, params, metadata) {
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, regEntry.stack.length), key, params: p, metadata };
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, key, p, regEntry.stack.length), key, params: p, metadata };
 
         const previousStack = regEntry.stack.slice();
         const lastTop = regEntry.stack[regEntry.stack.length - 1];
@@ -644,7 +644,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
         const at = Math.max(0, regEntry.stack.length - 1);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, at), key, params: p, metadata };
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, key, p, at), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
 
         // Before replace lifecycle
@@ -688,7 +688,7 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
       return withLock<boolean | NavActionResult>(async () => {
         const { key, params: p } = parseRawKey(rawKey, params);
         const at = Math.max(0, regEntry.stack.length - 1);
-        const newEntry: StackEntry = { uid: generateCompositeUid(id, groupContext, groupStackId, key, p, at), key, params: p, metadata };
+        const newEntry: StackEntry = { uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, key, p, at), key, params: p, metadata };
         const previousEntry = regEntry.stack[regEntry.stack.length - 1];
 
         // Before replace lifecycle (go is essentially a replace)

@@ -1,7 +1,7 @@
 import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI, NavigationMap, OverlayRender, RedirectFn, RenderRecord, StackEntry, SwipeBackOptions, TransitionRenderer, TransitionState } from './types';
 import type { GroupNavigationContextType } from './core/contexts';
 import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, useIsomorphicLayoutEffect } from './constants';
-import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack } from './core/contexts';
+import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack, toGroupRef } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry, type RegistryEntry } from './core/registry';
 import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, noteAdoptableEntries, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
@@ -1113,7 +1113,7 @@ export default function NavigationStack(props: {
                 try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
               })() : t.code);
               return {
-                uid: generateCompositeUid(id, groupContext, groupStackId, resolvedKey, t.params, i),
+                uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i),
                 key: resolvedKey,
                 params: t.params
               } as StackEntry;
@@ -1154,7 +1154,7 @@ export default function NavigationStack(props: {
       return;
     }
     regEntry.stack = [{
-      uid: generateCompositeUid(id, groupContext, groupStackId, key, params, 0),
+      uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, key, params, 0),
       key,
       params
     }];
@@ -1296,7 +1296,7 @@ export default function NavigationStack(props: {
           try { return decodeURIComponent(t.code.slice(2)); } catch { return t.code.slice(2); }
         })() : t.code);
         return {
-          uid: generateCompositeUid(id, groupContext, groupStackId, resolvedKey, t.params, i),
+          uid: generateCompositeUid(id, toGroupRef(groupContext), groupStackId, resolvedKey, t.params, i),
           key: resolvedKey,
           params: t.params,
         };

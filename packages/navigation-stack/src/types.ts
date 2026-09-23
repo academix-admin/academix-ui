@@ -162,6 +162,19 @@ export type MissingRouteConfig = {
  *   const nav = useNav<RouteKeys<typeof routes>>();
  *   nav.push('detial');   // Error: not assignable to 'home' | 'detail'
  */
+/**
+ * WHAT THE UID RULE NEEDS TO KNOW ABOUT A GROUP — which is a value, not a live object.
+ *
+ * The rule is "an entry is named by its group, its stack, which page it is, and its position". It
+ * used to be handed the whole `GroupNavigationContextType` — four callbacks, one of which it called
+ * — so a rule that needs a string depended on a thing only a mounted React tree can produce.
+ *
+ * `null` and `{ id: null }` are DIFFERENT and both happen: no group at all, versus a group that has
+ * not named itself yet. The first is `root:root`; the second is not. Collapsing them to a nullable
+ * string would quietly rename every entry in an unnamed group.
+ */
+export type GroupRef = { id: string | null } | null;
+
 export type RouteKeys<T extends NavigationMap> = Extract<keyof T, string>;
 
 /**

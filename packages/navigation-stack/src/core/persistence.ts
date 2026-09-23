@@ -1,8 +1,9 @@
-import type { NavParams, NavigationMap, ParsedStack, StackEntry } from '../types';
+import type { GroupRef, NavParams, NavigationMap, ParsedStack, StackEntry } from '../types';
 import { setInFragment } from '@academix-admin/overlay-route';
 import { writeHistoryEntry } from './history-writer';
 import { NAV_STACK_VERSION, STACK_SEPARATOR, STORAGE_TTL_MS } from '../constants';
 import type { GroupNavigationContextType } from './contexts';
+import { toGroupRef } from './contexts';
 // Stack persistence, URL/param encoding and uid helpers.
 import type { ComponentType, ReactNode, ReactElement } from 'react';
 
@@ -49,14 +50,14 @@ export function generateStableUid(key: string, params?: NavParams): string {
  */
 export function generateCompositeUid(
   stackId: string,
-  groupContext: GroupNavigationContextType | null,
+  group: GroupRef,
   groupStackId: string | null,
   key: string,
   params?: NavParams,
   at?: number
 ): string {
-  const groupStackKey = groupContext
-    ? `${groupContext.getGroupId()}:${groupStackId}`
+  const groupStackKey = group
+    ? `${group.id}:${groupStackId}`
     : 'root:root';
   const pageUid = generateStableUid(key, params);
   const own = typeof at === 'number' ? `at${at}` : 'at?';
@@ -67,7 +68,7 @@ export function generateCompositeUid(
 export function ensureCompositeUid(
   uid: string | undefined,
   stackId: string,
-  groupContext: GroupNavigationContextType | null,
+  group: GroupRef,
   groupStackId: string | null,
   key: string,
   params?: NavParams,
@@ -81,7 +82,7 @@ export function ensureCompositeUid(
   if (uid && uid.split(':').length >= 4) {
     return uid;
   }
-  return generateCompositeUid(stackId, groupContext, groupStackId, key, params, at);
+  return generateCompositeUid(stackId, group, groupStackId, key, params, at);
 }
 
 export function parseRawKey(raw: string, params?: NavParams) {
@@ -104,6 +105,7 @@ export function storageKeyFor(id: string) {
 }
 
 export function readPersistedStack(id: string, groupContext: GroupNavigationContextType | null, groupStackId: string | null): StackEntry[] | null {
+  const group = toGroupRef(groupContext);
   try {
     if (typeof window === "undefined") return null;
     const raw = sessionStorage.getItem(storageKeyFor(id));
@@ -116,7 +118,7 @@ export function readPersistedStack(id: string, groupContext: GroupNavigationCont
       return null;
     }
     return parsed.entries.map((p, i) => {
-      const compositeUid = ensureCompositeUid(p.uid, id, groupContext, groupStackId, p.key, p.params, i);
+      const compositeUid = ensureCompositeUid(p.uid, id, group, groupStackId, p.key, p.params, i);
       return { uid: compositeUid, key: p.key, params: p.params, metadata: p.metadata };
     });
   } catch (e) {
