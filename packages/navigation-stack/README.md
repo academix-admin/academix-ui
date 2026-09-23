@@ -19,6 +19,10 @@ native mobile navigator, in the browser.
 > 📖 **[More real-world examples →](./EXAMPLES.md)** — lifecycle, DI, nested
 > stacks, request/response and more, adapted from a production app.
 
+> **Working on the library itself?** [EXTRACTION.md](https://github.com/academix-admin/academix-ui/blob/main/packages/navigation-stack/EXTRACTION.md) records the staged plan for
+> separating the navigation MODEL from the browser plumbing — what is done, what is deliberately not
+> started, and the one product decision that makes the rest worth doing.
+
 ## Install
 
 ```bash
