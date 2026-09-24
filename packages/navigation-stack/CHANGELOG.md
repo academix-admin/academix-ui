@@ -1,5 +1,47 @@
 # @academix-admin/navigation-stack
 
+## 1.6.1
+
+### Patch Changes
+
+- `useNavTitle` re-applies the name when the stack moves
+
+  Setting it once should be enough: the name lives on the entry, and a pop restores it from there
+  without the page re-rendering. But an entry can be REBUILT — from the URL, from a persisted stack,
+  on a tab switch — and a rebuild that loses its metadata leaves the page underneath with no name.
+  That was invisible while pages named themselves from a render body, because popping re-rendered the
+  page and it named itself again. An effect does not re-run on a pop, so the loss showed up as a title
+  stuck on the page that had just been closed.
+
+  The hook now also depends on the current location, so it re-applies on every stack change.
+  `nav.title()` is idempotent, so the runs that change nothing cost a comparison.
+
+## 1.6.0
+
+### Minor Changes
+
+- `nav.title()` is now genuinely safe to call while rendering, and adds `useNavTitle()`
+
+  `title()` has always been documented as callable from a render body — that is the whole point of it,
+  a page naming itself as it draws. It was not: telling the stack's subscribers runs `setState` on
+  `NavigationStack`, and React refuses that during another component's render. Any app with the call
+  in a shared page shell had this on the console of every screen:
+
+      Cannot update a component (`NavigationStack`) while rendering a different component
+      (`PageScaffold`).
+
+  Nothing looked broken, because React warns and then applies the update anyway — which is exactly why
+  it survived. The name is now written synchronously, as before, and the notification is deferred by
+  one microtask: after the render, before paint. Several renames in one pass collapse into a single
+  notification.
+
+  Also new: `useNavTitle(title)`, which applies a name in an effect and does nothing outside a stack,
+  so a shell used on both public pages and stack pages can call it without branching on
+  `useNavOptional()`.
+
+  No behaviour change for callers. A test that reproduces the warning ships with it — the previous
+  tests asserted `document.title` and passed the entire time the bug existed.
+
 ## 1.5.0
 
 ### Minor Changes
@@ -8,9 +50,12 @@
 
   ```ts
   const { top } = resolvePath(pathname, shopRoutes);
-  if (top?.key === 'product_page') {
+  if (top?.key === "product_page") {
     const product = await fetchProduct(top.params.id);
-    return { title: `${product.name} — ₦${product.price}`, openGraph: { images: [product.photo] } };
+    return {
+      title: `${product.name} — ₦${product.price}`,
+      openGraph: { images: [product.photo] },
+    };
   }
   ```
 
@@ -32,7 +77,6 @@
   `buildPath`, `parsePath`, `splitBase`, `slugify` and `soleParamNamesOf` are exported alongside it,
   for anything that wants the codec directly.
 
-
 ## 1.4.0
 
 ### Minor Changes
@@ -40,7 +84,13 @@
 - A stack can be rendered on a server.
 
   ```tsx
-  <NavigationStack id="shop" navLink={shopRoutes} entry="shop_page" paths location={pathname} />
+  <NavigationStack
+    id="shop"
+    navLink={shopRoutes}
+    entry="shop_page"
+    paths
+    location={pathname}
+  />
   ```
 
   ```
@@ -72,7 +122,6 @@
   Next: `stackRoute()` for the catch-all, with `load` and `meta` colocated on the page components
   already in `navLink` — so a route needs no list of paths and no second place to keep in step.
 
-
 ## 1.3.0
 
 ### Minor Changes
@@ -80,7 +129,13 @@
 - `paths` — the stack in the address bar, as something a person can read.
 
   ```tsx
-  <NavigationStack id="shop" navLink={shopRoutes} entry="shop_page" paths syncHistory />
+  <NavigationStack
+    id="shop"
+    navLink={shopRoutes}
+    entry="shop_page"
+    paths
+    syncHistory
+  />
   ```
 
   ```
@@ -117,7 +172,6 @@
   Opt-in per stack, so every app that has not asked for it is untouched — asserted by a test that
   pushes with `paths` off and finds the URL unchanged.
 
-
 ## 1.2.0
 
 ### Minor Changes
@@ -133,12 +187,11 @@
 
   ```tsx
   const nav = useNavOptional();
-  nav?.title(title);   // names the page where there is one, does nothing where there is not
+  nav?.title(title); // names the page where there is one, does nothing where there is not
   ```
 
   `useNav()` is now the same binding with the throw kept, so both give a page-bound `title` and
   neither can drift from the other.
-
 
 ## 1.1.0
 
@@ -148,7 +201,7 @@
 
   ```tsx
   const nav = useNav();
-  nav.title(product ? `${product.name} · Stock` : 'Stock');
+  nav.title(product ? `${product.name} · Stock` : "Stock");
   ```
 
   The browser's title follows the top of the stack. Called through `useNav()` it names the page that
@@ -170,7 +223,6 @@
   entries from key and params alone and dropped their metadata. The page does not re-render on the
   way back (that is the point of keeping tabs mounted), so nothing ever put it back. Both rebuild
   paths now carry the metadata of any entry whose uid is unchanged.
-
 
 ## 1.0.0
 
@@ -208,7 +260,6 @@
   has no behavioural tests to upgrade against. It goes at 2.0. New code should import it from
   `/devtools`.
 
-
 ## 0.21.0
 
 ### Minor Changes
@@ -233,7 +284,6 @@
   lifecycle. Every example in it is run by `test/testing-helper.test.tsx` rather than asserted on a
   documentation page — which is how the `params` prop managed to be wrong until 0.20.1.
 
-
 ## 0.20.1
 
 ### Patch Changes
@@ -256,7 +306,6 @@
   SEO, file-based routing, server components — and what React Router, TanStack Router and React
   Navigation each do better.
 
-
 ## 0.20.0
 
 ### Minor Changes
@@ -274,14 +323,13 @@
   into the main entry whether an app ever opens it or not. It now has its own entry point:
 
   ```ts
-  import { NavigationDevtools } from '@academix-admin/navigation-stack/devtools';
+  import { NavigationDevtools } from "@academix-admin/navigation-stack/devtools";
   ```
 
   The barrel still exports it, so nothing breaks — which also means the main bundle has NOT shrunk
   yet. Measured, so the plan rests on a number rather than a guess: removing the barrel re-export
   takes the main entry from **42.1 KB to 38.9 KB gzipped**. That removal is a breaking change and
   belongs at 1.0. Consumers should move to the subpath now so it costs nothing then.
-
 
 ## 0.19.2
 

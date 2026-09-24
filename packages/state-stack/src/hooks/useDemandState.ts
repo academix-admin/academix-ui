@@ -86,9 +86,18 @@ export function useDemandState<T>(
 ] {
   const pathname = useResolvedPathname();
 
-  if (!pathname && _globalConfig.debug) {
+  /*
+   * ONLY WHEN THE PATHNAME IS ACTUALLY BEING USED TO SCOPE SOMETHING.
+   *
+   * This warned whenever the pathname was unknown, including for every caller that had passed an
+   * explicit `scope` — for whom the pathname is irrelevant and the warning's claim ("risking key
+   * collisions") is simply false. An app that scopes everything properly, which is the thing this
+   * warning exists to encourage, got the most of it: four copies on every public page. A warning
+   * that fires when nothing is wrong is a warning people learn to scroll past.
+   */
+  if (!pathname && !opts?.scope && _globalConfig.debug) {
     console.warn(
-      '[StateStack] useDemandState: resolved pathname is null. ' +
+      '[StateStack] useDemandState: resolved pathname is null and no `scope` was given. ' +
         "State will be scoped to 'route:unknown', risking key collisions. " +
         'Provide an explicit `scope` via opts, or configure `usePathname` via ' +
         'initStateStack (or the @academix-admin/state-stack/next adapter) to avoid this.'

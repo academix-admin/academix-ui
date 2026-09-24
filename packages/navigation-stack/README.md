@@ -280,9 +280,12 @@ function ProductPage({ id }: { id?: string }) {
 - **Only the stack on screen writes the document title.** In a group every tab stays mounted, so
   five stacks setting one string would leave the browser saying "Rewards" while somebody looks at
   Stock.
-- **Safe to call on every render.** Setting the same name twice does nothing — no re-render, no
-  history write. It takes no lock and runs no guards, because naming a page is not a navigation and
-  must not be refused or queued behind one.
+- **Safe to call on every render, and from inside one.** Setting the same name twice does nothing —
+  no re-render, no history write. It takes no lock and runs no guards, because naming a page is not
+  a navigation and must not be refused or queued behind one. The name is written immediately and the
+  stack's subscribers are told one microtask later, which is what keeps a call made during a render
+  from updating another component mid-render — React refuses that outright, and a shared page shell
+  calling `title()` put the warning on every screen of an app. (Fixed in 1.6.0.)
 - **A stack whose top has no name** leaves the title as it was when that stack mounted, rather than
   keeping the name of a page that has since been popped.
 
@@ -292,6 +295,19 @@ URL, a stack rebuilt from storage.
 ```tsx
 nav.title('Receipt 9AU8B');            // names this page
 nav.title('Stock', someOtherEntryUid); // names another entry, if you have its uid
+```
+
+### `useNavTitle(title)`
+
+The same thing as a hook, for a page or a shared shell that would rather declare its name than call
+a method while rendering. It applies the name in an effect, and does nothing at all outside a stack
+— so a shell used both on a public page and inside a stack can call it without branching:
+
+```tsx
+function PageScaffold({ title, children }) {
+  useNavTitle(title);   // no `useNavOptional()`, no `?.`, nothing to get wrong
+  …
+}
 ```
 
 Why this matters beyond the tab: the browser's back/forward list, shared links, and analytics all

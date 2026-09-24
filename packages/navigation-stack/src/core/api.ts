@@ -752,6 +752,18 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
      * through the action lock would mean a title set during a push silently losing to the push.
      * It replaces the entry rather than mutating it, so the uid is untouched — the renderer keys on
      * uid, so nothing remounts and no transition is triggered by a page getting a name.
+     *
+     * SAFE TO CALL WHILE RENDERING, which is where it is called from — a page names itself as it
+     * draws, and a shell like `PageScaffold` does it for every page at once. That is the API this
+     * shipped with and it was not honest: telling the listeners runs `setState` on the stack, and
+     * doing that during another component's render is something React refuses outright
+     * ("Cannot update a component while rendering a different component"). It appeared in the
+     * console of every screen in two apps.
+     *
+     * So the name is written NOW and the telling is deferred by one microtask. The write is what a
+     * synchronous read needs; the notification is what React needs to happen after the render. A
+     * microtask lands before paint, so nothing is visibly late, and several renames in one pass
+     * collapse into one notification.
      */
     title(next: string, uid?: string) {
       const stack = regEntry.stack;
@@ -764,35 +776,42 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
 
       stack[i] = { ...current, metadata: { ...(current.metadata ?? {}), title: next } };
 
-      const copy = stack.slice();
-      regEntry.listeners.forEach((l: StackChangeListener) => {
-        try {
-          l(copy);
-        } catch (e) {
-          console.error('[NavStack] title listener failed:', e);
+      if (regEntry.titleFlushQueued) return;
+      regEntry.titleFlushQueued = true;
+
+      queueMicrotask(() => {
+        regEntry.titleFlushQueued = false;
+
+        const copy = regEntry.stack.slice();
+        regEntry.listeners.forEach((l: StackChangeListener) => {
+          try {
+            l(copy);
+          } catch (e) {
+            console.error('[NavStack] title listener failed:', e);
+          }
+        });
+
+        /*
+         * THE WORDS IN THE URL ARRIVE HERE, NOT AT THE PUSH.
+         *
+         * A push writes the address immediately; the page names itself while it renders, which is
+         * afterwards. So a path written at push time can only say `/product/2d6ab81c-…` — the very
+         * shape the slug exists to avoid. Naming the page refreshes the address in place, and the
+         * link becomes `/product/gulder-60cl~2d6ab81c-…`.
+         *
+         * A REPLACE, never a push: naming a page is not a navigation and must not leave an entry in
+         * the back button. Only when this stack owns the pathname — otherwise there is nothing in
+         * the URL a title could change.
+         */
+        if (syncHistory && regEntry.pathMode) {
+          try {
+            updateNavQueryParamForStack(id, buildUrlPath([{ navLink, stack: regEntry.stack }]), groupContext, groupStackId);
+          } catch {
+            // An address that keeps the old words is worse than one that has none, and neither is
+            // worth failing a render over.
+          }
         }
       });
-
-      /*
-       * THE WORDS IN THE URL ARRIVE HERE, NOT AT THE PUSH.
-       *
-       * A push writes the address immediately; the page names itself while it renders, which is
-       * afterwards. So a path written at push time can only say `/product/2d6ab81c-…` — the very
-       * shape the slug exists to avoid. Naming the page refreshes the address in place, and the
-       * link becomes `/product/gulder-60cl~2d6ab81c-…`.
-       *
-       * A REPLACE, never a push: naming a page is not a navigation and must not leave an entry in
-       * the back button. Only when this stack owns the pathname — otherwise there is nothing in the
-       * URL a title could change.
-       */
-      if (syncHistory && regEntry.pathMode) {
-        try {
-          updateNavQueryParamForStack(id, buildUrlPath([{ navLink, stack: regEntry.stack }]), groupContext, groupStackId);
-        } catch {
-          // An address that keeps the old words is worse than one that has none, and neither is
-          // worth failing a render over.
-        }
-      }
     },
 
     async replaceParam(newParams: NavParams, merge: boolean = true) {

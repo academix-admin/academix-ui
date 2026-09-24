@@ -153,8 +153,28 @@ export function useDemandResource<T>(
   useEffect(() => {
     mountedRef.current = true;
     return () => {
+      /*
+       * UNMOUNTING DOES NOT CANCEL THE READ, and this is the important line in the file.
+       *
+       * It used to. The answer then arrived to a component that had gone, was dropped on the floor,
+       * and the read was never made again — because `demand()` is SHARED BY KEY: while the first
+       * read is in the air the key has a pending operation, and a second mount asking for the same
+       * key is handed that same promise rather than starting its own. So the sequence
+       *
+       *     mount → read starts → unmount (abort) → mount → handed the aborted read → it resolves
+       *     into nothing
+       *
+       * left the screen on `{ loaded: false, loading: true, error: null, data: null }` for ever.
+       * No error, because nothing failed. React's Strict Mode performs exactly that sequence on
+       * every component, so in development EVERY screen built on this hook hung; in production it
+       * hung for anyone who left a screen and came straight back.
+       *
+       * A read belongs to the KEY, not to whichever component happened to ask first. So the answer
+       * is allowed to land in the store, where the next mount will find it. Only a read SUPERSEDED
+       * by a newer read of the same key is abandoned, and that one is aborted at the top of
+       * `runFetch` where the newer read starts.
+       */
       mountedRef.current = false;
-      abortRef.current?.abort();
     };
   }, []);
 
@@ -174,34 +194,42 @@ export function useDemandResource<T>(
       for (;;) {
         try {
           const got = await fetcherRef.current({ signal: ctrl.signal, get: () => dataRef.current });
-          if (ctrl.signal.aborted || !mountedRef.current) return;
+          // Superseded by a newer read of this key: that one's answer is the current one.
+          if (ctrl.signal.aborted) return;
           /*
            * `override`, because a resolved value is an ANSWER even when it is empty. The guard that
            * protects a cache from being wiped is for reads that FAIL, and those throw — they never
            * arrive here.
+           *
+           * COMMITTED EVEN IF THE COMPONENT HAS GONE — see the note on the unmount above. The value
+           * goes to the store, which outlives the component and is where the next mount reads from.
            */
           commit(got);
+          cbRef.current.onSuccess?.(got);
+          // Only the on-screen flags need a living component. Setting state on one that has
+          // unmounted is a no-op in React 18, but saying so is clearer than relying on it.
+          if (!mountedRef.current) return;
           setError(null);
           setCause(null);
           setLoading(false);
           setIsValidating(false);
-          cbRef.current.onSuccess?.(got);
           return;
         } catch (e) {
-          if (ctrl.signal.aborted || !mountedRef.current) return;
+          if (ctrl.signal.aborted) return;
           if (attempt < retry) {
             attempt += 1;
             await delay(retryDelay * attempt);
-            if (ctrl.signal.aborted || !mountedRef.current) return;
+            if (ctrl.signal.aborted) return;
             continue;
           }
           // KEPT. Only the error is set; the last answer stays where it is.
           const said = messageOf(e, fallbackMessage);
+          cbRef.current.onError?.(said, e);
+          if (!mountedRef.current) return;
           setError(said);
           setCause(e);
           setLoading(false);
           setIsValidating(false);
-          cbRef.current.onError?.(said, e);
           return;
         }
       }

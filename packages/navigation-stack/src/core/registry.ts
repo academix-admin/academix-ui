@@ -57,6 +57,16 @@ export type RegistryEntry = {
    * cleared by the render reconciler.
    */
   browserDrivenChange?: boolean;
+  /**
+   * A rename has landed on the stack and the listeners have not been told yet.
+   *
+   * `title()` is called from render bodies — that is the whole point of it, a page naming itself as
+   * it draws — and telling a listener there is a `setState` on the stack during somebody else's
+   * render, which React refuses. So the name is written synchronously and the telling is deferred
+   * by one microtask, which is after the render and before paint. This flag collapses several
+   * renames in one render pass into a single notification.
+   */
+  titleFlushQueued?: boolean;
 };
 
 export const _clientRegistry =

@@ -1,5 +1,42 @@
 # @academix-admin/state-stack
 
+## 0.6.2
+
+### Patch Changes
+
+- The route-scope warning no longer fires at callers that named a scope
+
+  `useDemandState` warned "resolved pathname is null … risking key collisions" whenever the pathname
+  was unknown — including for every caller that had passed an explicit `scope`, for whom the pathname
+  is not used for anything and the claim is false. An app that scopes all of its state properly, which
+  is exactly what the warning exists to encourage, saw the most of it: four copies on every page.
+
+  It now fires only when there is no `scope` and the pathname really is what the state would be scoped
+  by. The message says so.
+
+## 0.6.1
+
+### Patch Changes
+
+- A read interrupted by an unmount no longer leaves the screen on a spinner for ever
+
+  `useDemandResource` aborted its read when the component unmounted. Because `demand()` is shared by
+  key, a second mount asking the same question was handed the FIRST mount's still-pending operation
+  rather than starting its own — and that one then resolved into nothing, because it had been aborted.
+  The screen was left on:
+
+      { loaded: false, loading: true, error: null, data: null }
+
+  for ever. No error, because nothing failed. React's Strict Mode performs exactly that sequence —
+  mount, unmount, mount — on every component, so in development every screen built on this hook could
+  hang; in production it hung for anyone who left a screen and came straight back. Found on a page
+  stuck on "Loading orders" whose RPC had plainly answered `200 []`.
+
+  A read belongs to the KEY, not to whichever component happened to ask first. Unmounting no longer
+  cancels it: the answer lands in the store, where the next mount finds it. Only a read SUPERSEDED by
+  a newer read of the same key is abandoned. The on-screen flags are still only set on a living
+  component.
+
 ## 0.6.0
 
 ### Minor Changes
@@ -43,7 +80,6 @@
     read that throws starts again, and the page never renders at all. One attempt per key per
     request; after that the page renders without it, exactly as a browser would.
 
-
 ## 0.5.1
 
 ### Patch Changes
@@ -69,7 +105,6 @@
 
   Both documented patterns are RUN, in `test/ssr-seeding.test.tsx`, rather than asserted on a page:
   the seed shows until the read lands and is then replaced, and rendering the hook throws no promise.
-
 
 ## 0.5.0
 
@@ -107,7 +142,6 @@
   its scope is invalidated, and wiring `useInvalidation` in here changed nothing measurable — the
   test passed with the line deleted and one invalidation caused one read either way. Re-reading on
   invalidation is this hook's contract and is tested; it is simply not this hook's job to deliver it.
-
 
 ## 0.4.0
 

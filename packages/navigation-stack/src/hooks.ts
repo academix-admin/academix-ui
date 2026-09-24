@@ -106,6 +106,43 @@ export function useNavOptional<K extends string = string>(): NavStackAPI<K> | nu
   return useNavBinding() as unknown as NavStackAPI<K> | null;
 }
 
+/**
+ * NAME THE PAGE, the way a hook should.
+ *
+ * `nav.title(x)` in a render body works — it is written to be called from one — but it is still a
+ * write performed while rendering, and a reader has to know it is safe. This says it plainly: a
+ * declaration that this page is called that, applied after the render like any other effect.
+ *
+ * Does nothing outside a stack, so a shell used on both a public page and a page inside a stack can
+ * call it unconditionally rather than branching on `useNavOptional()`.
+ *
+ * ```tsx
+ * useNavTitle(title);
+ * ```
+ */
+export function useNavTitle(title: string | null | undefined): void {
+  const nav = useNavOptional();
+  /*
+   * RE-APPLIED WHENEVER THE STACK MOVES, not only when the name changes.
+   *
+   * Setting it once is enough in principle: the name lives on the entry and a pop restores it from
+   * there without the page re-rendering. In practice an entry can be REBUILT — from the URL, from
+   * a persisted stack, on a tab switch — and a rebuild that drops its metadata leaves the page
+   * underneath with no name at all. With the name set from a render body that was invisible,
+   * because popping re-rendered the page and it named itself again; an effect does not re-run on a
+   * pop, so the loss became visible as a title stuck on the page that had just been closed.
+   *
+   * Depending on the location makes this run again on every stack change. `title()` is idempotent,
+   * so the runs that change nothing cost a comparison.
+   */
+  const location = useLocation();
+  // The path changes on every push and pop, so it is the cheapest honest "the stack moved" signal.
+  const at = location?.path ?? null;
+  useEffect(() => {
+    if (title) nav?.title(title);
+  }, [nav, title, at]);
+}
+
 /** Shared by both: the api, bound to the page that is asking. */
 function useNavBinding(): NavStackAPI | null {
   const context = useContext(NavContext);
