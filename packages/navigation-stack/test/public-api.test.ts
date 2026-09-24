@@ -112,6 +112,12 @@ const PUBLIC_EXPORTS = [
   'devtoolsEnabled',
   'NavigationDevtools',
   'isBrowser',
+  'resolvePath',
+  'buildPath',
+  'parsePath',
+  'splitBase',
+  'slugify',
+  'soleParamNamesOf',
   'safeWindow',
 ].sort();
 
@@ -171,6 +177,8 @@ import type {
   NavSnapshot,
   NavEntrySnapshot,
   NavigationDevtoolsProps,
+  ParsedPathEntry,
+  SoleParamNames,
 } from '../src/index';
 
 /** Naming each one is the assertion: a type that is gone cannot be named. */
@@ -208,13 +216,15 @@ type PublicTypes = [
   NavSnapshot,
   NavEntrySnapshot,
   NavigationDevtoolsProps,
+  ParsedPathEntry,
+  SoleParamNames,
 ];
 
 /*
  * How many there are, so that DELETING a name from the list above is a failure too. Without this
  * the tuple only catches renames: a removed line takes its own assertion with it.
  */
-const PUBLIC_TYPE_COUNT = 33;
+const PUBLIC_TYPE_COUNT = 35;
 
 describe('the public API', () => {
   it('exports exactly what is written down here', () => {

@@ -142,5 +142,17 @@ export type { NavigationDevtoolsProps } from './devtools-ui';
 import { installNavDevtools as _installNavDevtools } from './devtools';
 _installNavDevtools();
 
+
+/*
+ * THE URL CODEC, on its own.
+ *
+ * Pure functions with no React, no DOM and no history in them, so they run wherever a URL needs to
+ * be understood: a server component deciding a page's title, a route handler, a script building a
+ * sitemap. A server has to know what an address means before anything renders, and what it does with
+ * that — the copy, the image, the data — belongs to the app, not here.
+ */
+export { resolvePath, buildPath, parsePath, splitBase, slugify, soleParamNamesOf } from './model/paths';
+export type { ParsedPathEntry, SoleParamNames } from './model/paths';
+
 // Opt-in compile-time route-key safety: useNav<RouteKeys<typeof routes>>()
 export type { RouteKeys } from './types';

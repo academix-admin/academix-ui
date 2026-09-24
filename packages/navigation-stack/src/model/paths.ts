@@ -231,3 +231,48 @@ export function pathnameFor(base: string, stack: StackEntry[], navLink: Navigati
   const joined = `${base}${own === '/' ? '' : own}`;
   return joined || '/';
 }
+
+/**
+ * WHAT A URL MEANS, WITHOUT RENDERING ANYTHING.
+ *
+ * The whole codec in one answer: which pages this address names, which of them is on top, and where
+ * the stack is mounted. Pure — no React, no DOM, no history — so it runs in a server component, in a
+ * route handler, in a script that builds a sitemap, or in a test.
+ *
+ * It exists because a server needs to know what a URL means BEFORE any of this renders. Deciding a
+ * page's title and its og:image is the app's business — it owns the copy and the data — and all it
+ * needs from this library is a straight answer about what the address refers to:
+ *
+ * ```ts
+ * const { top } = resolvePath(pathname, shopRoutes);
+ * if (top?.key === 'product_page') {
+ *   const product = await fetchProduct(top.params.id);
+ *   return { title: `${product.name} — ₦${product.price}` };
+ * }
+ * ```
+ *
+ * No coupling in either direction: this hands back plain data, and what happens next is the app's.
+ */
+export function resolvePath(
+  location: string,
+  navLink: NavigationMap,
+  soleParamNames: SoleParamNames = {},
+): {
+  /** Where this stack is mounted — everything before its own first route. */
+  base: string;
+  /** Every page the address names, deepest last. */
+  entries: ParsedPathEntry[];
+  /** The page on top, which is the one a title and an og:image describe. */
+  top: ParsedPathEntry | null;
+  /** Segments this stack did not recognise — a nested stack's, if there is one. */
+  rest: string[];
+} {
+  const { base, rest } = splitBase(location, navLink);
+  const parsed = parsePath(rest, navLink, soleParamNames);
+  return {
+    base,
+    entries: parsed.entries,
+    top: parsed.entries[parsed.entries.length - 1] ?? null,
+    rest: parsed.rest,
+  };
+}

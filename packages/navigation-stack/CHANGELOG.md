@@ -1,5 +1,38 @@
 # @academix-admin/navigation-stack
 
+## 1.5.0
+
+### Minor Changes
+
+- `resolvePath()` — what a URL means, answered without rendering anything.
+
+  ```ts
+  const { top } = resolvePath(pathname, shopRoutes);
+  if (top?.key === 'product_page') {
+    const product = await fetchProduct(top.params.id);
+    return { title: `${product.name} — ₦${product.price}`, openGraph: { images: [product.photo] } };
+  }
+  ```
+
+  Pure: no React, no DOM, no history. It runs in a server component deciding a page's title, in a
+  route handler, in a script that builds a sitemap, or in a test.
+
+  **This is what lets the two libraries stay strangers.** A server-rendered, indexable page needs
+  routing AND data, and the obvious way to deliver it is a package that knows both — which would have
+  made navigation-stack depend on state-stack and broken the rule that each is independent. It is not
+  needed. state-stack already exposes `createRequestStore`, `StateStackProvider` and
+  `dehydrate`/`hydrate`; navigation-stack exposes the stack and now this. An app joins them in its own
+  route file, in about twenty lines, and neither library learns the other exists.
+
+  It is also the answer for metadata without a second render or a title sink: the app resolves the
+  address, then uses its own data layer and its own words. Deciding what a page is called is the
+  app's business — it owns the copy — and all it needed was a straight answer about what the address
+  refers to.
+
+  `buildPath`, `parsePath`, `splitBase`, `slugify` and `soleParamNamesOf` are exported alongside it,
+  for anything that wants the codec directly.
+
+
 ## 1.4.0
 
 ### Minor Changes
