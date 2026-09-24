@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSyncExternalStore } from 'react';
 import { StateStackCore } from '../core/StateStackCore';
+import { useCore } from '../core/store-context';
 import { _globalConfig, useResolvedPathname, getDefaultStorage } from '../config';
 import type { StorageAdapter } from '../types';
 
@@ -109,7 +110,7 @@ export function useDemandState<T>(
   const reviveRef = useRef(opts?.revive);
   reviveRef.current = opts?.revive;
 
-  const core = StateStackCore.instance;
+  const core = useCore();
   const initialRef = useRef(initial);
 
   const [isHydrated, setIsHydrated] = useState(() =>
@@ -130,7 +131,19 @@ export function useDemandState<T>(
       () => core.getStateSync(scope, key, initialRef.current),
       [scope, key]
     ),
-    useCallback(() => initialRef.current, [])
+    /*
+     * THE SERVER SNAPSHOT, which React uses for every render that has no browser — and for the
+     * client's first render, when it hydrates.
+     *
+     * This returned the initial value and ignored the store, so a page rendered on a server showed
+     * its empty state however much the store knew: the read completed, the value was written, React
+     * rendered again, and the hook still said null. The store is the answer in both places; the
+     * difference between the two snapshots is only how changes are noticed afterwards.
+     *
+     * It also has to agree with the client's first render, or hydration mismatches — and it does,
+     * because the client's store is hydrated from the page before anything renders.
+     */
+    useCallback(() => core.getStateSync(scope, key, initialRef.current), [scope, key])
   );
 
   useEffect(() => {
@@ -185,7 +198,11 @@ export function useDemandState<T>(
   useEffect(() => {
     if (firstDepsRunRef.current) {
       firstDepsRunRef.current = false;
-      if (revalidateOnMount) core.resetDemand(scope, key);
+      /*
+       * A value that came with the page is already the newest there is — re-reading it on mount is
+       * the double fetch the handoff exists to avoid, and the flash that comes with it.
+       */
+      if (revalidateOnMount && !core.takeFromPage(scope, key)) core.resetDemand(scope, key);
       return;
     }
     core.resetDemand(scope, key);

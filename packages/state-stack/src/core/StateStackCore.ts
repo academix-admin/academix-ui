@@ -11,6 +11,123 @@ export class StateStackCore {
   private static _instance: StateStackCore | null = null;
   private static _listenerAttached = false;
 
+  /**
+   * A store belonging to ONE render, sharing nothing with the singleton.
+   *
+   * For a server, where a module lives as long as the process and is shared by every request. It
+   * deliberately attaches no storage listener and no broadcast channel: those are about one device
+   * with several tabs, and a server has neither.
+   */
+  /**
+   * EVERYTHING THIS STORE KNOWS, AS PLAIN DATA.
+   *
+   * The handoff a server-rendered page needs: what was fetched while rendering, carried in the HTML,
+   * so the browser starts with the answers already in hand rather than fetching them a second time
+   * and flashing empty on the way. This is the same thing every framework calls dehydrating a cache.
+   *
+   * Keys are marked as demanded on the way back in, so a hook that finds its value present does not
+   * immediately ask for it again — which would undo the point.
+   */
+  dehydrate(): Record<string, Record<string, unknown>> {
+    const out: Record<string, Record<string, unknown>> = {};
+    for (const [scope, keys] of this.stacks) {
+      for (const [key, value] of keys) {
+        if (value === undefined) continue;
+        (out[scope] ??= {})[key] = value;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * READ IT NOW, ON A SERVER, BY SUSPENDING UNTIL IT IS HERE.
+   *
+   * On a client these hooks never suspend, deliberately: suspending means showing nothing until the
+   * data is ready, and a screen that already has an answer must keep it. THAT REASON DOES NOT EXIST
+   * ON A SERVER. There is no screen, nothing to blank, and nobody watching — so the honest thing is
+   * to wait for the answer and render the page with it, which is the difference between a crawler
+   * receiving a product and receiving an empty frame.
+   *
+   * One read per key per request: React renders a suspended tree again once the promise settles, and
+   * without this the second attempt would start a second fetch and suspend again, for ever.
+   */
+  serverRead<T>(scope: string, key: string, load: () => Promise<T>): T {
+    /*
+     * `null` counts as absent here, not as an answer. A resource starts at null meaning "nothing has
+     * been read yet", and that initial value reaches the store — so treating it as present would
+     * have the server decide it already knew, and render the empty state it was trying to avoid.
+     */
+    const existing = this.getStateSync<T | undefined>(scope, key, undefined);
+    if (existing !== undefined && existing !== null) return existing as T;
+
+    const ik = this.subKey(scope, key);
+    /*
+     * Tried once and it failed. React renders a suspended tree again when its promise settles, so
+     * suspending a second time on a read that just threw is an infinite loop — and the page never
+     * renders at all. Once is the whole allowance: the page renders without it, exactly as a browser
+     * would when a read fails.
+     */
+    if (this.serverFailed.has(ik)) return undefined as unknown as T;
+
+    let pending = this.serverReads.get(ik);
+    if (!pending) {
+      pending = load()
+        .then((value) => {
+          const sm = this.stacks.get(scope) ?? new Map<string, unknown>();
+          sm.set(key, value);
+          this.stacks.set(scope, sm);
+          this.markDemanded(scope, key);
+          this.markLoaded(scope, key);
+          this.serverReads.delete(ik);
+        })
+        .catch(() => {
+          /*
+           * A read that failed leaves the page to render without it, exactly as it would in a
+           * browser. A crawler getting a page missing one price is better than a 500, and a person
+           * whose network blinked still gets their screen.
+           */
+          this.serverFailed.add(ik);
+          this.serverReads.delete(ik);
+        });
+      this.serverReads.set(ik, pending);
+    }
+    throw pending;
+  }
+
+  /**
+   * Was this value carried in with the page, and not yet used?
+   *
+   * Asked once, by the first hook to mount on it — which then stops asking, so only that first
+   * render treats it as already fresh.
+   */
+  takeFromPage(scope: string, key: string): boolean {
+    const ik = this.subKey(scope, key);
+    if (!this.fromPage.has(ik)) return false;
+    this.fromPage.delete(ik);
+    return true;
+  }
+
+  /** Put a dehydrated snapshot back. Anything already here wins: it is newer than the page. */
+  hydrate(snapshot: Record<string, Record<string, unknown>> | null | undefined): void {
+    if (!snapshot) return;
+    for (const scope of Object.keys(snapshot)) {
+      for (const key of Object.keys(snapshot[scope] ?? {})) {
+        if (this.getStateSync(scope, key, undefined) !== undefined) continue;
+        const sm = this.stacks.get(scope) ?? new Map<string, unknown>();
+        sm.set(key, snapshot[scope][key]);
+        this.stacks.set(scope, sm);
+        this.markDemanded(scope, key);
+        this.markLoaded(scope, key);
+        this.markHydrated(scope, key);
+        this.fromPage.add(this.subKey(scope, key));
+      }
+    }
+  }
+
+  static createIsolated(): StateStackCore {
+    return new StateStackCore();
+  }
+
   static get instance(): StateStackCore {
     if (!this._instance) {
       this._instance = new StateStackCore();
@@ -49,6 +166,19 @@ export class StateStackCore {
    * is per KEY and only reaches what is holding that key's value.
    */
   private invalidationListeners = new Map<string, Set<() => void>>();
+  /**
+   * Keys that arrived with the page, not from this browser.
+   *
+   * A mounting hook normally re-reads, which is right: the value it has is from last time. A value
+   * the SERVER just fetched is not from last time — it is the freshest thing there is, and reading
+   * it again immediately means the shop pays for two reads and the screen flashes between them.
+   * Consumed on first use, so the second mount revalidates like any other.
+   */
+  private fromPage = new Set<string>();
+  /** Reads in flight during ONE server render, so a suspended re-render does not start another. */
+  private serverReads = new Map<string, Promise<void>>();
+  /** Reads that failed during THIS render, so a retry does not start them again, for ever. */
+  private serverFailed = new Set<string>();
   private autoClearScopes = new Set<string>();
   private storageEventListenerAttached = false;
   private broadcastChannel?: BroadcastChannel;

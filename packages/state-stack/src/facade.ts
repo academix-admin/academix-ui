@@ -68,6 +68,10 @@ export const StateStack = {
   clearByCondition: coreInstance.clearByCondition.bind(coreInstance),
   clearMatching: coreInstance.clearMatching.bind(coreInstance),
 
+  /** The handoff for a server-rendered page: carry what was fetched, start with it already known. */
+  dehydrate: coreInstance.dehydrate.bind(coreInstance),
+  hydrate: coreInstance.hydrate.bind(coreInstance),
+
   adapters: {
     indexedDB: indexedDBAdapter,
     localStorage: browserStorageAdapter,

@@ -1,5 +1,49 @@
 # @academix-admin/state-stack
 
+## 0.6.0
+
+### Minor Changes
+
+- The same page renders on a server, with its data in it.
+
+  ```
+  renderToPipeableStream(<ProductPage />)
+
+    before   <h1>Loading</h1><p>₦</p>
+    after    <h1>Gulder 60cl</h1><p>₦12500</p>
+  ```
+
+  The page is unchanged. It calls `useDemandResource` exactly as it does in a browser — no `seed`, no
+  `typeof window`, no server-only copy.
+
+  **A store per request.** `StateStackProvider` + `createRequestStore()`, because the core is a
+  module-level singleton and on a server a module is shared by every request the process handles. A
+  store written while rendering one shopper's page would be readable while rendering the next
+  shopper's, and what leaks is their cart and their prices. This has been harmless only because
+  nothing WROTE during a server render; server rendering with data ends that, so the isolation goes
+  in first and is tested first. An app that provides nothing behaves exactly as before.
+
+  **`dehydrate()` / `hydrate()`** — what the server fetched, carried in the page, so the browser
+  starts with the answers rather than reading them again and flashing empty between. A hydrated key
+  is treated as already fresh for its first mount, or `revalidateOnMount` would immediately undo the
+  point.
+
+  **Suspend on a server, never on a client.** 0.5.1 said these hooks never suspend, because
+  suspending blanks a screen that already has an answer. That reason does not exist on a server:
+  there is no screen, nothing to blank and nobody watching, so waiting for the answer is the honest
+  thing. The rule is now stated precisely rather than absolutely.
+
+  Three things the tests found, each a real defect:
+
+  - `useSyncExternalStore`'s SERVER snapshot returned the initial value and ignored the store, so a
+    page rendered on a server showed its empty state however much the store knew.
+  - A resource's `null` — "nothing read yet" — was being taken for an answer, so the server decided
+    it already knew and rendered the empty state it was trying to avoid.
+  - A failed read suspended for ever: React retries a suspended tree when its promise settles, so a
+    read that throws starts again, and the page never renders at all. One attempt per key per
+    request; after that the page renders without it, exactly as a browser would.
+
+
 ## 0.5.1
 
 ### Patch Changes

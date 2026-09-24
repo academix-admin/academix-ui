@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { StateStackCore } from '../core/StateStackCore';
+import { useCore } from '../core/store-context';
 
 /**
  * RE-READ WHENEVER THIS SCOPE IS INVALIDATED.
@@ -29,11 +29,12 @@ export function useInvalidation(scope: string | null, onChanged: () => void): vo
    * Held in a ref so an inline closure does not resubscribe on every render: the subscription
    * follows the SCOPE, not the identity of the function.
    */
+  const core = useCore();
   const ref = useRef(onChanged);
   ref.current = onChanged;
 
   useEffect(() => {
     if (!scope) return;
-    return StateStackCore.instance.onInvalidate(scope, () => ref.current());
-  }, [scope]);
+    return core.onInvalidate(scope, () => ref.current());
+  }, [core, scope]);
 }

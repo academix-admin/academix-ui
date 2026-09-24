@@ -35,7 +35,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDemandState } from './useDemandState';
-import { StateStackCore } from '../core/StateStackCore';
+import { useCore } from '../core/store-context';
 import type { StorageAdapter } from '../types';
 
 export type DemandStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -134,6 +134,7 @@ export function useDemandResource<T>(
     revalidateOnMount: demandOpts.revalidateOnMount ?? true,
   });
 
+  const core = useCore();
   const [loading, setLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -228,9 +229,9 @@ export function useDemandResource<T>(
    */
   const refetch = useCallback(async () => {
     if (!enabled) return;
-    if (scope) StateStackCore.instance.resetDemand(scope, key);
+    if (scope) core.resetDemand(scope, key);
     await runFetch((v) => setDataRaw(v as T | null));
-  }, [enabled, scope, key, runFetch, setDataRaw]);
+  }, [core, enabled, scope, key, runFetch, setDataRaw]);
 
   /*
    * Something elsewhere said this scope changed, and this re-reads — but not from here.
@@ -247,6 +248,20 @@ export function useDemandResource<T>(
     },
     [setDataRaw],
   );
+
+  /*
+   * ON A SERVER, WAIT FOR THE ANSWER INSTEAD OF RENDERING WITHOUT IT.
+   *
+   * Everything above is the client's behaviour and is unchanged. Here there is no screen to blank
+   * and nobody watching a spinner: rendering an empty frame would simply ship an empty frame, which
+   * is what a crawler would index and what a link preview would show.
+   *
+   * After the read settles React renders this component again, `data` is present, and the rest of
+   * the hook proceeds exactly as it does in a browser.
+   */
+  if (typeof window === 'undefined' && enabled && data === null && scope) {
+    core.serverRead(scope, key, () => fetcherRef.current({ signal: new AbortController().signal, get: () => dataRef.current }));
+  }
 
   const loaded = data !== null;
   const status: DemandStatus = loading && !loaded ? 'loading' : error && !loaded ? 'error' : loaded ? 'success' : 'idle';

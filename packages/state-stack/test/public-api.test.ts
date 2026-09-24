@@ -39,6 +39,8 @@ const PUBLIC_EXPORTS = [
   'useDemandState',
   'useDemandResource',
   'useInvalidation',
+  'StateStackProvider',
+  'createRequestStore',
   'isEmptyValue',
 
   // Local state that is not fetched
@@ -74,6 +76,8 @@ const FACADE_KEYS = [
   'clearByPrefix',
   'clearByCondition',
   'clearMatching',
+  'dehydrate',
+  'hydrate',
   'adapters',
 ].sort();
 
@@ -91,6 +95,8 @@ const CORE_METHODS = [
   'isDemanded', 'markDemanded', 'clearDemanded', 'resetDemand',
   'isHydrated', 'markHydrated', 'subscribeToHydration',
   'runDemandOperation', 'debug', 'dispose',
+  // createIsolated is a STATIC — it makes a store, so it is not on one.
+  'dehydrate', 'hydrate', 'takeFromPage', 'serverRead',
   'onInvalidate',
 ];
 

@@ -27,4 +27,6 @@ export { useInvalidation } from './hooks/useInvalidation';
 export { useAtom } from './hooks/useAtom';
 export { useComputed, useToggle, useList } from './hooks/local-hooks';
 
+export { StateStackProvider, createRequestStore } from './core/store-context';
+
 export { StateStack } from './facade';
