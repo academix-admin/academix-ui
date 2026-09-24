@@ -2,7 +2,7 @@ import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI,
 import { parsePath, soleParamNamesOf, splitBase } from './model/paths';
 import type { GroupNavigationContextType } from './core/contexts';
 import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, useIsomorphicLayoutEffect } from './constants';
-import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack, toGroupRef } from './core/contexts';
+import { NavContext, CurrentEntryContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack, toGroupRef } from './core/contexts';
 import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry, type RegistryEntry } from './core/registry';
 import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, noteAdoptableEntries, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
@@ -904,6 +904,19 @@ export default function NavigationStack(props: {
    */
   paths?: boolean;
   /**
+   * The URL to build the first stack from, for a render that has no `window` — a server.
+   *
+   * A stack normally finds its own location. On a server there is nothing to find it in, so the
+   * request supplies it and the stack renders the page that URL names into HTML. That is the whole
+   * difference between a crawler receiving a product and a crawler receiving an empty shell.
+   *
+   * The client uses the same value on its first render, which is what makes hydration match: same
+   * location, same pure codec, same uids — and a uid is `group:stack:page:position`, a function of
+   * its inputs, so both sides compute the same React keys. Storage is reconciled afterwards, in an
+   * effect, never during the first render.
+   */
+  location?: string;
+  /**
    * Whether a `push` creates a real browser history entry (and pop/popUntil/popToRoot give those
    * entries back), so the browser's back/forward — and therefore the platform's own back gesture —
    * step through the stack. Defaults to `true`.
@@ -955,6 +968,7 @@ export default function NavigationStack(props: {
     autoDispose = true,
     syncHistory = false,
     paths = false,
+    location,
     historyPush = true,
     lazyComponents,
     missingRouteConfig,
@@ -1004,8 +1018,43 @@ export default function NavigationStack(props: {
   const groupContext = useGroupNavigation();
   const groupStackId = useGroupStackId();
 
-  const [isInitialized, setInitialized] = useState(false);
-  const [stackSnapshot, setStackSnapshot] = useState<StackEntry[]>([]);
+  /*
+   * THE FIRST STACK, WORKED OUT WHILE RENDERING — not in an effect.
+   *
+   * This is the single reason a stack could not be server-rendered: it started empty and was filled
+   * by an effect, and a server runs no effects. So the server rendered nothing, every public page
+   * was a shell, and no crawler ever saw a product.
+   *
+   * Only when the stack keeps its pages in the path AND there is a location to read. Everything
+   * else behaves exactly as before, including every app that has not asked for this.
+   */
+  const initialFromLocation = useMemo(() => {
+    if (!paths) return null;
+    const href = location ?? (typeof window !== 'undefined' ? window.location.pathname : null);
+    if (!href) return null;
+
+    const { base, rest } = splitBase(href, mergedNavLink);
+    const { entries } = parsePath(rest, mergedNavLink);
+    if (entries.length === 0) return null;
+
+    return {
+      base,
+      stack: entries.map((e, i) => ({
+        uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, e.key, e.params, i),
+        key: e.key,
+        params: e.params,
+      })) as StackEntry[],
+    };
+  }, [paths, location, mergedNavLink, groupContext, groupStackId]);
+
+  /*
+   * A stack that already has its pages — because the URL said what they were — is initialised.
+   *
+   * This flag gates the whole render, and it used to be set only by the init effect. On a server
+   * there are no effects, so it stayed false and the component returned null however much it knew.
+   */
+  const [isInitialized, setInitialized] = useState(() => Boolean(initialFromLocation));
+  const [stackSnapshot, setStackSnapshot] = useState<StackEntry[]>(() => initialFromLocation?.stack ?? []);
   const swipeContainerRef = useRef<HTMLDivElement>(null);
   const currentPathRef = useRef(
     typeof window !== 'undefined' ? window.location.pathname : ''
@@ -1644,6 +1693,7 @@ export default function NavigationStack(props: {
 
     const renderer = renderTransition ?? builtInRenderer;
     return (
+      <CurrentEntryContext.Provider value={currentEntry}>
       <CurrentPageContext.Provider value={currentEntry.uid}>
         {renderer({
           children: (
@@ -1656,6 +1706,7 @@ export default function NavigationStack(props: {
           isTop
         })}
       </CurrentPageContext.Provider>
+      </CurrentEntryContext.Provider>
     );
   }
 

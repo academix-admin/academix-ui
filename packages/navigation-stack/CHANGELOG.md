@@ -1,5 +1,45 @@
 # @academix-admin/navigation-stack
 
+## 1.4.0
+
+### Minor Changes
+
+- A stack can be rendered on a server.
+
+  ```tsx
+  <NavigationStack id="shop" navLink={shopRoutes} entry="shop_page" paths location={pathname} />
+  ```
+
+  ```
+  renderToString(…'/s/7R8U2A/shop/product/gulder-60cl~2d6ab81c-…')
+
+    before   ''
+    after    <h1>Gulder 60cl</h1><p>₦12,500 · in stock</p>
+  ```
+
+  **One line was the reason this was impossible.** The stack started empty and was filled by an
+  effect, and a server runs no effects — so it rendered nothing, every public page was a shell, and
+  no crawler ever saw a product. The first stack is now worked out while rendering, from the location
+  the request supplies.
+
+  It only works because of two decisions made for other reasons. `parsePath` is pure — no DOM, no
+  React — and a uid is `group:stack:page:position`, a function of its inputs rather than a counter.
+  Both sides compute the same uids from the same URL, so the client's markup matches the server's and
+  hydration holds. A counter would have made this impossible.
+
+  **`useLocation()` works on a server too**, which it did not. It asks the api, and the api reads the
+  live stack out of the registry — and on a server the registry is a fresh Map for every call, so
+  that one request's pages can never leak into another's HTML. There was no stack to ask, so a page
+  rendered on a server saw no params. It now falls back to the entry it is being rendered as, which
+  is in the tree either way. A page must not have to know where it is running.
+
+  Nothing changes for a stack that has not asked for `paths`: no location, no render-time stack, same
+  behaviour. A test asserts a server render without it still produces no page.
+
+  Next: `stackRoute()` for the catch-all, with `load` and `meta` colocated on the page components
+  already in `navLink` — so a route needs no list of paths and no second place to keep in step.
+
+
 ## 1.3.0
 
 ### Minor Changes

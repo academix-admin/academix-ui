@@ -1,4 +1,4 @@
-import type { GroupRef, NavStackAPI } from '../types';
+import type { GroupRef, NavStackAPI, StackEntry } from '../types';
 // React contexts for navigation + group coordination.
 import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
 import type { ComponentType, ReactNode, ReactElement } from 'react';
@@ -35,6 +35,17 @@ export function useGroupStackId() {
 
 export const NavContext = createContext<NavStackAPI | null>(null);
 export const CurrentPageContext = createContext<string | null>(null);
+
+/**
+ * The ENTRY a page is being rendered as — its key and its params.
+ *
+ * `useLocation` normally asks the api, which reads the live stack out of the registry. On a server
+ * the registry is a fresh Map for every call (deliberately: a shared one would leak one request's
+ * stack into another's HTML), so there is no stack to ask and a page rendered on a server would see
+ * no params at all. Reading them from the entry being rendered works on both sides, which is the
+ * only acceptable answer — a page must not need to know where it is running.
+ */
+export const CurrentEntryContext = createContext<StackEntry | null>(null);
 export const _currentPageUidByStack = new Map<string, string>();
 
 /**

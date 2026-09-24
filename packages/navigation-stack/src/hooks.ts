@@ -1,4 +1,4 @@
-import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext } from './core/contexts';
+import { NavContext, CurrentEntryContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext } from './core/contexts';
 import type { NavStackAPI, NavigationMap, NavLocation, OverlayRender, OverlayOptions } from './types';
 import { globalObjectRegistry } from './di/object-registry';
 // Public hooks + tagged-navigation helpers.
@@ -33,6 +33,12 @@ export function safeWindow<T>(
  */
 export function useLocation(): NavLocation | null {
   const nav = useContext(NavContext);
+  /*
+   * The entry this page is being rendered as. On a server the api has no stack to report — the
+   * registry is a fresh Map per call, so that one request's pages cannot leak into another's HTML —
+   * and a page would see no params at all. The entry is right here in the tree either way.
+   */
+  const entry = useContext(CurrentEntryContext);
   const [location, setLocation] = useState<NavLocation | null>(() =>
     nav ? nav.getLocation() : null
   );
@@ -43,6 +49,12 @@ export function useLocation(): NavLocation | null {
     return nav.subscribe(() => setLocation(nav.getLocation()));
   }, [nav]);
 
+  /*
+   * Whichever knows. The api wins once it is live, because it follows a `replaceParam`; the entry is
+   * what there is during a server render and on the very first client render before effects.
+   */
+  if (location && location.key) return location;
+  if (entry) return { path: '', key: entry.key, params: entry.params, href: '' };
   return location;
 }
 
