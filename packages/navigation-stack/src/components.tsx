@@ -1,4 +1,5 @@
 import type { BuiltinTransition, LazyComponent, MissingRouteConfig, NavStackAPI, NavigationMap, OverlayRender, RedirectFn, RenderRecord, StackEntry, SwipeBackOptions, TransitionRenderer, TransitionState } from './types';
+import { parsePath, soleParamNamesOf, splitBase } from './model/paths';
 import type { GroupNavigationContextType } from './core/contexts';
 import { DEFAULT_MAX_STACK_SIZE, DEFAULT_TRANSITION_DURATION, GROUP_STYLE_CSS, useIsomorphicLayoutEffect } from './constants';
 import { NavContext, CurrentPageContext, GroupNavigationContext, GroupStackIdContext, PageBodyContext, findParentNavContext, useGroupNavigation, useGroupStackId, _currentPageUidByStack, toGroupRef } from './core/contexts';
@@ -889,6 +890,20 @@ export default function NavigationStack(props: {
   autoDispose?: boolean;
   syncHistory?: boolean;
   /**
+   * Write this stack into the PATH instead of `?nav=`, and read it back from there.
+   *
+   *     /s/7R8U2A/product/gulder-60cl~2d6ab81c-0e67-4bcd-ae22-38160f0f1965
+   *
+   * A URL a person can read, send and be sent; one a crawler can index; one a link preview can
+   * describe. Nothing else to configure — `navLink` already names every route, which makes it both
+   * the vocabulary for writing a path and the dictionary for reading one, and where the stack is
+   * mounted is worked out from the URL rather than declared.
+   *
+   * Off by default, and per stack. In a group only the stack ON SCREEN writes the pathname; the
+   * others keep their `?nav=` token, which is what restores them when a tab is returned to.
+   */
+  paths?: boolean;
+  /**
    * Whether a `push` creates a real browser history entry (and pop/popUntil/popToRoot give those
    * entries back), so the browser's back/forward — and therefore the platform's own back gesture —
    * step through the stack. Defaults to `true`.
@@ -939,6 +954,7 @@ export default function NavigationStack(props: {
     maxStackSize,
     autoDispose = true,
     syncHistory = false,
+    paths = false,
     historyPush = true,
     lazyComponents,
     missingRouteConfig,
@@ -1094,6 +1110,35 @@ export default function NavigationStack(props: {
     }
 
 
+    /*
+     * PATHS FIRST, when this stack keeps its pages there.
+     *
+     * The base — everything before this stack's own first route — is worked out from the URL and
+     * remembered, so every later write lands after it. A path with nothing of ours in it still
+     * establishes the base: that is a stack sitting at its entry route, which is the common case.
+     */
+    if (paths && typeof window !== 'undefined') {
+      const { base, rest } = splitBase(window.location.pathname, mergedNavLink);
+      regEntry.pathMode = { base };
+
+      const { entries } = parsePath(rest, mergedNavLink, soleParamNamesOf(regEntry.stack));
+      if (entries.length > 0) {
+        regEntry.stack = entries.map((e, i) => ({
+          uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, e.key, e.params, i),
+          key: e.key,
+          params: e.params,
+        }));
+        setStackSnapshot([...regEntry.stack]);
+        noteAdoptableEntries(
+          id,
+          regEntry.stack.length,
+          readAxState(window.history.state)?.axPushed === true,
+        );
+        setInitialized(true);
+        return;
+      }
+    }
+
     // First priority: Parse from URL
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
@@ -1181,7 +1226,7 @@ export default function NavigationStack(props: {
     setStackSnapshot([...regEntry.stack]);
     if (persist) writePersistedStack(id, regEntry.stack);
     setInitialized(true);
-  }, [id, entry, mergedNavLink, groupContext, groupStackId]);
+  }, [id, entry, mergedNavLink, groupContext, groupStackId, paths]);
 
 
   /*

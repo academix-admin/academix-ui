@@ -772,6 +772,27 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
           console.error('[NavStack] title listener failed:', e);
         }
       });
+
+      /*
+       * THE WORDS IN THE URL ARRIVE HERE, NOT AT THE PUSH.
+       *
+       * A push writes the address immediately; the page names itself while it renders, which is
+       * afterwards. So a path written at push time can only say `/product/2d6ab81c-…` — the very
+       * shape the slug exists to avoid. Naming the page refreshes the address in place, and the
+       * link becomes `/product/gulder-60cl~2d6ab81c-…`.
+       *
+       * A REPLACE, never a push: naming a page is not a navigation and must not leave an entry in
+       * the back button. Only when this stack owns the pathname — otherwise there is nothing in the
+       * URL a title could change.
+       */
+      if (syncHistory && regEntry.pathMode) {
+        try {
+          updateNavQueryParamForStack(id, buildUrlPath([{ navLink, stack: regEntry.stack }]), groupContext, groupStackId);
+        } catch {
+          // An address that keeps the old words is worse than one that has none, and neither is
+          // worth failing a render over.
+        }
+      }
     },
 
     async replaceParam(newParams: NavParams, merge: boolean = true) {

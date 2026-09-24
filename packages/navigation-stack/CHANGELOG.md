@@ -1,5 +1,50 @@
 # @academix-admin/navigation-stack
 
+## 1.3.0
+
+### Minor Changes
+
+- `paths` — the stack in the address bar, as something a person can read.
+
+  ```tsx
+  <NavigationStack id="shop" navLink={shopRoutes} entry="shop_page" paths syncHistory />
+  ```
+
+  ```
+  before   /s/7R8U2A?nav=shop:1.a1.b1.p:JTdCJTIyaWQlMjIlM0ElMjIyZDZh…
+  after    /s/7R8U2A/shop/product/gulder-60cl~2d6ab81c-0e67-4bcd-ae22-38160f0f1965
+  ```
+
+  `?nav=` is a codec only this library reads. That is right for the tabs nobody is looking at, and
+  wrong for the one they are: a person cannot read it, a crawler cannot index it, and a link pasted
+  into a message tells the person receiving it nothing.
+
+  **One prop, and nothing else to declare.** `navLink` already names every route, which makes it both
+  the vocabulary for writing a path and the dictionary for reading one — so there is no second map of
+  paths to keep in step, and none to drift. Where the stack is mounted is worked out from the URL
+  (everything before its own first route) rather than passed in, for the same reason.
+
+  **Words first, identity after**, because ids are as often uuids as numbers: `/product/2d6ab81c-…`
+  opens with thirty-six characters of noise, and a search result truncates the tail — losing exactly
+  the part worth reading. The words come from `nav.title()`, so a page that names itself for the
+  browser tab names itself in the URL at the same time, and they cannot disagree. They are
+  decoration: identity lives in the params, so translating or correcting a title changes what the URL
+  says and never what it opens.
+
+  **Naming a page refreshes the address.** A push writes the URL immediately, while the page names
+  itself as it renders — afterwards. Left alone, a path could only ever say `/product/2d6ab81c-…`,
+  which is the shape the slug exists to avoid. So `title()` rewrites the address in place, as a
+  replace and never a push: naming a page is not a navigation and must not leave an entry in the back
+  button.
+
+  **In a group, only the stack on screen writes the pathname.** There is one address bar and five
+  mounted tabs; the others keep their `?nav=` token, which is also what restores them when a tab is
+  returned to.
+
+  Opt-in per stack, so every app that has not asked for it is untouched — asserted by a test that
+  pushes with `paths` off and finds the URL unchanged.
+
+
 ## 1.2.0
 
 ### Minor Changes

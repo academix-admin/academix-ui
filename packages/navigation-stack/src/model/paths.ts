@@ -201,3 +201,33 @@ export function parsePath(
 
   return { entries, rest: segments.slice(i) };
 }
+
+/**
+ * WHERE THIS STACK'S PART OF THE PATH BEGINS.
+ *
+ * A stack mounted at `/s/7R8U2A` writes its pages after that prefix, and nothing tells it what the
+ * prefix is — so it works it out: everything before the first segment that names one of its own
+ * routes belongs to whoever mounted it.
+ *
+ * Derived rather than configured, because a base path passed as a prop is one more thing to keep in
+ * step with the route that renders the stack, and it would be wrong the first time either moved.
+ */
+export function splitBase(path: string, navLink: NavigationMap): { base: string; rest: string } {
+  const slugs = new Set(routeSlugs(navLink).values());
+  const segments = String(path).split('/').filter(Boolean);
+
+  let i = 0;
+  while (i < segments.length && !slugs.has(segments[i])) i += 1;
+
+  return {
+    base: i === 0 ? '' : `/${segments.slice(0, i).join('/')}`,
+    rest: i >= segments.length ? '' : `/${segments.slice(i).join('/')}`,
+  };
+}
+
+/** The pathname this stack should be showing, given where it is mounted. */
+export function pathnameFor(base: string, stack: StackEntry[], navLink: NavigationMap): string {
+  const own = buildPath(stack, navLink);
+  const joined = `${base}${own === '/' ? '' : own}`;
+  return joined || '/';
+}

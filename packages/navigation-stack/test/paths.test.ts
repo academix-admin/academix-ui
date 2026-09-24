@@ -7,6 +7,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  splitBase,
+  pathnameFor,
   slugify,
   routeSlugs,
   encodeParams,
@@ -183,5 +185,36 @@ describe('reading it back', () => {
     // A cold load has no previous stack to learn from, and a lone param is almost always an id.
     const { entries } = parsePath('/product/7', navLink);
     expect(entries[0].params).toEqual({ id: '7' });
+  });
+});
+
+describe('where a stack is mounted', () => {
+  it('works out its own base from the first route it recognises', () => {
+    // A stack mounted at /s/7R8U2A writes its pages after that, and nothing tells it the prefix.
+    expect(splitBase('/s/7R8U2A/product/7', navLink)).toEqual({ base: '/s/7R8U2A', rest: '/product/7' });
+    expect(splitBase('/main/stock/product/7', navLink)).toEqual({ base: '/main', rest: '/stock/product/7' });
+  });
+
+  it('a path that is all ours has no base', () => {
+    expect(splitBase('/stock/product/7', navLink)).toEqual({ base: '', rest: '/stock/product/7' });
+  });
+
+  it('and one with nothing of ours is all base', () => {
+    expect(splitBase('/s/7R8U2A', navLink)).toEqual({ base: '/s/7R8U2A', rest: '' });
+  });
+
+  it('writes the stack back after that base', () => {
+    const stack = [entry('stock_page'), entry('product_page', { id: '7' }, 'Gulder 60cl')];
+    expect(pathnameFor('/s/7R8U2A', stack, navLink)).toBe('/s/7R8U2A/stock/product/gulder-60cl~7');
+    expect(pathnameFor('', stack, navLink)).toBe('/stock/product/gulder-60cl~7');
+  });
+
+  it('round-trips through the base it found', () => {
+    const stack = [entry('stock_page'), entry('product_page', { id: '7' })];
+    const url = pathnameFor('/s/7R8U2A', stack, navLink);
+    const { base, rest } = splitBase(url, navLink);
+    expect(base).toBe('/s/7R8U2A');
+    expect(parsePath(rest, navLink, soleParamNamesOf(stack)).entries.map((e) => e.key))
+      .toEqual(['stock_page', 'product_page']);
   });
 });

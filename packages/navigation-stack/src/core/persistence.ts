@@ -2,6 +2,8 @@ import type { GroupRef, NavParams, NavigationMap, ParsedStack, StackEntry } from
 import { setInFragment } from '@academix-admin/overlay-route';
 import { writeHistoryEntry } from './history-writer';
 import { NAV_STACK_VERSION, STACK_SEPARATOR, STORAGE_TTL_MS } from '../constants';
+import { pathnameFor } from '../model/paths';
+import { getRegistry } from './registry';
 import type { GroupNavigationContextType } from './contexts';
 import { toGroupRef } from './contexts';
 // Stack persistence, URL/param encoding and uid helpers.
@@ -866,7 +868,28 @@ export function updateNavQueryParamForStack(
     const current = url.searchParams.get('nav');
     const map = parseCombinedNavParam(current || undefined);
 
-    if (path && path.length > 0) {
+    /*
+     * THE STACK ON SCREEN CAN OWN THE PATHNAME INSTEAD.
+     *
+     * `?nav=` says where you are in a codec only this library reads — right for the tabs nobody is
+     * looking at, wrong for the one they are: a person cannot read it, a crawler cannot index it,
+     * and a link pasted into a message tells the person receiving it nothing.
+     *
+     * Only ONE stack may write the pathname, because there is only one, and it is the one on
+     * screen. The others keep their token in `?nav=` exactly as before, which is also what restores
+     * them when a tab is returned to.
+     */
+    const reg = getRegistry().get(stackId);
+    const ownsPathname =
+      Boolean(reg?.pathMode) &&
+      (groupContext ? groupContext.isActiveStack(groupStackId || '') : true);
+
+    if (ownsPathname && reg?.navLink) {
+      url.pathname = pathnameFor(reg.pathMode!.base, reg.stack, reg.navLink);
+      // Its pages are in the path now; leaving them in `?nav=` as well would be two answers to one
+      // question, and the two would disagree the moment either changed.
+      delete map[stackId];
+    } else if (path && path.length > 0) {
       map[stackId] = path;
     } else {
       delete map[stackId];

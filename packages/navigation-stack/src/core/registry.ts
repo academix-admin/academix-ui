@@ -37,6 +37,14 @@ export type RegistryEntry = {
    */
   popstateInFlight?: boolean;
   /**
+   * This stack writes its pages into the PATH rather than into `?nav=`.
+   *
+   * `base` is where the stack is mounted — everything in the pathname before its own first route —
+   * worked out once from the URL rather than passed in, so there is nothing to keep in step with the
+   * route that renders it.
+   */
+  pathMode?: { base: string };
+  /**
    * Serial of the last history entry this stack applied. Lets a popstate for a generation we have
    * already applied be skipped rather than re-derived — the browser can deliver one for state we
    * just wrote ourselves when an async history.go lands after the stack was mutated.
