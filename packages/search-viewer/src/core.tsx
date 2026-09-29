@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
 
 // ==================== Shared types ====================
 
@@ -307,6 +307,56 @@ export const SearchBar = ({
   </div>
 );
 
+/**
+ * RAISE THE KEYBOARD INSIDE THE TAP, then hand it to the real box.
+ *
+ * iOS shows the keyboard only for a focus made while the user's own tap is still being handled.
+ * The sheet mounts its search box a frame or more after it opens, so at the moment of the tap there
+ * is no box to focus — and by the time there is, the tap is over and iOS will focus it silently,
+ * with no keyboard. The standard way through: focus an invisible stand-in input synchronously (the
+ * keyboard rises for it), then move focus to the real box the moment it exists — iOS keeps a raised
+ * keyboard up when focus moves from one input to another in script. The stand-in is removed at once.
+ *
+ * `font-size: 16px` so iOS does not zoom the page to it.
+ */
+export function focusWhenMounted(getInput: () => HTMLInputElement | null): () => void {
+  if (typeof document === "undefined") return () => {};
+  const now = getInput();
+  if (now) {
+    now.focus({ preventScroll: true });
+    return () => {};
+  }
+  const proxy = document.createElement("input");
+  proxy.setAttribute("aria-hidden", "true");
+  proxy.tabIndex = -1;
+  proxy.style.cssText =
+    "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0;pointer-events:none;";
+  document.body.appendChild(proxy);
+  proxy.focus({ preventScroll: true });
+
+  let stopped = false;
+  const started = Date.now();
+  const hand = () => {
+    if (stopped) return;
+    const input = getInput();
+    if (input) {
+      input.focus({ preventScroll: true });
+      proxy.remove();
+      return;
+    }
+    if (Date.now() - started > 1500) {
+      proxy.remove();
+      return;
+    }
+    requestAnimationFrame(hand);
+  };
+  requestAnimationFrame(hand);
+  return () => {
+    stopped = true;
+    proxy.remove();
+  };
+}
+
 // ==================== useSearchInput hook ====================
 
 export const useSearchInput = (
@@ -332,11 +382,30 @@ export const useSearchInput = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  /*
+   * THE KEYBOARD COMES UP WITH THE SHEET — on iOS too.
+   *
+   * iOS raises the keyboard only for a focus made inside the user's own tap. This focused after the
+   * open ANIMATION (`onOpenEnd`), long after the tap, so on an iPhone the box was focused and the
+   * keyboard never appeared. It also bumped `inputKey` first, remounting the input — so the
+   * `.focus()` that followed landed on the element being thrown away.
+   *
+   * Now the input is focused in a layout effect the moment `isOpen` turns true: React commits a
+   * tap's state change synchronously, so this still runs inside the tap. `onOpenEnd` stays as the
+   * fallback for anything that took focus away during the animation, and it no longer remounts.
+   */
+  useLayoutEffect(() => {
+    if (!isOpen || !searchProp?.autoFocus) return;
+    setShouldAutoFocus(true);
+    return focusWhenMounted(() => searchInputRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   const handleOpenEnd = useCallback(() => {
-    if (searchProp?.autoFocus && searchInputRef.current) {
-      setInputKey((prev) => prev + 1);
-      setShouldAutoFocus(true);
-      searchInputRef.current.focus();
+    if (!searchProp?.autoFocus || !searchInputRef.current) return;
+    setShouldAutoFocus(true);
+    if (document.activeElement !== searchInputRef.current) {
+      searchInputRef.current.focus({ preventScroll: true });
     }
   }, [searchProp?.autoFocus]);
 

@@ -150,10 +150,16 @@ function SearchViewer<T = any, C = any>({
   // Precedence: an explicit `searchState` prop always wins (matches today's exact behaviour for any
   // consumer not using Row/Column) -> then a reported Column aggregate, if one exists -> then the
   // built-in single-query state machine below (for plain SearchViewer usage with queryData directly).
-  const searchState =
-    externalSearchState !== "initial"
-      ? externalSearchState
-      : reportedAggregate ?? internalSearchState;
+  /*
+   * WHICH TERM THE BUILT-IN STATE ANSWERS.
+   *
+   * After a term that found nothing, typing its correction left "No results found" on screen for
+   * the debounce and the round trip — the previous term's answer, drawn under the new one. A
+   * consumer reported it as "empty for a moment before the match shows, even with the same name".
+   * While the typed text differs from the term last searched, "empty" is not yet an answer: it is
+   * shown as loading. `askedFor` is set by the same call that starts every search (see `runSearch`).
+   */
+  const [askedFor, setAskedFor] = useState<string>("");
 
   const removeDuplicates = useCallback(
     (items: SearchResult<T>[]): SearchResult<T>[] => {
@@ -187,6 +193,15 @@ function SearchViewer<T = any, C = any>({
     [removeDuplicates, minQueryLength]
   );
 
+  // Every search goes through here, so the viewer knows which term its state answers.
+  const runSearch = useCallback(
+    (value: string) => {
+      setAskedFor(value);
+      return executeSearch(value);
+    },
+    [executeSearch]
+  );
+
   const {
     searchValue,
     inputKey,
@@ -195,7 +210,19 @@ function SearchViewer<T = any, C = any>({
     handleOpenEnd,
     handleSearchChange,
     handleClear,
-  } = useSearchInput(isOpen, searchProp, debounceMs, executeSearch);
+  } = useSearchInput(isOpen, searchProp, debounceMs, runSearch);
+
+  // Read in the SAME render as the keystroke — a copy updated in an effect lagged one frame, and
+  // that frame was the flash.
+  const builtInState: SearchState =
+    internalSearchState === "empty" && searchValue.trim() !== askedFor.trim()
+      ? "loading"
+      : internalSearchState;
+
+  const searchState =
+    externalSearchState !== "initial"
+      ? externalSearchState
+      : reportedAggregate ?? builtInState;
 
   // Latest query, read by the open/localDataDeps effect below without making `searchValue` a dependency.
   const searchValueRef = useRef(searchValue);
@@ -227,9 +254,9 @@ function SearchViewer<T = any, C = any>({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen && (onInitialDataRef.current || searchOnOpen)) {
-      executeSearch(searchValueRef.current);
+      runSearch(searchValueRef.current);
     }
-  }, [isOpen, executeSearch, searchOnOpen, ...(localDataDeps ?? [])]);
+  }, [isOpen, runSearch, searchOnOpen, ...(localDataDeps ?? [])]);
 
   // Fetch the next page from `cursor`. Shared by the scroll handler and the
   // bottom-sentinel IntersectionObserver so pagination fires regardless of which
@@ -459,7 +486,7 @@ function SearchViewer<T = any, C = any>({
               inputRef={searchInputRef}
               onChange={handleSearchChange}
               onBack={() => { onClose(); searchInputRef.current?.blur(); }}
-              onClear={() => handleClear(executeSearch)}
+              onClear={() => handleClear(runSearch)}
             />
           </Sheet.Header>
           <Sheet.Content>
