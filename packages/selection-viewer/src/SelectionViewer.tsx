@@ -604,27 +604,64 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
     }
   };
 
-  const handleScroll = useCallback(
-    async (e: React.UIEvent<HTMLDivElement>) => {
-      if (isPaginating.current || !onPaginate) return;
+  /*
+   * PAGINATION LISTENS TO WHATEVER ACTUALLY SCROLLS.
+   *
+   * It listened to `.selection-viewer-content` alone. Inside the sheet that element is not the
+   * scroller: react-modal-sheet wraps content in its own `.react-modal-sheet-content-scroller`, the
+   * content grows to its full height (4,601px for a hundred rows, measured) and the WRAPPER scrolls.
+   * The content box never fired a scroll event, so `onPaginate` was never called — every consumer's
+   * list stopped at its first page with nothing to say it had.
+   *
+   * So the nearest scrolling ancestor is found and listened to, and the content itself as well (for
+   * a layout where it is the scroller). And the check also runs when the content changes size: a
+   * first page too short to scroll can never produce a scroll event, but it is plainly "at the
+   * bottom", so it asks for the next one straight away.
+   */
+  const onPaginateRef = useRef(onPaginate);
+  onPaginateRef.current = onPaginate;
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
 
-      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-      const isNearBottom = scrollHeight - scrollTop <= clientHeight * 1.2;
+  const checkNearBottom = useCallback(async (el: HTMLElement) => {
+    const paginate = onPaginateRef.current;
+    if (isPaginating.current || !paginate) return;
 
-      if (isNearBottom) {
-        isPaginating.current = true;
-        const hasMore = await onPaginate();
-        if (!hasMore) {
-          isPaginating.current = false;
-        } else {
-          setTimeout(() => {
-            isPaginating.current = false;
-          }, 500);
-        }
-      }
-    },
-    [onPaginate]
-  );
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const isNearBottom = scrollHeight - scrollTop <= clientHeight * 1.2;
+    if (!isNearBottom) return;
+
+    isPaginating.current = true;
+    const hasMore = await paginate();
+    if (!hasMore) {
+      isPaginating.current = false;
+    } else {
+      setTimeout(() => {
+        isPaginating.current = false;
+      }, 500);
+    }
+  }, []);
+
+  const hasPaginate = Boolean(onPaginate);
+  useEffect(() => {
+    if (!contentEl || !hasPaginate) return;
+    const scroller =
+      (contentEl.closest(".react-modal-sheet-content-scroller") as HTMLElement | null) ?? contentEl;
+    const onScroll = () => void checkNearBottom(scroller);
+    const onInnerScroll = () => void checkNearBottom(contentEl);
+
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    if (scroller !== contentEl) contentEl.addEventListener("scroll", onInnerScroll, { passive: true });
+
+    const resize =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => onScroll()) : null;
+    resize?.observe(contentEl);
+
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      contentEl.removeEventListener("scroll", onInnerScroll);
+      resize?.disconnect();
+    };
+  }, [contentEl, hasPaginate, checkNearBottom]);
 
   if (!isOpen && unmountOnClose) return null;
 
@@ -846,8 +883,8 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
 
         <Sheet.Content>
           <div
+            ref={setContentEl}
             className={`selection-viewer-content ${childrenDirection}`}
-            onScroll={onPaginate ? handleScroll : undefined}
             style={{
               paddingTop: isSearchFocused ? layoutProp?.gapBetweenSearchAndContent : '0',
               paddingBottom: keyboardHeight > 0
