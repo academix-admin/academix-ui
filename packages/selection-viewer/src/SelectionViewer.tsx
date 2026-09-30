@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Sheet } from "@academix-admin/modal-sheet";
 import { useOverlayRoute } from '@academix-admin/overlay-route';
 
@@ -447,55 +447,6 @@ const useModalKeys = (isOpen: boolean, onClose: () => void, containerId: string)
   }, [isOpen, onClose, containerId]);
 };
 
-/**
- * THE KEYBOARD RISES INSIDE THE TAP — AND THE PAGE DOES NOT MOVE.
- *
- * iOS raises the keyboard only for a focus made while the user's own tap is still being handled, so
- * something must be focused then. But the sheet is still sliding up from the bottom at that moment,
- * and focusing the real box there — low on the screen, where the keyboard is about to be — makes iOS
- * PAN THE WHOLE PAGE UP to keep it in view. The sheet then settles at the top of a page that stays
- * panned: its header cut off at the top, its rows running under the keyboard. That was 0.3.1–0.3.2 /
- * 0.5.2–0.5.4. 0.3.0 / 0.5.0 never panned, because they focused only after the sheet had opened —
- * and never raised the keyboard on iOS either.
- *
- * So the tap focuses an invisible stand-in pinned to the TOP of the screen: the keyboard rises and
- * there is nothing to pan to. When the sheet has finished opening, focus moves to the real box —
- * now at the top too — without scrolling, and iOS keeps the keyboard up when focus moves from one
- * input to another. If the page was panned anyway, it is put back.
- */
-function holdKeyboard(): { handTo: (input: HTMLInputElement | null) => void; cancel: () => void } {
-  if (typeof document === "undefined") return { handTo: () => {}, cancel: () => {} };
-  const stand = document.createElement("input");
-  stand.setAttribute("aria-hidden", "true");
-  stand.tabIndex = -1;
-  // `font-size: 16px` so iOS does not zoom the page to it.
-  stand.style.cssText =
-    "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0;pointer-events:none;";
-  document.body.appendChild(stand);
-  stand.focus({ preventScroll: true });
-  let done = false;
-  return {
-    handTo(input) {
-      if (done) return;
-      done = true;
-      input?.focus({ preventScroll: true });
-      stand.remove();
-      settleViewport();
-    },
-    cancel() {
-      if (done) return;
-      done = true;
-      stand.remove();
-    },
-  };
-}
-
-/** A page the keyboard panned is put back where it was: the sheet's header at the top. */
-function settleViewport(): void {
-  if (typeof window === "undefined") return;
-  if (window.scrollY !== 0 || document.documentElement.scrollTop !== 0) window.scrollTo(0, 0);
-}
-
 const SelectionViewer: React.FC<SelectionViewerProps> = ({
   id: providedId,
   isOpen,
@@ -616,52 +567,42 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
     }
   }, [isOpen, searchProp?.autoFocus]);
 
-  /*
-   * THE KEYBOARD COMES UP WITH THE SHEET — on iOS too. See search-viewer's `useSearchInput`: the
-   * focus is made in a layout effect while the opening tap is still being handled, which is the only
-   * focus iOS answers with a keyboard. It used to wait for the open animation and remount the input
-   * first, so the focus landed on a discarded element, after the tap, and no keyboard rose.
+/*
+   * THE KEYBOARD COMES UP ONCE THE SHEET HAS OPENED — the way a person's own tap on the box does.
+   *
+   * Nothing is focused while the sheet slides up. When it has opened (`onOpenEnd`) the box, now at
+   * the top of the screen, gets a plain focus(): iOS raises the keyboard, the header stays, and the
+   * rows sit above the keyboard. This is 0.3.0 / 0.5.0's timing, which academix-web runs.
+   *
+   * 0.3.1–0.3.3 / 0.5.2–0.5.5 tried to raise the keyboard inside the opening tap instead (the box
+   * itself, then an invisible stand-in at the top of the screen). With the keyboard rising while
+   * the sheet was still moving, iOS moved the page: the header went off the top and the rows sat
+   * under the keyboard, until the person dropped the keyboard and tapped the box again.
+   *
+   * `autoFocus` is set only here, so a box remounted later (leaving search) does not grab focus.
+   * If the sheet never reports that it opened, the box is focused after 1.2s all the same.
    */
-  const holding = useRef<ReturnType<typeof holdKeyboard> | null>(null);
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-    leftSearch.current = false;
-    if (!searchProp?.autoFocus) return;
-    const hold = holdKeyboard();
-    holding.current = hold;
-    // If the sheet never says it has opened, the box still gets the keyboard.
-    const late = setTimeout(() => {
-      if (holding.current !== hold) return;
-      holding.current = null;
-      if (leftSearch.current) return hold.cancel();
-      setShouldAutoFocus(true);
-      hold.handTo(searchInputRef.current);
-    }, 1200);
-    return () => {
-      clearTimeout(late);
-      hold.cancel();
-      if (holding.current === hold) holding.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
+  const focusedOnOpen = useRef(false);
   const handleOpenEnd = useCallback(() => {
-    if (!searchProp?.autoFocus || !searchInputRef.current) return;
-    const hold = holding.current;
-    holding.current = null;
-    // Left search before the sheet finished opening: that was the person's choice, not a lost focus.
-    if (leftSearch.current) {
-      hold?.cancel();
+    if (!searchProp?.autoFocus || !searchInputRef.current || focusedOnOpen.current) return;
+    focusedOnOpen.current = true;
+    // Left search before the sheet finished opening: that was the person's choice.
+    if (leftSearch.current) return;
+    setShouldAutoFocus(true);
+    searchInputRef.current.focus();
+  }, [searchProp?.autoFocus]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      focusedOnOpen.current = false;
       return;
     }
-    // `autoFocus` only now: a box that focused itself mid-slide is what made iOS pan the page.
-    setShouldAutoFocus(true);
-    if (hold) hold.handTo(searchInputRef.current);
-    else if (document.activeElement !== searchInputRef.current) {
-      searchInputRef.current.focus({ preventScroll: true });
-      settleViewport();
-    }
-  }, [searchProp?.autoFocus]);
+    leftSearch.current = false;
+    if (!searchProp?.autoFocus) return;
+    const late = setTimeout(handleOpenEnd, 1200);
+    return () => clearTimeout(late);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -673,8 +614,7 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
     setIsSearchFocused(true);
     searchProp?.onFocus?.();
     requestAnimationFrame(() => {
-      searchInputRef.current?.focus({ preventScroll: true });
-      settleViewport();
+      searchInputRef.current?.focus();
     });
   };
 
