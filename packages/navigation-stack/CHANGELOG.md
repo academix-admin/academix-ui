@@ -1,5 +1,15 @@
 # @academix-admin/navigation-stack
 
+## 1.9.0
+
+- **Scroll positions are only recorded from the page the user is on.** A page covered by a push
+  (marked `inert`), a page with no height (hidden), or a page mid-restore no longer records its scroll
+  events: each of those reported a clamped offset (often 0) that overwrote the true position, so on a
+  browser that drops a hidden element's scroll (iOS Safari) the page came back at the top.
+- **Restoring retries until the position holds** (each frame, up to ~0.75s) instead of three tries
+  within 20ms, and stops the moment the user touches or scrolls. A page still laying out after a pop
+  no longer clamps the restore short.
+
 ## 1.8.0
 
 ### Minor Changes

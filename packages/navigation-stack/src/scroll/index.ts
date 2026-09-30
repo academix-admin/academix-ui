@@ -475,6 +475,30 @@ export const globalScrollData = {
 const WIDTH_TOLERANCE_PX = 2;
 
 /**
+ * A PAGE BEING RESTORED DOES NOT RECORD ITS OWN RESTORE (1.9.0).
+ *
+ * Setting `scrollTop` fires a scroll event. While the page is still short — mid-transition, not yet
+ * laid out — the browser clamps the offset, and that clamped figure was saved as the page's position,
+ * overwriting the true one: a list left at 900px came back at 351px, every time. Until this moment
+ * (epoch ms) the page's scroll events are not recorded.
+ */
+const restoringUntil = new Map<string, number>();
+
+/**
+ * Whether a scroll event on this container says where the USER is.
+ *
+ * Not while it is being restored (above), not while it is not the top page (the page under a push is
+ * `inert` and collapses as the new page covers it — each step of that collapse clamped the offset and
+ * was saved), and not while it has no height at all (hidden).
+ */
+function isUserScroll(uid: string, container: HTMLElement): boolean {
+  if ((restoringUntil.get(uid) ?? 0) > Date.now()) return false;
+  if (container.clientHeight === 0) return false;
+  if (container.closest('.navstack-page')?.hasAttribute('inert')) return false;
+  return true;
+}
+
+/**
  * Where to scroll to, given what the container looked like when the position was captured.
  *
  * Same width: the exact pixel offset, which is what the user actually saw.
@@ -718,7 +742,10 @@ export function useUnifiedScrollRestoration(
     function attachScrollListener(uid: string, container: HTMLElement, entry: StackEntry) {
       const handleScroll = () => {
         const scrollPosition = getCurrentScrollPosition(container);
-        globalScrollData.scrollPositions.set(uid, scrollPosition);
+        // Only where the user put it — see `isUserScroll`. The broadcast below still goes out, so a
+        // bar in autohide mode hears every movement.
+        const record = isUserScroll(uid, container);
+        if (record) globalScrollData.scrollPositions.set(uid, scrollPosition);
 
         const scrollHeight = container?.scrollHeight ?? 0;
         const clientHeight = container?.clientHeight ?? 0;
@@ -727,10 +754,12 @@ export function useUnifiedScrollRestoration(
         // Recorded with every position: a pixel offset is only meaningful at the width it was taken
         // at, and the width can change between capture and restore (rotation, resize, a responsive
         // breakpoint).
-        globalScrollData.scrollMetrics.set(uid, {
-          width: container?.clientWidth ?? 0,
-          maxScroll,
-        });
+        if (record) {
+          globalScrollData.scrollMetrics.set(uid, {
+            width: container?.clientWidth ?? 0,
+            maxScroll,
+          });
+        }
         const scrollPercentage = maxScroll > 0 ? (scrollPosition / maxScroll) * 100 : 0;
 
         scrollBroadcaster.broadcast({
@@ -774,34 +803,72 @@ export function useUnifiedScrollRestoration(
 
     // Restore position when becoming active
     if (isActiveGroup && (groupStackKeyChanged || uidChanged || becameActive)) {
-      const restoreScroll = () => {
-        const scrollKey = uid;
+      const scrollKey = uid;
+      const savedPosition = globalScrollData.scrollPositions.get(scrollKey) ?? 0;
+      const captured = globalScrollData.scrollMetrics.get(scrollKey);
+
+      /*
+       * UNTIL IT GETS THERE (1.9.0), not three tries in 20ms.
+       *
+       * A page coming back into view is not laid out at once — it is mid-transition, or its height
+       * is still arriving — and a restore against a short page lands wherever the browser clamps
+       * it. So it is tried every frame until the offset holds or ~0.75s has passed, and it stops the
+       * moment the person touches or scrolls: their hand beats our memory.
+       */
+      const deadline = Date.now() + 750;
+      restoringUntil.set(scrollKey, deadline + 100);
+      let userMoved = false;
+      const hold: { detach: (() => void) | null } = { detach: null };
+
+      const restoreScroll = (): boolean => {
         const container = getScrollableContainer(uid);
-        if (!container) {
-          return;
+        if (!container) return false;
+        if (!hold.detach) {
+          const stop = () => {
+            userMoved = true;
+            restoringUntil.delete(scrollKey);
+          };
+          container.addEventListener('touchstart', stop, { passive: true, once: true });
+          container.addEventListener('wheel', stop, { passive: true, once: true });
+          hold.detach = () => {
+            container.removeEventListener('touchstart', stop);
+            container.removeEventListener('wheel', stop);
+          };
         }
-        const savedPosition = globalScrollData.scrollPositions.get(scrollKey) ?? 0;
-        const captured = globalScrollData.scrollMetrics.get(scrollKey);
         const currentMaxScroll = Math.max(
           (container.scrollHeight ?? 0) - (container.clientHeight ?? 0),
           0,
         );
-        setScrollPosition(
-          resolveScrollTarget(savedPosition, captured, container.clientWidth ?? 0, currentMaxScroll),
-          container,
+        const target = resolveScrollTarget(
+          savedPosition,
+          captured,
+          container.clientWidth ?? 0,
+          currentMaxScroll,
         );
+        setScrollPosition(target, container);
+        // There when the offset holds AND it is not merely clamped short of where they were.
+        const wanted = captured && Math.abs(captured.width - (container.clientWidth ?? 0)) > WIDTH_TOLERANCE_PX
+          ? target
+          : savedPosition;
+        return Math.abs(container.scrollTop - wanted) <= 2;
       };
 
-      // Immediate restore
-      restoreScroll();
+      const settle = () => {
+        if (userMoved || restoreScroll() || Date.now() > deadline) {
+          hold.detach?.();
+          if (!userMoved) restoringUntil.set(scrollKey, Date.now() + 100);
+          return;
+        }
+        requestAnimationFrame(settle);
+      };
 
-      // Fallback restores
-      requestAnimationFrame(() => {
-        restoreScroll();
-      });
-      setTimeout(() => {
-        restoreScroll();
-      }, 20);
+      // Immediate, then every frame until it holds.
+      if (restoreScroll()) {
+        hold.detach?.();
+        restoringUntil.set(scrollKey, Date.now() + 100);
+      } else {
+        requestAnimationFrame(settle);
+      }
     }
 
     // Update global state
