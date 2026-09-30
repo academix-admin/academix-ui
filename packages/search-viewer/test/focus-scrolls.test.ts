@@ -3,11 +3,13 @@ import { renderHook, act, cleanup } from '@testing-library/react';
 import { useSearchInput } from '../src/core';
 
 /**
- * THE BOX IS FOCUSED ONCE THE SHEET HAS OPENED, NOT WHILE IT SLIDES UP.
+ * THE BOX IS FOCUSED IN THE TAP THAT OPENS THE SHEET — WITH THE SHEET ALREADY IN PLACE (0.3.5).
  *
- * A keyboard raised while the sheet was still moving (0.3.1-0.3.3) made iOS move the page: header
- * off the top, rows under the keyboard. A focus once the sheet is at rest behaves like the
- * person's own tap on the box.
+ * A phone raises its keyboard only for a focus made in the tap. 0.3.1-0.3.3 did that while the sheet
+ * slid up, and iOS moved the page (header off the top, rows under the keyboard); 0.3.4 waited for the
+ * slide to end, which kept the page still and never raised the keyboard. The sheet now opens in place
+ * (`instant`, modal-sheet 0.3.0) when its box takes focus, so the box is focused in the same render
+ * that opens it — as a person's own tap on the box would.
  */
 afterEach(() => {
   cleanup();
@@ -25,16 +27,14 @@ const setup = () => {
 };
 
 describe('focus on open', () => {
-  it('focuses nothing while the sheet opens, and the box once it has opened', () => {
+  it('focuses the box in the render that opens the sheet', () => {
     const { box, hook } = setup();
     hook.rerender({ open: true });
-    expect(document.activeElement, 'something took focus mid-slide').not.toBe(box);
-    expect(document.activeElement?.tagName).not.toBe('INPUT');
-    expect(hook.result.current.shouldAutoFocus).toBe(false);
-
+    expect(document.activeElement, 'the box was not focused in the opening render').toBe(box);
+    expect(hook.result.current.shouldAutoFocus).toBe(true);
+    // The sheet reporting that it opened changes nothing: it is already done, once.
     act(() => hook.result.current.handleOpenEnd());
     expect(document.activeElement).toBe(box);
-    expect(hook.result.current.shouldAutoFocus).toBe(true);
   });
 
   it('still focuses the box if the sheet never reports that it opened', async () => {

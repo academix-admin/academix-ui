@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
 import { Sheet } from "@academix-admin/modal-sheet";
 import { useOverlayRoute } from '@academix-admin/overlay-route';
 
@@ -592,6 +592,21 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
     searchInputRef.current.focus();
   }, [searchProp?.autoFocus]);
 
+  /*
+   * IN THE TAP, ONCE THE SHEET IS IN PLACE (0.3.5 / 0.5.7). The sheet opens `instant` when the box
+   * takes focus (modal-sheet 0.3.0): drawn at rest in the render that opens it. This layout effect
+   * runs in that same tap, so the phone raises its keyboard — and because the sheet is not sliding,
+   * the box is where a person's own tap would find it, and the page does not move. 0.3.4 / 0.5.6
+   * focused after the slide, which kept the page still but, outside the tap, never raised the
+   * keyboard on an iPhone.
+   */
+  useLayoutEffect(() => {
+    if (!isOpen || !searchProp?.autoFocus) return;
+    leftSearch.current = false;
+    handleOpenEnd();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) {
       focusedOnOpen.current = false;
@@ -718,6 +733,8 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
       style={{ zIndex }}
       maxHeight={maxHeight}
       onOpenEnd={handleOpenEnd}
+      // In place, not sliding, when the box takes focus as it opens — see the layout effect above.
+      instant={Boolean(searchProp?.autoFocus)}
     >
       <Sheet.Container
         id={id}

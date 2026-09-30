@@ -66,6 +66,15 @@ export interface SheetProps {
   style?: React.CSSProperties;
   /** Max height hint for initial positioning. Pass same value as Container maxHeight */
   maxHeight?: string | number;
+  /**
+   * OPEN IN PLACE, NO SLIDE (0.3.0). The sheet is drawn at rest in the very render that opens it, and
+   * `onOpenStart`/`onOpenEnd` fire at once. For a sheet whose field takes focus as it opens: a phone
+   * only raises its keyboard for a focus made inside the tap, and a field focused while its sheet is
+   * still sliding up makes iOS pan the whole page (header off the top, rows under the keyboard). In
+   * place, focusing it inside the tap is the same as the person tapping it — which works.
+   * Closing still slides. Default false: every other sheet opens as it always has.
+   */
+  instant?: boolean;
   onOpenStart?: () => void;
   onOpenEnd?: () => void;
   onCloseStart?: () => void;
@@ -246,6 +255,7 @@ const SheetBase = forwardRef<any, SheetProps>(({
   mountPoint,
   style,
   maxHeight,
+  instant = false,
   onOpenStart,
   onOpenEnd,
   onCloseStart,
@@ -288,13 +298,31 @@ const SheetBase = forwardRef<any, SheetProps>(({
   const [state, setState] = useState<SheetState>(isOpen ? 'opening' : 'closed');
   const [visible, setVisible] = useState(isOpen);
 
+  /*
+   * INSTANT: AT REST FROM THE FIRST RENDER. `y` is set during render — before the container first
+   * draws, so its first frame is at rest — and the children are drawn in that same render rather than
+   * one later, so a field inside can be focused by the consumer's layout effect in the same tap.
+   * Setting a motion value is idempotent, and nothing else reads it yet.
+   */
+  // 'closed' when it was already mounted; 'opening' when it mounts already open (its first state).
+  const instantOpening = instant && isOpen && (state === 'closed' || state === 'opening');
+  if (instantOpening && y.get() !== 0) y.set(0);
+
   const animOpts = { ease, duration };
 
   // State machine transitions
   useEffect(() => {
     if (isOpen && state === 'closed') {
       setVisible(true);          // mount children
-      setState('opening');       // will animate once height is measured
+      if (instant) {
+        // Already at rest (above): nothing to animate, and it has opened.
+        y.set(0);
+        setState('open');
+        onOpenStart?.();
+        onOpenEnd?.();
+      } else {
+        setState('opening');     // will animate once height is measured
+      }
     } else if (!isOpen && (state === 'open' || state === 'opening')) {
       setState('closing');
     }
@@ -364,6 +392,17 @@ const SheetBase = forwardRef<any, SheetProps>(({
   useEffect(() => {
     if (state !== 'opening') return;
     if (openAnimationStarted.current) return;
+
+    // Instant: already at rest (set during render) — nothing to animate, and it has opened.
+    if (instant) {
+      openAnimationStarted.current = true;
+      y.set(0);
+      setVisible(true);
+      setState('open');
+      onOpenStart?.();
+      onOpenEnd?.();
+      return;
+    }
 
     // Off-screen NOW, by whichever distance is certain to clear the viewport.
     const parkAt = Math.max(sheetHeight, effectiveMaxHeight);
@@ -499,7 +538,7 @@ const SheetBase = forwardRef<any, SheetProps>(({
           ...style,
         }}
       >
-        {visible ? children : null}
+        {visible || instantOpening ? children : null}
       </motion.div>
     </SheetContext.Provider>
   );

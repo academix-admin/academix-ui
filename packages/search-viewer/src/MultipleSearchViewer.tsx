@@ -88,6 +88,8 @@ function MultipleSearchViewer({
       style={{ zIndex }}
       maxHeight={maxHeight}
       onOpenEnd={handleOpenEnd}
+        // In place, not sliding, when the box takes focus as it opens (see `useSearchInput`).
+        instant={Boolean(searchProp?.autoFocus)}
     >
       <Sheet.Container
         id={id}
