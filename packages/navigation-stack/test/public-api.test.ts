@@ -68,6 +68,9 @@ const PUBLIC_EXPORTS = [
   'usePullToRefresh',
   'scrollIntoViewBelow',
   'useScrollIntoViewBelow',
+  'revealInRow',
+  'sidewaysScrollerOf',
+  'useRevealTappedInRows',
 
   // Gestures
   'useSwipeBack',

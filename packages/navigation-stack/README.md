@@ -413,6 +413,25 @@ What a tab can rely on, whatever the props:
   (It used to be; apps had to wait for the `popstate` themselves.)
 - **A page reopened while it is still animating out stays open.**
 
+## Sideways rows: a tapped card is never left hanging
+
+```tsx
+useRevealTappedInRows();              // once, near the root: every tap in any sideways row
+revealInRow(element);                 // or one element, from your own code
+<div className="tabs" data-no-reveal> // a row with its own policy (e.g. centring its active tab)
+```
+
+A row of chips, filters or cards that scrolls sideways cuts the one at its edge in half; tapping it
+selects it and leaves it half off screen. `useRevealTappedInRows` listens once at the document and,
+a frame after any tap inside a sideways-scrolling row (measured after the tap's re-render), moves
+that row just far enough that the tapped control is wholly inside it, with a 12px margin.
+
+**Sideways only, and only the row.** `Element.scrollIntoView` also scrolls the page up or down, and
+fights any vertical settle running at the same moment; this changes the row's `scrollLeft` and
+nothing else. Smooth unless the person prefers reduced motion. What counts as the card is the
+control that was tapped (`button`, link, `role="tab"`/`option`/`radio`/`button`, `label`, or
+anything marked `data-reveal`), not the icon inside it.
+
 ## Scroll restoration
 
 Each page's scroll position is captured as you scroll and restored when you return to it.

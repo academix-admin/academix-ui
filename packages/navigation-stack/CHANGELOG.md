@@ -1,5 +1,18 @@
 # @academix-admin/navigation-stack
 
+## 1.8.0
+
+### Minor Changes
+
+- A card tapped in a sideways row finishes the tap fully on screen
+
+  `useRevealTappedInRows()` — mount once near the root — and `revealInRow(el)` for one element. A tap
+  inside any sideways-scrolling row moves that row, sideways only, just far enough that the tapped
+  control is wholly inside it; the page never moves up or down. A row with its own policy opts out
+  with `data-no-reveal`. `sidewaysScrollerOf(el)` finds the row. Asked for by a shop: "any card clicked
+  in a row list is scrolled into view, so we do not have a half-hanging selected card".
+  `test/row-reveal.test.tsx`.
+
 ## 1.7.0
 
 ### Minor Changes

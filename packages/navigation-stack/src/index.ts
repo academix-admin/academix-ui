@@ -29,6 +29,8 @@ export {
   scrollIntoViewBelow,
   useScrollIntoViewBelow,
 } from './scroll';
+export { revealInRow, sidewaysScrollerOf, useRevealTappedInRows } from './scroll/row-reveal';
+export type { RevealInRowOptions } from './scroll/row-reveal';
 export type {
   UseScrollEventsHandlers,
   UseScrollEventsOptions,
