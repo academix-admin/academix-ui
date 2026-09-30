@@ -319,6 +319,37 @@ export const SearchBar = ({
  *
  * `font-size: 16px` so iOS does not zoom the page to it.
  */
+/**
+ * FOCUS THE BOX THE WAY A PLAIN focus() DID — native scroll included.
+ *
+ * Before 0.3.1 / 0.5.2 the box was focused once the sheet had opened, with a plain `focus()`, and
+ * that is what made the sheet behave: iOS scrolls a newly focused box into view with the keyboard
+ * accounted for, which pushed the header away and left the results showing above the keyboard. The
+ * 0.3.1 / 0.5.2 fix (focus inside the tap, so the keyboard rises at all) focused with
+ * `preventScroll: true`, and that scroll never happened again — the header stayed and the rows sat
+ * under the keyboard.
+ *
+ * A box that ALREADY has focus is not scrolled by focusing it again, so focus is bounced through a
+ * stand-in and back: moving focus from one input to another keeps the keyboard up on iOS, and the
+ * real box, newly focused, gets the browser's own keyboard-aware scroll.
+ */
+function focusWithNativeScroll(input: HTMLInputElement): void {
+  if (typeof document === "undefined") return;
+  if (document.activeElement === input) {
+    const bounce = document.createElement("input");
+    bounce.setAttribute("aria-hidden", "true");
+    bounce.tabIndex = -1;
+    bounce.style.cssText =
+      "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0;pointer-events:none;";
+    document.body.appendChild(bounce);
+    bounce.focus({ preventScroll: true });
+    input.focus();
+    bounce.remove();
+    return;
+  }
+  input.focus();
+}
+
 export function focusWhenMounted(getInput: () => HTMLInputElement | null): () => void {
   if (typeof document === "undefined") return () => {};
   const now = getInput();
@@ -340,7 +371,8 @@ export function focusWhenMounted(getInput: () => HTMLInputElement | null): () =>
     if (stopped) return;
     const input = getInput();
     if (input) {
-      input.focus({ preventScroll: true });
+      // A plain focus, so the browser scrolls the box into view as it always did (see above).
+      input.focus();
       proxy.remove();
       return;
     }
@@ -404,9 +436,8 @@ export const useSearchInput = (
   const handleOpenEnd = useCallback(() => {
     if (!searchProp?.autoFocus || !searchInputRef.current) return;
     setShouldAutoFocus(true);
-    if (document.activeElement !== searchInputRef.current) {
-      searchInputRef.current.focus({ preventScroll: true });
-    }
+    // Now that the sheet is where it will stay: the scroll a plain focus gives (see above).
+    focusWithNativeScroll(searchInputRef.current);
   }, [searchProp?.autoFocus]);
 
   const handleSearchChange = useCallback(
