@@ -16,6 +16,10 @@ const frames = (n = 4) =>
     for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(() => r(null)));
   });
 
+// The box takes focus once the sheet has opened; jsdom never finishes the slide, so the late
+// hand-over (1.2s) is what puts the picker into search here.
+const opened = () => act(() => new Promise((r) => setTimeout(r, 1300)));
+
 describe('leaving search with the arrow', () => {
   it('stays out of search once the arrow is pressed', async () => {
     render(
@@ -29,6 +33,7 @@ describe('leaving search with the arrow', () => {
         <button type="button">Coca-Cola</button>
       </SelectionViewer>,
     );
+    await opened();
     await frames();
     const arrow = screen.getByRole('button', { name: 'Exit search mode' });
     expect(arrow, 'autoFocus opens the picker in search').toBeTruthy();
@@ -55,6 +60,7 @@ describe('leaving search with the arrow', () => {
         <button type="button">Coca-Cola</button>
       </SelectionViewer>,
     );
+    await opened();
     await frames();
     fireEvent.click(screen.getByRole('button', { name: 'Exit search mode' }));
     await frames(6);
