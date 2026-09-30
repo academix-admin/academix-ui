@@ -7,6 +7,7 @@ import { PageMemoryManager, TransitionManager } from './core/managers';
 import { getRegistry, type RegistryEntry } from './core/registry';
 import { buildUrlPath, decodeStackPath, generateCompositeUid, isEqual, noteAdoptableEntries, parseCombinedNavParam, parseRawKey, parseUrlPathIntoStacks, readPersistedStack, removeNavQueryParamForStack, updateNavQueryParamForStack, writePersistedStack, readAxState } from './core/persistence';
 import { writeHistoryEntry } from './core/history-writer';
+import { directionOf, markKeptInTab, ownMoveInFlight, wasKeptInTab } from './core/history-moves';
 import { createApiFor } from './core/api';
 import { scrollBroadcaster, useUnifiedScrollRestoration } from './scroll';
 import { useSwipeBack } from './gestures/swipe-back';
@@ -415,9 +416,54 @@ export type GroupNavigationStackProps = {
   persist?: boolean;
   preloadAll?: boolean;
   defaultStack?: string;
+  /**
+   * The platform's Back (Android's button, iOS's edge-swipe, the browser's arrow) pops the page
+   * of the tab you are on, the way a native tab bar behaves — instead of following the browser to
+   * whichever tab last stood on the entry it lands on.
+   *
+   * Tabs share one browser history, so the entry behind a deep page is often one another tab
+   * stamped (switching tabs restamps the entry you are on). Without this, Back on the second page
+   * of one tab can arrive on a different tab. At a tab's first page, Back still goes where the
+   * browser goes. Off by default: the browser's own behaviour is the library's default.
+   */
+  backStaysInTab?: boolean;
 };
 
 export const GROUP_STATE_STORAGE_KEY = 'navstack-group-state';
+
+const _backKeptBy = new WeakMap<Event, string | null>();
+
+/**
+ * Which tab keeps this Back for itself under `backStaysInTab`, or null — decided ONCE per event.
+ *
+ * Every stack in the group handles the same popstate, in whatever order their listeners were
+ * registered, and the answer depends on the depth of the tab on screen, which the keeping tab then
+ * changes. Asked twice, it could answer twice; cached on the event, every stack hears the same.
+ */
+function tabKeepingBack(event: PopStateEvent, groupContext: GroupNavigationContextType | null): string | null {
+  if (!groupContext?.backStaysInTab) return null;
+  if (_backKeptBy.has(event)) return _backKeptBy.get(event) ?? null;
+
+  let keeper: string | null = null;
+  const onScreen = groupContext.getCurrent();
+  const state = event.state as { group?: unknown } | null;
+  const entryTab = state && typeof state.group === 'string' ? state.group : null;
+  if (entryTab && entryTab !== onScreen && directionOf(event) === 'back') {
+    const groupId = groupContext.getGroupId();
+    getRegistry().forEach((reg) => {
+      if (
+        reg.groupMember?.group === groupId &&
+        reg.groupMember.tab === onScreen &&
+        !reg.parentId &&
+        reg.stack.length > 1
+      ) {
+        keeper = onScreen;
+      }
+    });
+  }
+  _backKeptBy.set(event, keeper);
+  return keeper;
+}
 
 export function readGroupState(groupId: string): { activeStack: string; } | null {
   try {
@@ -453,7 +499,8 @@ export function GroupNavigationStack({
   onCurrentChange,
   persist = false,
   preloadAll = true,
-  defaultStack
+  defaultStack,
+  backStaysInTab = false,
 }: GroupNavigationStackProps) {
 
   const [hydrated, setHydrated] = useState(false);
@@ -623,8 +670,10 @@ export function GroupNavigationStack({
 
     isActiveStack: (stackId: string) => {
       return stackId === activeStackId;
-    }
-  }), [id, activeStackId, navStack, persist]);
+    },
+
+    backStaysInTab,
+  }), [id, activeStackId, navStack, persist, backStaysInTab]);
 
   // Save group state to storage when it changes
   useEffect(() => {
@@ -639,8 +688,23 @@ export function GroupNavigationStack({
     if (typeof window === "undefined" || !hydrated) return;
 
     const handler = (e: PopStateEvent) => {
+      /*
+       * OUR OWN POP NEVER CHANGES TAB.
+       *
+       * A pop on a page hands its history back with `history.go`, and the entry that lands is
+       * normally the popping tab's own. When it is not — the entry log lost after a reload, an entry
+       * restamped by a tab switch — the entry names another tab, and obeying it took the person
+       * from the tab they pressed Back on to one they had left. The stack is already where the Back
+       * put it; the tab is the one it was pressed on.
+       *
+       * Read NOW: a move stays "ours" only for the dispatch of its own popstate.
+       */
+      const ownMove = ownMoveInFlight();
       // Small delay to ensure all stacks are ready
       setTimeout(() => {
+        if (ownMove) return;
+        // The tab on screen answered this Back by popping its own page (`backStaysInTab`).
+        if (wasKeptInTab(e)) return;
         if (e.state && e.state.group && navStack.has(e.state.group)) {
           const newGroupId = e.state.group;
           // DELIBERATELY no restUrl() here.
@@ -1324,6 +1388,54 @@ export default function NavigationStack(props: {
 
       if (!api.isActiveStack()) return;
 
+      /*
+       * OUR OWN POP, ARRIVING — and every stack hears it, not only the one that moved.
+       *
+       * `isActiveStack()` says "this stack syncs history", which every tab does at once, so every
+       * tab handles every popstate. For a person's Back that is the design: the entry records every
+       * stack, and each rebuilds from it. For OUR move it is not. The stack that popped is already
+       * right — it moved first, and this is the browser catching up — and no other stack moved at
+       * all. Rebuilding from the entry the pop landed on undid the pop's meaning when that entry
+       * disagreed (a lost log, an entry another tab restamped), and rewound every OTHER tab to
+       * whatever that older entry said: pop on Stock, and Sell lost the pages it had.
+       *
+       * So nobody rebuilds, and the stack that moved makes the entry describe where it now is.
+       */
+      const mover = ownMoveInFlight();
+      if (mover !== null) {
+        if (mover === id) describeThisEntry(currentRegEntry);
+        return;
+      }
+
+      /*
+       * BACK STAYS IN THE TAB (the group's `backStaysInTab`), decided once for all stacks.
+       *
+       * The browser went Back onto an entry another tab stamped, while the tab on screen is deep.
+       * That Back meant "the page before this one": the tab on screen pops one page and restamps the
+       * entry as its own, and no other tab moves. At a tab's first page nothing keeps the Back, and
+       * it is handled as the browser's — every stack rebuilds and the group follows the entry.
+       */
+      const keeper = tabKeepingBack(event, groupContext);
+      if (keeper !== null) {
+        if (groupStackId === keeper && !currentRegEntry.parentId) {
+          const previousStack = currentRegEntry.stack;
+          const popped = previousStack.slice(0, -1);
+          currentRegEntry.popstateInFlight = true;
+          currentRegEntry.browserDrivenChange = true;
+          try {
+            currentRegEntry.stack = popped;
+            setStackSnapshot([...popped]);
+            if (persist) writePersistedStack(id, popped);
+            api._notifyExternalStackChange(previousStack);
+          } finally {
+            currentRegEntry.popstateInFlight = false;
+          }
+          describeThisEntry(currentRegEntry);
+          markKeptInTab(event);
+        }
+        return;
+      }
+
       // The browser has already moved. Mark the re-derive so emit() does not ALSO hand history
       // entries back for the resulting pop — that would consume a second entry and skip a page.
       currentRegEntry.popstateInFlight = true;
@@ -1339,6 +1451,14 @@ export default function NavigationStack(props: {
       }
     };
 
+    /** Make the entry the browser is standing on say where this stack is (a replace). */
+    const describeThisEntry = (reg: RegistryEntry) => {
+      try {
+        const localPath = buildUrlPath([{ navLink: mergedNavLink, stack: reg.stack }]);
+        updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, 'replace');
+      } catch { /* a description is never worth breaking a navigation for */ }
+    };
+
     const handlePopStateInner = (currentRegEntry: RegistryEntry, event: PopStateEvent) => {
 
       // Restoring the stack to its ROOT when the URL carries no state for it is the whole point of
@@ -1352,7 +1472,9 @@ export default function NavigationStack(props: {
       // Truncating to the existing first entry (rather than re-resolving the `entry` prop) keeps
       // the root's uid and params exactly as they were, so nothing re-mounts unnecessarily.
       const restoreToRoot = () => {
-        const rootStack = currentRegEntry.stack.slice(0, 1);
+        // A stack with nothing left has no first entry to keep; its `entry` prop is its root.
+        const rootStack = currentRegEntry.stack.length > 0 ? currentRegEntry.stack.slice(0, 1) : rootFromEntryProp();
+        if (rootStack.length === 0) return;
         if (!isEqual(currentRegEntry.stack, rootStack)) {
           const previousStack = currentRegEntry.stack;
           currentRegEntry.stack = rootStack;
@@ -1416,6 +1538,9 @@ export default function NavigationStack(props: {
         };
       });
 
+      // An entry that names none of our pages is "at the root", never "no pages at all".
+      if (newStack.length === 0) { restoreToRoot(); return; }
+
       if (!isEqual(currentRegEntry.stack, newStack)) {
         const previousStack = currentRegEntry.stack;
         currentRegEntry.stack = newStack;
@@ -1433,6 +1558,12 @@ export default function NavigationStack(props: {
       window.addEventListener('popstate', handlePopState);
     }
 
+    // Which group and tab this stack is, so a decision about a tab can find its stack.
+    const reg = getRegistry().get(id);
+    if (reg && groupContext && groupStackId) {
+      reg.groupMember = { group: groupContext.getGroupId(), tab: groupStackId };
+    }
+
     return () => {
       if (syncHistory) {
         window.removeEventListener('popstate', handlePopState);
@@ -1442,6 +1573,17 @@ export default function NavigationStack(props: {
   }, [id, mergedNavLink, syncHistory, autoDispose, api, persist, groupContext]);
 
   const lastLen = useRef(stackSnapshot.length);
+
+  /** The stack's first page as its `entry` prop names it — for a stack with nothing left to keep. */
+  function rootFromEntryProp(): StackEntry[] {
+    const { key, params } = parseRawKey(entry);
+    if (!mergedNavLink[key]) return [];
+    return [{
+      uid: generateCompositeUid(toGroupRef(groupContext), groupStackId, key, params, 0),
+      key,
+      params,
+    }];
+  }
 
   useEffect(() => {
     const handleStackEmpty = () => {
@@ -1473,6 +1615,21 @@ export default function NavigationStack(props: {
 
       if (lastLen.current > 0 && stack.length === 0) {
         if (!groupContext) handleStackEmpty();
+        /*
+         * A TAB IS NEVER LEFT EMPTY, whatever emptied it. `pop` and `popUntil` refuse to, but a tab
+         * with no pages draws nothing at all until a reload, so this is the net under every other
+         * way: its first page comes back.
+         */
+        else queueMicrotask(() => {
+          const reg = getRegistry().get(id);
+          if (!reg || reg.stack.length > 0) return;
+          const root = rootFromEntryProp();
+          if (root.length === 0) return;
+          reg.stack = root;
+          setStackSnapshot([...root]);
+          if (persist) writePersistedStack(id, root);
+          api._notifyExternalStackChange([]);
+        });
       }
       lastLen.current = stack.length;
     });
@@ -1574,6 +1731,25 @@ export default function NavigationStack(props: {
 
     const added = stackSnapshot.filter((s) => !old.includes(s.uid));
     const removed = renders.filter((r) => !cur.includes(r.entry.uid)).map((r) => r.entry.uid);
+
+    /*
+     * BACK BEFORE IT HAD GONE.
+     *
+     * A page's uid is its place in the stack, so popping a page and opening the same one again
+     * inside the exit animation gives it back its old uid. It was never "added" — its render record
+     * was still there, animating out — and the exit timer then removed the page the person had just
+     * opened: on the stack, and not on the screen. Such a record comes back in, and the new timer
+     * for its uid replaces the one that would have removed it.
+     */
+    const revived = renders
+      .filter((r) => r.state === 'exit' && cur.includes(r.entry.uid))
+      .map((r) => r.entry.uid);
+    if (revived.length > 0) {
+      setRenders((prev) => prev.map((r) =>
+        revived.includes(r.entry.uid) ? { ...r, state: 'enter', createdAt: Date.now() } : r,
+      ));
+      revived.forEach((uid) => transitionManager.start(uid, transitionDuration, () => { }));
+    }
 
     if (added.length === 0 && removed.length === 0) {
       if (stackSnapshot.length > 0 && renders.length > 0) {

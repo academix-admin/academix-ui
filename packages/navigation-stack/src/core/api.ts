@@ -5,6 +5,7 @@ import { _currentPageUidByStack, toGroupRef } from './contexts';
 import type { GroupNavigationContextType } from './contexts';
 import { getRegistry } from './registry';
 import { buildUrlPath, generateCompositeUid, parseRawKey, storageKeyFor, updateNavQueryParamForStack, decodeStackPath, parseUrlPathIntoStacks, parseCombinedNavParam, buildCombinedNavParam, consumeHistoryEntries, stepBackOneAdoptedEntry, reconcileLedgerToDepth, resetPushDepth, getPushDepth, recordEntryDepth, takeEntriesAboveDepth } from './persistence';
+import { ownMoveSettled } from './history-moves';
 import { recordNavEvent } from '../devtools';
 import { globalObjectRegistry } from '../di/object-registry';
 import { getOverlayStore, notifyOverlays, disposeOverlays, clampOffset, type OverlayEntryRec } from '../overlay/registry';
@@ -224,6 +225,21 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
     pendingOperations++;
 
     /*
+     * NOT WHILE A POP OF OURS IS STILL ARRIVING.
+     *
+     * A pop changes the stack at once and hands its history entries back with `history.go`, which
+     * the browser delivers a moment later. A push made in that moment wrote its entry first, and
+     * then the late move carried the browser back past it — the page opened and was gone, the stack
+     * "restored" to before it. Seen in the shop as a receipt that flashed and vanished after a sale.
+     * Apps had to learn to wait for the popstate themselves; now the library does.
+     *
+     * Bounded: a move the browser never delivers releases this after a second.
+     */
+    if (syncHistory || regEntry.historySyncEnabled) {
+      try { await ownMoveSettled(); } catch { /* never worth refusing a navigation over */ }
+    }
+
+    /*
      * A NAVIGATION WE ARE MAKING is never one the platform already animated.
      *
      * `browserDrivenChange` says "the arrival being reconciled is already on screen — iOS's
@@ -429,6 +445,15 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
           if (regEntry.parentId) return false;
           return false;
         }
+        /*
+         * A TAB KEEPS ITS FIRST PAGE.
+         *
+         * Outside a group, popping the last page is how a stack says "I am done" — the parent or
+         * `onExitStack` takes over. A tab has nothing to hand over to: the group deliberately does
+         * not, so the tab was left EMPTY, drawing nothing until a reload. The shop saw "Money just
+         * went blank" — a second tap on Back while the first page was still sliding out is enough.
+         */
+        if (groupContext && regEntry.stack.length <= 1) return false;
         const top = regEntry.stack[regEntry.stack.length - 1];
         const pageBelow = regEntry.stack[regEntry.stack.length - 2];
 
@@ -486,6 +511,8 @@ export function createApiFor(id: string, navLink: NavigationMap, syncHistory: bo
         const previousStack = regEntry.stack.slice();
         let i = regEntry.stack.length - 1;
         while (i >= 0 && !predicate(regEntry.stack[i], i, regEntry.stack)) i--;
+        // Nothing matched: a tab still keeps its first page (see pop).
+        if (i < 0 && groupContext) i = 0;
 
         if (i < regEntry.stack.length - 1) {
           const poppedEntries = regEntry.stack.slice(i + 1);

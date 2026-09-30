@@ -25,6 +25,7 @@ import {
   readAxState,
   recordWrittenEntry,
 } from './persistence';
+import { indexForWrite, noteWrittenIndex } from './history-moves';
 
 export type HistoryWriteMode = 'push' | 'replace';
 
@@ -93,11 +94,17 @@ export function writeHistoryEntry({ mode, href, navParam, state }: HistoryWrite)
    * A push that is later replaced in place stays pushed: the entry behind it is still there.
    */
   const wasPushed = readAxState(window.history.state)?.axPushed === true;
+  /*
+   * `axIndex` — where this entry sits in the browser's list, so an arrival can be compared with
+   * where we stood and a Back told apart from a Forward. A popstate says neither.
+   */
+  const axIndex = indexForWrite(mode);
   const ax = {
     navStack: navParam,
     axSerial: serial,
     axEpoch: currentEpoch(),
     axPushed: mode === 'push' ? true : wasPushed,
+    axIndex,
   };
 
   if (mode === 'push') {
@@ -110,6 +117,7 @@ export function writeHistoryEntry({ mode, href, navParam, state }: HistoryWrite)
     );
   }
 
+  noteWrittenIndex(axIndex);
   recordWrittenEntry(prevSerial, serial, navParam, mode, prevNavParam);
   return serial;
 }

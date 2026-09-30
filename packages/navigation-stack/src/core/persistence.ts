@@ -1,6 +1,7 @@
 import type { GroupRef, NavParams, NavigationMap, ParsedStack, StackEntry } from '../types';
 import { setInFragment } from '@academix-admin/overlay-route';
 import { writeHistoryEntry } from './history-writer';
+import { markOwnMove } from './history-moves';
 import { NAV_STACK_VERSION, STACK_SEPARATOR, STORAGE_TTL_MS } from '../constants';
 import { pathnameFor } from '../model/paths';
 import { getRegistry } from './registry';
@@ -378,6 +379,8 @@ export type AxHistoryState = {
    * "not ours to number".
    */
   axEpoch?: string;
+  /** Position in the browser's list, as far as our own writes can count it. */
+  axIndex?: number;
 };
 
 /** Read our slice of an entry's state, if this entry was written by us. */
@@ -392,6 +395,7 @@ export function readAxState(state: unknown): AxHistoryState | null {
     axSerial: s.axSerial,
     axEpoch: s.axEpoch,
     axPushed: s.axPushed === true,
+    ...(typeof s.axIndex === 'number' ? { axIndex: s.axIndex } : {}),
   };
 }
 
@@ -726,6 +730,7 @@ export function stepBackOneAdoptedEntry(stackId: string, targetDepth: number): n
   if (depthOfStackIn(nav, stackId) <= targetDepth) return 0;
 
   try {
+    markOwnMove(stackId);
     window.history.go(-1);
     clearOverlayFragmentOnArrival();
   } catch {
@@ -783,6 +788,7 @@ export function consumeHistoryEntries(stackId: string, requested: number, target
 
   _pushDepth.set(stackId, Math.max(0, available - counted));
   try {
+    markOwnMove(stackId);
     window.history.go(-n);
     clearOverlayFragmentOnArrival();
   } catch {

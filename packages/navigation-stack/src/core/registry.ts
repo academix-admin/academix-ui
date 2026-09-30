@@ -67,6 +67,10 @@ export type RegistryEntry = {
    * renames in one render pass into a single notification.
    */
   titleFlushQueued?: boolean;
+  /**
+   * Which group and which of its tabs this stack is, so the group can find it by tab.
+   */
+  groupMember?: { group: string | null; tab: string };
 };
 
 export const _clientRegistry =

@@ -8,6 +8,8 @@ export type GroupNavigationContextType = {
   getCurrent: () => string;
   goToGroupId: (groupId: string) => Promise<boolean>;
   isActiveStack: (stackId: string) => boolean;
+  /** The group's `backStaysInTab` prop — read by its stacks when the browser moves Back. */
+  backStaysInTab?: boolean;
 };
 
 export const GroupNavigationContext = createContext<GroupNavigationContextType | null>(null);

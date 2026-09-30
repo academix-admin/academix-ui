@@ -379,6 +379,40 @@ Render a `<NavigationStack />` inside a page of another stack — the child
 auto-detects its parent. For coordinated siblings (e.g. a tab bar), wrap them in
 `<GroupNavigationStack>`.
 
+```tsx
+<GroupNavigationStack
+  id="main-group"
+  navStack={new Map([['home', <HomeStack />], ['profile', <ProfileStack />]])}
+  current={active}
+  onCurrentChange={setActive}
+  persist
+  backStaysInTab
+/>
+```
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `id` | `string` | — | The group's id. |
+| `navStack` | `Map<string, ReactElement>` | — | One stack per tab, keyed by tab id. Keep the Map stable (`useMemo`). |
+| `current` | `string` | — | The tab to show. The group writes it to the URL (`?group=`) and follows the browser when Back lands on another tab's entry. |
+| `onCurrentChange` | `(id) => void` | — | Told when the group changes tab itself — a Back that lands on another tab's entry. |
+| `persist` | `boolean` | `false` | Remember the tab across reloads (sessionStorage). |
+| `preloadAll` | `boolean` | `true` | Mount every tab up front, so switching is instant and each keeps its pages. |
+| `backStaysInTab` | `boolean` | `false` | The platform's Back (Android's button, iOS's edge-swipe) pops the page of the tab on screen, like a native tab bar, instead of following the browser to whichever tab last stood on the entry it lands on. At a tab's first page, Back still goes where the browser goes. |
+
+What a tab can rely on, whatever the props:
+
+- **A tab is never empty.** `pop()` on a tab's first page is refused, `popUntil` that matches nothing
+  keeps the first page, and a rebuild from an entry that names none of the tab's pages lands on its
+  first page. Outside a group, popping the last page still hands over to the parent or `onExitStack`.
+- **The app's own Back never changes tab**, and never moves another tab. A pop hands its history
+  entries back with `history.go`, which the browser delivers later; when that arrives, the popping
+  stack stays where it is and restamps the entry, and no other stack rebuilds from it.
+- **A navigation waits for a pop still arriving.** `push` straight after `pop` is safe: the push is
+  written after the browser has finished moving back, so it is not carried away by the late move.
+  (It used to be; apps had to wait for the `popstate` themselves.)
+- **A page reopened while it is still animating out stays open.**
+
 ## Scroll restoration
 
 Each page's scroll position is captured as you scroll and restored when you return to it.

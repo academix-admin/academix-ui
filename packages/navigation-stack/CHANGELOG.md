@@ -1,5 +1,38 @@
 # @academix-admin/navigation-stack
 
+## 1.7.0
+
+### Minor Changes
+
+- A tab is never blank, and Back never changes tab behind your back
+
+  Reported from a shop running on phones: "Money just went blank", and "I pop on one page, I am on
+  another tab". Traced end to end, five faults, each now pinned by a test that fails against 1.6.1
+  (`test/tab-never-blank.test.tsx`):
+
+  1. **A tab could be emptied.** `pop()` on a tab's first page — a second tap on Back while the page
+     is still sliding out is enough — left the stack with no pages, and a group deliberately does not
+     hand an empty tab to anyone, so it drew nothing until a reload. `pop` now refuses in a group,
+     `popUntil` keeps the first page, a rebuild from an entry naming none of the tab's pages lands on
+     its first page, and a tab that is emptied any other way gets its first page back.
+  2. **The app's own Back could change tab.** A pop hands its entries back with `history.go(-n)`;
+     when the entry it lands on was last stamped by another tab (a tab switch restamps the entry you
+     are on; a reload loses the entry log), the group obeyed it. The library now marks its own moves:
+     the tab stays, the popping stack stays, and the entry is restamped to describe it.
+  3. **The app's own Back moved the OTHER tabs.** `isActiveStack()` is true for every tab that syncs
+     history, so every tab rebuilt from the entry a pop landed on — pop on Stock, and Sell was
+     rewound to whatever that older entry recorded. Our own moves are no longer rebuilt from.
+  4. **A push straight after a pop was carried away.** The pop's `history.go` arrives after the push
+     was written and "restored" the stack to before it — the page opened and vanished. Navigations
+     now wait for a pop of ours still arriving (bounded at one second).
+  5. **A page reopened while animating out vanished.** Its uid is its position, so it came back
+     under the uid its exit timer was about to remove. Such a record is now revived.
+
+  New, opt-in: `<GroupNavigationStack backStaysInTab>` — the platform's Back pops the page of the tab
+  on screen, as a native tab bar does, instead of following the browser to another tab's entry. At a
+  tab's first page Back still goes where the browser goes, and Forward is never treated as a Back
+  (entries now record their position, `axIndex`, so the direction of a move can be told).
+
 ## 1.6.1
 
 ### Patch Changes
