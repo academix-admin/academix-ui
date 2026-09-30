@@ -1,5 +1,23 @@
 # @academix-admin/state-stack
 
+## 0.6.3
+
+### Patch Changes
+
+- A read made after a write sees the write
+
+  `setState` saved to storage first and updated memory after, so for a persisted key — an IndexedDB
+  round trip on a phone — every read in between saw the value from before the write, and a
+  read-modify-write built on that read replaced it when the two landed in order. A shop's till lost
+  its open customers this way: loading them wrote three tabs, the till read an empty list, started a
+  customer of its own on top of it, and that write landed last. A phone signing in showed none of the
+  shop's open customers and left another empty one behind each time.
+
+  Memory is now updated at once, and storage is written behind it in order, per key, so the last
+  write is still the one stored. A storage read already in flight when a write happens no longer
+  lands on top of it. No API change. `test/write-then-read.test.tsx` — three of its four cases fail
+  on 0.6.2.
+
 ## 0.6.2
 
 ### Patch Changes

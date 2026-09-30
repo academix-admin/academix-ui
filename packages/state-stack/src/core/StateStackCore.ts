@@ -187,6 +187,11 @@ export class StateStackCore {
   private hydratedKeys = new Set<string>();
   private loadedKeys = new Set<string>();
   private pendingHydration = new Map<string, Promise<boolean>>();
+  /**
+   * How many times each key has been WRITTEN. A hydration that started before a write must not
+   * land after it: the value read from storage is older than the one just set.
+   */
+  private writeSeq = new Map<string, number>();
   private hydrationSubscribers = new Map<string, Set<Subscriber>>();
 
   private demandedKeys = new Set<string>();
@@ -256,10 +261,25 @@ export class StateStackCore {
       return this.pendingHydration.get(ik)!;
     }
 
+    const startedAt = this.writeSeq.get(ik) ?? 0;
+    /*
+     * WRITTEN WHILE WE WERE READING — then what storage holds is older than what memory holds.
+     *
+     * `setState` puts a value in memory at once (see there), and a storage read already in flight
+     * finishes later. Applying it would put the older value back over the newer one.
+     */
+    const overtaken = () => (this.writeSeq.get(ik) ?? 0) !== startedAt;
+
     const p = (async (): Promise<boolean> => {
       try {
         const sk = this.storageKey(scope, key);
         const stored = await storage.getItem(sk);
+        if (overtaken()) {
+          this.hydratedKeys.add(ik);
+          this.loadedKeys.add(ik);
+          this.notifyHydration(scope, key);
+          return false;
+        }
 
         if (stored != null) {
           try {
@@ -281,7 +301,7 @@ export class StateStackCore {
           const legacyKey = `${prefix}${scope}:${key}`;
           try {
             const legacyStored = await storage.getItem(legacyKey);
-            if (legacyStored != null) {
+            if (legacyStored != null && !overtaken()) {
               const parsed = JSON.parse(legacyStored);
               if (!this.stacks.has(scope)) this.stacks.set(scope, new Map());
               this.stacks.get(scope)!.set(key, applyRevive(parsed));
@@ -384,46 +404,56 @@ export class StateStackCore {
   ): Promise<S> {
     const ik = this.subKey(scope, key);
 
+    /*
+     * MEMORY FIRST, AT ONCE — then storage, in order, behind it.
+     *
+     * This used to write to storage and only then to memory, all inside the per-key queue. For a
+     * persisted key that is an IndexedDB round trip, so a read made straight after a write saw the
+     * value from BEFORE it — and a read-modify-write built on that read overwrote it when the two
+     * landed in order. Seen in a shop's till: loading the open orders wrote three tabs; the till was
+     * told it had loaded, read the list, found it empty, started a customer of its own on top of
+     * that empty list — and the queued write of [that one customer] landed after the three and
+     * replaced them. A phone signing in showed none of the shop's open customers, and every such
+     * load left a new empty one behind.
+     *
+     * Memory is what every reader reads, so it is what a write must change first. Persisting still
+     * happens in order, per key, through the same queue — the last write is the one that is stored.
+     */
+    if (!this.stacks.has(scope)) this.stacks.set(scope, new Map());
+    const sm = this.stacks.get(scope)!;
+    const prev = sm.get(key);
+
+    if (pushHistory) {
+      if (!this.history.has(ik)) {
+        this.history.set(ik, { past: [], future: [], maxDepth: 50 });
+      }
+      const h = this.history.get(ik)!;
+      h.past.push(prev === undefined ? null : safeClone(prev));
+      if (h.past.length > h.maxDepth) h.past.shift();
+      h.future = [];
+    }
+
+    this.writeSeq.set(ik, (this.writeSeq.get(ik) ?? 0) + 1);
+    sm.set(key, safeClone(value));
+    this.loadedKeys.add(ik);
+    if (persist) {
+      // Memory now holds the newest value there is; nothing is left to wait for before reading it.
+      this.hydratedKeys.add(ik);
+      this.notifyHydration(scope, key);
+    }
+    this.notify(scope, key);
+
+    if (!persist) return value;
+
+    const stored = JSON.stringify(value);
     return this.queueUpdate(ik, async () => {
-      if (!this.stacks.has(scope)) this.stacks.set(scope, new Map());
-      const sm = this.stacks.get(scope)!;
-      const prev = sm.get(key);
-
-      // Mark not-hydrated during the write so concurrent reads wait.
-      if (persist) this.hydratedKeys.delete(ik);
-
-      if (persist) {
-        try {
-          await storage.setItem(
-            this.storageKey(scope, key),
-            JSON.stringify(value)
-          );
-          // Notify other tabs — stamps our tabId so we ignore our own echo.
-          this.broadcastStateChange(scope, key, value);
-        } catch (err) {
-          console.error('[StateStack] persist error:', err);
-        }
+      try {
+        await storage.setItem(this.storageKey(scope, key), stored);
+        // Notify other tabs — stamps our tabId so we ignore our own echo.
+        this.broadcastStateChange(scope, key, value);
+      } catch (err) {
+        console.error('[StateStack] persist error:', err);
       }
-
-      if (pushHistory) {
-        if (!this.history.has(ik)) {
-          this.history.set(ik, { past: [], future: [], maxDepth: 50 });
-        }
-        const h = this.history.get(ik)!;
-        h.past.push(prev === undefined ? null : safeClone(prev));
-        if (h.past.length > h.maxDepth) h.past.shift();
-        h.future = [];
-      }
-
-      sm.set(key, safeClone(value));
-      this.loadedKeys.add(ik);
-
-      if (persist) {
-        this.hydratedKeys.add(ik);
-        this.notifyHydration(scope, key);
-      }
-
-      this.notify(scope, key);
       return value;
     });
   }
