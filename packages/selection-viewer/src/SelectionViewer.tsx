@@ -542,6 +542,11 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [inputKey, setInputKey] = useState(0);
   const [shouldAutoFocus, setShouldAutoFocus] = useState(false);
+  /*
+   * The person left search with the arrow. `autoFocus` is for the OPENING only: after this, nothing
+   * of ours may put the box back in focus — see `handleBackFromSearch`.
+   */
+  const leftSearch = useRef(false);
   const isPaginating = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const sheetRef = useRef<any>(null);
@@ -619,7 +624,9 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
    * first, so the focus landed on a discarded element, after the tap, and no keyboard rose.
    */
   useLayoutEffect(() => {
-    if (!isOpen || !searchProp?.autoFocus) return;
+    if (!isOpen) return;
+    leftSearch.current = false;
+    if (!searchProp?.autoFocus) return;
     setShouldAutoFocus(true);
     return focusWhenMounted(() => searchInputRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -627,6 +634,8 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
 
   const handleOpenEnd = useCallback(() => {
     if (!searchProp?.autoFocus || !searchInputRef.current) return;
+    // Left search before the sheet finished opening: that was the person's choice, not a lost focus.
+    if (leftSearch.current) return;
     setShouldAutoFocus(true);
     if (document.activeElement !== searchInputRef.current) {
       searchInputRef.current.focus({ preventScroll: true });
@@ -651,7 +660,17 @@ const SelectionViewer: React.FC<SelectionViewerProps> = ({
     searchProp?.onBlur?.();
   };
 
+  /*
+   * THE ARROW LEAVES SEARCH, AND STAYS OUT.
+   *
+   * Leaving search swaps the full-screen search header for the normal one, and that mounts a NEW
+   * search box. It carried `autoFocus` — still true from the opening — so the new box took focus
+   * the moment it appeared, focusing it re-entered search mode, and the arrow looked dead: "we
+   * cannot press the back button in the viewer". Opening is the only time the box focuses itself.
+   */
   const handleBackFromSearch = () => {
+    leftSearch.current = true;
+    setShouldAutoFocus(false);
     setIsSearchFocused(false);
     if (searchInputRef.current) {
       searchInputRef.current.blur();
