@@ -8,7 +8,14 @@ on:
 
 jobs:
   build-test:
+    name: build-test (React ${{ matrix.react }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 18.3.1 is what the packages pin and what academix-web and store-manager run.
+        # 19.3.0 is what JIMSteps runs. Both must stay green.
+        react: ['18.3.1', '19.3.0']
     steps:
       - uses: actions/checkout@v4
 
@@ -21,8 +28,16 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Build first so cross-package type resolution (e.g. search-viewer ->
-      # modal-sheet) and package-name imports in tests work.
+      # Rewrites the react/react-dom devDependency pins in this checkout only, then reinstalls.
+      - name: Use React ${{ matrix.react }}
+        if: matrix.react != '18.3.1'
+        run: node scripts/use-react.mjs ${{ matrix.react }} && npm install --no-audit --no-fund
+
+      - name: React in use
+        run: node -p "'react ' + require('react/package.json').version + ', react-dom ' + require('react-dom/package.json').version"
+
+      # Dependency order (scripts/build.mjs), so cross-package type resolution works on a
+      # clean checkout (e.g. bottom-viewer -> overlay-route).
       - name: Build
         run: npm run build
 

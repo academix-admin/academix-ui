@@ -1,7 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["react", "react-dom"]
+    "types": ["react", "react-dom"],
+    // src/next.ts imports the package's own public entry on purpose (one core instance at
+    // runtime; tsup keeps it external). For TYPES, resolve that self-import to the source, so a
+    // clean build doesn't need this package's own dist/index.d.ts to exist first.
+    "paths": { "@academix-admin/state-stack": ["./src/index.ts"] }
   },
   "include": ["src"],
   "exclude": ["src/_legacy", "test"]
