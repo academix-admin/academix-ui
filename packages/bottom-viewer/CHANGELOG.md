@@ -1,5 +1,17 @@
 # @academix-admin/bottom-viewer
 
+## 0.4.1
+
+### Patch Changes
+
+- Depend on `@academix-admin/modal-sheet` `^0.3.0` (was `^0.1.0`).
+
+  For 0.x versions a caret range never crosses a minor, so `^0.1.0` held every app on modal-sheet
+  0.1.8 inside bottom-viewer, next to the app's own copy: two copies of the sheet in every bundle,
+  and none of 0.2.0/0.3.0 here. Those releases only add optional props (`historyRoute`, `instant`),
+  and bottom-viewer handles `historyRoute` itself without passing it to the sheet, so nothing
+  registers twice and behaviour is unchanged.
+
 ## 0.2.0
 
 ### Minor Changes
