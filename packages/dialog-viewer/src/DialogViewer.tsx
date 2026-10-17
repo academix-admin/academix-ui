@@ -117,6 +117,12 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
   box-sizing: border-box;
 }
 
+/* The container takes focus on open (tabIndex -1) so the dialog is announced. That programmatic
+   focus is not something to draw a ring around; the buttons keep their own focus ring. */
+#${id} .dialog-container:focus {
+  outline: none;
+}
+
 #${id} .dialog-header {
   padding: 20px 20px 12px;
   text-align: center;
@@ -170,6 +176,7 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
   border: none;
   border-radius: 8px;
   font-size: 16px;
+  font-family: inherit;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
