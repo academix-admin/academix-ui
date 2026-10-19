@@ -38,6 +38,14 @@ interface DialogLayoutProps {
   secondaryTextColor?: string;
   dangerColor?: string;
   dangerTextColor?: string;
+  /**
+   * The container's shadow and the content's padding, for a dialog whose `customView` is a whole
+   * card of its own (a game's question card, a receipt): pass `boxShadow: 'none'` and
+   * `contentPadding: '0'` with a transparent `backgroundColor`, and the dialog draws nothing around
+   * it. Both default to what this package has always drawn.
+   */
+  boxShadow?: string;
+  contentPadding?: string;
 }
 
 interface DialogViewerProps {
@@ -108,7 +116,7 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
   max-width: 400px;
   width: calc(100% - 32px);
   margin: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: ${layoutProp?.boxShadow ?? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'};
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 32px - var(--ax-keyboard-inset, 0px));
@@ -137,7 +145,7 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
 }
 
 #${id} .dialog-content {
-  padding: 0 20px 20px;
+  padding: ${layoutProp?.contentPadding ?? '0 20px 20px'};
   overflow-y: auto;
   flex: 1;
   -webkit-overflow-scrolling: touch;
@@ -281,7 +289,7 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
   }
   
   #${id} .dialog-content {
-    padding: 0 16px 16px;
+    padding: ${layoutProp?.contentPadding ?? '0 16px 16px'};
   }
   
   #${id} .dialog-actions {
@@ -588,6 +596,9 @@ const DialogViewer = React.forwardRef<any, DialogViewerProps>(({
           {currentContent || (message && <p className="dialog-message">{message}</p>)}
         </div>
 
+        {/* No row at all when there is nothing in it (`buttons={[]}`, no cancel): a card that
+            carries its own buttons would otherwise sit above an empty, padded strip. */}
+        {(showCancel || defaultButtons.length > 0) && (
         <div className="dialog-actions">
           {showCancel && (
             <button
@@ -609,6 +620,7 @@ const DialogViewer = React.forwardRef<any, DialogViewerProps>(({
             </button>
           ))}
         </div>
+        )}
       </div>
     </div>
   );
