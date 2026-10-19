@@ -46,6 +46,27 @@ interface DialogLayoutProps {
    */
   boxShadow?: string;
   contentPadding?: string;
+  /**
+   * The type and the shape of the title and the buttons, so a dialog can wear an app's own look
+   * (a game's chunky buttons and coloured title band) without the app drawing its own dialog.
+   *
+   * - `fontFamily`: the whole dialog's face (defaults to inheriting the page's).
+   * - `headerBackground`: paints the title as a band across the top (a colour or a gradient), with
+   *   `headerAlign` (`'center'` by default) and `titleFontSize` / `titleFontWeight`.
+   * - `buttonRadius`, `buttonFontSize`, `buttonFontWeight`, `buttonShadow` (e.g. a solid
+   *   `0 4px 0 rgba(0,0,0,.2)` for a pressable look).
+   *
+   * Every one defaults to what this package has always drawn.
+   */
+  fontFamily?: string;
+  headerBackground?: string;
+  headerAlign?: 'center' | 'left';
+  titleFontSize?: string;
+  titleFontWeight?: string | number;
+  buttonRadius?: string;
+  buttonFontSize?: string;
+  buttonFontWeight?: string | number;
+  buttonShadow?: string;
 }
 
 interface DialogViewerProps {
@@ -122,7 +143,9 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
   max-height: calc(100vh - 32px - var(--ax-keyboard-inset, 0px));
   position: relative;
   animation: scaleIn 0.2s ease-out;
-  box-sizing: border-box;
+  box-sizing: border-box;${layoutProp?.fontFamily ? `
+  font-family: ${layoutProp.fontFamily};` : ''}${layoutProp?.headerBackground ? `
+  overflow: hidden;` : ''}
 }
 
 /* The container takes focus on open (tabIndex -1) so the dialog is announced. That programmatic
@@ -133,13 +156,15 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
 
 #${id} .dialog-header {
   padding: 20px 20px 12px;
-  text-align: center;
-  flex-shrink: 0;
+  text-align: ${layoutProp?.headerAlign ?? 'center'};
+  flex-shrink: 0;${layoutProp?.headerBackground ? `
+  background: ${layoutProp.headerBackground};
+  margin-bottom: 16px;` : ''}
 }
 
 #${id} .dialog-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: ${layoutProp?.titleFontSize ?? '18px'};
+  font-weight: ${layoutProp?.titleFontWeight ?? 600};
   color: ${layoutProp?.titleColor || '#1a1a1a'};
   margin: 0;
 }
@@ -182,13 +207,14 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
   flex: 1;
   padding: 12px 16px;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: ${layoutProp?.buttonRadius ?? '8px'};
+  font-size: ${layoutProp?.buttonFontSize ?? '16px'};
   font-family: inherit;
-  font-weight: 500;
+  font-weight: ${layoutProp?.buttonFontWeight ?? 500};
   cursor: pointer;
   transition: all 0.2s;
-  min-height: 44px;
+  min-height: 44px;${layoutProp?.buttonShadow ? `
+  box-shadow: ${layoutProp.buttonShadow};` : ''}
 }
 
 #${id} .dialog-button-primary {
@@ -212,7 +238,6 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
 #${id} .dialog-button-danger {
   background-color: ${layoutProp?.dangerColor || '#FF3B30'};
   color: ${layoutProp?.dangerTextColor || 'white'};
-  color: white;
 }
 
 #${id} .dialog-button-danger:hover {
@@ -281,7 +306,8 @@ const getStyles = (id: string, layoutProp?: DialogLayoutProps) => `
     width: calc(100% - 24px);
     margin: 12px;
     max-height: calc(100vh - 24px - var(--ax-keyboard-inset, 0px));
-    border-radius: 16px;
+    /* A radius the app asked for holds on a phone too (it was always 16px here). */
+    border-radius: ${layoutProp?.borderRadius ?? '16px'};
   }
   
   #${id} .dialog-header {

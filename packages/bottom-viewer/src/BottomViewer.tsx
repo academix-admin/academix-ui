@@ -11,6 +11,16 @@ interface LayoutProps {
   /** Height the sheet opens at before its content is measured. Stops the open-and-jump. */
   minHeight?: string;
   maxWidth?: string;
+  /**
+   * The sheet's shape and type, so it can wear an app's own look (a game's rounder, card-like
+   * sheet) without the app drawing its own sheet: `borderRadius` (top corners, default `16px`),
+   * `boxShadow` (default the package's soft shadow), `fontFamily` and `textColor` (default: inherit
+   * from the page). Each defaults to what this package has always drawn.
+   */
+  borderRadius?: string;
+  boxShadow?: string;
+  fontFamily?: string;
+  textColor?: string;
 }
 
 interface CancelButtonProps {
@@ -482,8 +492,8 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
         id={id}
         ref={containerRef}
         backgroundColor={layoutProp?.backgroundColor || '#fff'}
-        borderRadius="16px"
-        boxShadow="0 -4px 20px rgba(0,0,0,0.15)"
+        borderRadius={layoutProp?.borderRadius ?? '16px'}
+        boxShadow={layoutProp?.boxShadow ?? '0 -4px 20px rgba(0,0,0,0.15)'}
         maxWidth={getMaxWidth()}
         className="bottom-viewer-container"
         // Announced as a modal dialog. Without this a screen reader treats it as another region of
@@ -508,6 +518,8 @@ const BottomViewer = React.forwardRef<any, BottomViewerProps>(({
            * with no transition at all.
            */
           minHeight: layoutProp?.minHeight ?? '20dvh',
+          ...(layoutProp?.fontFamily ? { fontFamily: layoutProp.fontFamily } : {}),
+          ...(layoutProp?.textColor ? { color: layoutProp.textColor } : {}),
         }}
       >
         <Sheet.Header>
