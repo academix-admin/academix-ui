@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { readOverlayFragment, writeOverlayFragment, settleOverlayFragment } from './fragment';
-import { claimOverlay, releaseOverlay } from './claims';
+import { claimOverlay, isOverlayClaimed, releaseOverlay } from './claims';
 
 /**
  * Give an overlay a history entry, so the platform's own Back closes it.
@@ -133,8 +133,17 @@ export function useOverlayRoute(
        * stack's own state instead, which is how "still our overlay" is told from "already moved
        * on".
        */
+      /*
+       * And only if nothing has CLAIMED it again in the meantime. React StrictMode runs an effect,
+       * cleans it up and runs it again on mount; the second run finds our entry still on top and
+       * claims it rather than pushing another. Stepping back after that took away the entry of an
+       * overlay that was open, and the popstate closed it: a sheet mounted already open vanished
+       * at once in development (found on JIMSteps' city picker, 19 Oct). The same race closed any
+       * overlay reopened within the tick.
+       */
       const ours = name;
       window.setTimeout(() => {
+        if (isOverlayClaimed(ours)) return;
         const state = window.history.state as { axOverlay?: string } | null;
         if (readOverlayFragment() === ours && state?.axOverlay === ours) window.history.back();
       }, 0);

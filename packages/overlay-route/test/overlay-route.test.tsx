@@ -192,4 +192,34 @@ describe('overlay-route', () => {
   it('is a no-op on a boot with no sheet named', () => {
     expect(closeUnrestoredOverlay()).toBe(false);
   });
+
+  it('stays open when it mounts already open under StrictMode (effects run, clean up, run again)', async () => {
+    // The cleanup between the two runs queues a step back off "its" entry; the second run has
+    // claimed the same entry by the time that step would fire, so it must not fire.
+    const back = vi.spyOn(window.history, 'back');
+    const view = render(
+      <React.StrictMode>
+        <Sheet startOpen />
+      </React.StrictMode>,
+    );
+    await settle(80);
+    expect(back, 'a re-claimed overlay must keep its entry').not.toHaveBeenCalled();
+    expect(view.queryByText('SHEET'), 'and stay on screen').not.toBeNull();
+    expect(readOverlayFragment()).toBe('sheet:one');
+    expect(isOverlayClaimed('sheet:one')).toBe(true);
+  });
+
+  it('still steps off its entry when closed by a button after a StrictMode mount', async () => {
+    const back = vi.spyOn(window.history, 'back');
+    const view = render(
+      <React.StrictMode>
+        <Sheet startOpen />
+      </React.StrictMode>,
+    );
+    await settle(80);
+    await act(async () => { view.getByText('close').click(); });
+    await settle(80);
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(isOverlayClaimed('sheet:one')).toBe(false);
+  });
 });

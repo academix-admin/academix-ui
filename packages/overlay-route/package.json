@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/overlay-route",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Give a sheet, picker or dialog its own history entry, so the platform's back gesture closes the overlay rather than the page under it.",
   "keywords": [
     "react",
