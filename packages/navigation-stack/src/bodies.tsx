@@ -2,6 +2,7 @@
 
 import React, { useContext, useEffect, useRef } from 'react';
 import { PageBodyContext } from './core/contexts';
+import { useSnapTravellingBar } from './scroll/snap-bar';
 
 /**
  * ColumnBody / RowBody — the single, keyboard-safe scroll region for a page
@@ -109,11 +110,17 @@ export interface ScaffoldProps {
    *   Right for a screen with its own sticky furniture beneath it: a toolbar or filter row cannot
    *   take the top of the screen while a pinned bar is already standing there.
    *
-   * The bar is laid OVER the body rather than removed from the column, and the body is padded by
-   * its height — so nothing jumps at the moment the behaviour takes effect, and content genuinely
-   * passes underneath it instead of being clipped short.
+   * The travelling bar is the first thing in the scroll body, so it moves at exactly the speed of
+   * the page, and a `position: sticky` element after it pins to the top once the bar has gone.
    */
   appBarBehavior?: AppBarBehavior;
+  /**
+   * With `appBarBehavior="scroll"`: when scrolling stops with the bar part-way off screen, settle
+   * it. Less than half gone, it comes back; half or more gone, it goes, and a sticky section
+   * beneath it takes the top. Never while a finger is down; smooth unless reduced motion is on.
+   * Off by default (1.10.0).
+   */
+  snap?: boolean;
   /** Pinned bottom bar (rides above the keyboard). Never scrolls. */
   bottomBar?: React.ReactNode;
   /** Page body. Wrapped in a ColumnBody scroll region unless `scroll={false}`. */
@@ -143,6 +150,7 @@ export interface ScaffoldProps {
 export function Scaffold({
   appBar,
   appBarBehavior = 'pinned',
+  snap = false,
   bottomBar,
   children,
   scroll = true,
@@ -169,6 +177,8 @@ export function Scaffold({
    * the bar has gone.
    */
   const travels = appBarBehavior === 'scroll' && appBar != null && scroll;
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useSnapTravellingBar(barRef, travels && snap);
 
   return (
     <>
@@ -180,7 +190,7 @@ export function Scaffold({
       {scroll ? (
         <ColumnBody className={bodyClassName} style={bodyStyle}>
           {travels && (
-            <div className="navstack-scaffold__bar navstack-scaffold__bar--travels" style={{ flex: '0 0 auto' }}>
+            <div ref={barRef} className="navstack-scaffold__bar navstack-scaffold__bar--travels" style={{ flex: '0 0 auto' }}>
               {appBar}
             </div>
           )}
