@@ -1,5 +1,16 @@
 # @academix-admin/navigation-stack
 
+## 1.10.0
+
+- **`Scaffold snap`: a travelling app bar is never left half on screen.** With
+  `appBarBehavior="scroll"`, stopping a scroll inside the bar's height used to leave it cut in half.
+  `snap` settles it when scrolling stops (on `scrollend`, or 140ms after the last scroll): less than
+  half gone, it comes back; half or more, it goes and the sticky section beneath takes the top. Never
+  while a finger is down; smooth unless reduced motion is on. Off by default, so nothing changes for
+  a page that doesn't ask.
+- README: the `appBarBehavior` row said the bar is laid over the body and the body padded; it is the
+  first thing in the scroll body. Fixed.
+
 ## 1.9.0
 
 - **Scroll positions are only recorded from the page the user is on.** A page covered by a push

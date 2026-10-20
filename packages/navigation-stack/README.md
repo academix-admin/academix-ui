@@ -358,7 +358,8 @@ import { Scaffold, ColumnBody, RowBody } from '@academix-admin/navigation-stack'
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `appBar` | `ReactNode` | — | Top bar. |
-| `appBarBehavior` | `'pinned' \| 'scroll'` | `'pinned'` | `'pinned'` stays put — right for a screen you read. `'scroll'` travels with the content and returns as you scroll up — right for a screen with its own sticky toolbar beneath, which cannot share the top with a pinned bar. The bar is laid OVER the body and the body padded by its height, so nothing jumps. |
+| `appBarBehavior` | `'pinned' \| 'scroll'` | `'pinned'` | `'pinned'` stays put — right for a screen you read. `'scroll'` travels with the content and returns as you scroll up — right for a screen with its own sticky toolbar beneath, which cannot share the top with a pinned bar. The travelling bar is the first thing in the scroll body, so a `position: sticky` element after it pins to the top once the bar has gone. |
+| `snap` | `boolean` | `false` | With `'scroll'`: when scrolling stops with the bar part-way off screen, settle it — less than half gone, it comes back; half or more, it goes and the sticky section beneath takes the top. Never while a finger is down; smooth unless reduced motion is on. (1.10.0) |
 | `bottomBar` | `ReactNode` | — | Pinned bottom bar. Rides above the keyboard, never scrolls. |
 | `scroll` | `boolean` | `true` | Wrap `children` in a `ColumnBody`. Set `false` to supply your own body — a `RowBody`, for instance. |
 | `bodyClassName` / `bodyStyle` | — | — | On the scroll body. Put the page's theme-variant class here so its CSS custom properties are in scope for the content. |
