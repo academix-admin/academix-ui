@@ -1,5 +1,11 @@
 # @academix-admin/bottom-viewer
 
+## 0.5.0
+
+### Minor Changes
+
+- 289a713: Theming through `layoutProp`: `borderRadius`, `boxShadow`, `fontFamily` and `textColor`. All optional; the defaults are what the sheet always drew. README usage rewritten to the real API.
+
 ## 0.4.1
 
 ### Patch Changes
