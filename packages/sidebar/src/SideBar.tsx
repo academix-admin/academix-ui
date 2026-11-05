@@ -13,6 +13,11 @@ export interface SidebarProps {
   navKeys: NavItem[];
   activeId?: string;
   onChange?: (id: string, item: NavItem) => void;
+  /**
+   * The ALREADY-active item was tapped again — the cue to take that section back to its first page
+   * (navigation-bar's `onReselect`, same meaning). Fires after `onChange`, which still fires too.
+   */
+  onReselect?: (id: string, item: NavItem) => void;
 
   /** Optional */
   logo?: React.ReactNode;
@@ -34,6 +39,16 @@ export interface SidebarProps {
   fontWeight?: number | string;
   borderRight?: string;
   shadow?: string;
+  /** Background of the selected item. Default: a white tint, for a dark sidebar. */
+  activeBackground?: string;
+  /** Background of an item under the pointer. Default: a white tint, for a dark sidebar. */
+  hoverBackground?: string;
+  /** The rules under the header and over the footer. Default: a white tint, for a dark sidebar. */
+  dividerColor?: string;
+  /** The expand/collapse button's colour. Default: grey. */
+  toggleColor?: string;
+  /** The sidebar's height. Default `100vh`; `100%` inside a shell that sets its own height. */
+  height?: string;
   className?: string;
 }
 
@@ -42,7 +57,7 @@ const getStyles = (id: string) => `
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        height: 100vh;
+        height: var(--sb-height, 100vh);
         transition: width 0.3s ease;
         overflow: hidden;
         position: relative;
@@ -79,7 +94,7 @@ const getStyles = (id: string) => `
         align-items: center;
         justify-content: space-between;
         padding: 16px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
+        border-bottom: 1px solid var(--sb-divider, rgba(255,255,255,0.1));
       }
 
       #${id} .sidebar-nav {
@@ -102,16 +117,16 @@ const getStyles = (id: string) => `
       }
 
       #${id} .sidebar-item:hover {
-        background-color: rgba(255, 255, 255, 0.05);
+        background-color: var(--sb-hover-bg, rgba(255, 255, 255, 0.05));
       }
 
       #${id} .sidebar-item.active {
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: var(--sb-active-bg, rgba(255, 255, 255, 0.1));
       }
 
       #${id} .sidebar-footer {
         padding: 16px;
-        border-top: 1px solid rgba(255,255,255,0.1);
+        border-top: 1px solid var(--sb-divider, rgba(255,255,255,0.1));
       }
 
       #${id} .sidebar-toggle {
@@ -123,12 +138,12 @@ const getStyles = (id: string) => `
         height: 32px;
         border-radius: 50%;
         transition: background-color 0.2s ease;
-        color: #9ca3af;
+        color: var(--sb-toggle, #9ca3af);
       }
 
       #${id} .sidebar-toggle:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: #e5e7eb;
+        background-color: var(--sb-hover-bg, rgba(255, 255, 255, 0.1));
+        color: var(--hoverColor, #e5e7eb);
       }
 
       #${id} .sidebar-logo-collapsed {
@@ -207,6 +222,7 @@ export default function Sidebar({
   navKeys,
   activeId,
   onChange,
+  onReselect,
 
   logo,
   footer,
@@ -225,6 +241,11 @@ export default function Sidebar({
   fontWeight = 500,
   borderRight = '1px solid rgba(255,255,255,0.1)',
   shadow = '2px 0 8px rgba(0,0,0,0.2)',
+  activeBackground,
+  hoverBackground,
+  dividerColor,
+  toggleColor,
+  height,
   className = '',
 }: SidebarProps) {
   const [id] = useState(() => providedId || `sidebar-${Math.random().toString(36).substr(2, 9)}`);
@@ -394,8 +415,10 @@ export default function Sidebar({
   };
 
   const handleClick = (item: NavItem) => {
+    const again = item.id === active;
     if (!controlled) setInternalActive(item.id);
     onChange?.(item.id, item);
+    if (again) onReselect?.(item.id, item);
   };
 
   if (!mounted) return null;
@@ -410,6 +433,12 @@ export default function Sidebar({
         borderRight,
         boxShadow: shadow,
         '--hoverColor': hoverColor,
+        // Only what was asked for: an unset prop leaves the stylesheet's own default in force.
+        ...(activeBackground !== undefined && { '--sb-active-bg': activeBackground }),
+        ...(hoverBackground !== undefined && { '--sb-hover-bg': hoverBackground }),
+        ...(dividerColor !== undefined && { '--sb-divider': dividerColor }),
+        ...(toggleColor !== undefined && { '--sb-toggle': toggleColor }),
+        ...(height !== undefined && { '--sb-height': height }),
       } as React.CSSProperties}
     >
       {/* Header */}

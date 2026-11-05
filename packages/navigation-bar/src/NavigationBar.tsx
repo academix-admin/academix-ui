@@ -102,8 +102,38 @@ export interface NavigationBarProps {
   floatingButtonShadow?: string;
   floatingButtonVisibility?: 'always' | 'whenHidden' | 'whenVisible';
 
+  /**
+   * Show the bar only while this media query matches — e.g. `"(max-width: 800px)"` for an app that
+   * uses a side rail on wide screens. While it does not match the bar renders nothing, removes the
+   * `--nav-height` it wrote on `<body>` (so the app's own CSS decides it), and reports
+   * `{ hidden: true, height: '0px' }` through `onVisibilityChange`, so anything anchored to the bar
+   * takes its place. Omit it and the bar is always shown, as before.
+   */
+  media?: string;
+
   /** Extra */
   className?: string;
+}
+
+/** Whether `query` matches now, following it as it changes. True when there is no query. */
+function useMediaShown(query: string | undefined): boolean {
+  const [shown, setShown] = useState(true);
+  useEffect(() => {
+    if (!query || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      setShown(true);
+      return;
+    }
+    const list = window.matchMedia(query);
+    const update = () => setShown(list.matches);
+    update();
+    if (typeof list.addEventListener === 'function') {
+      list.addEventListener('change', update);
+      return () => list.removeEventListener('change', update);
+    }
+    list.addListener(update);
+    return () => list.removeListener(update);
+  }, [query]);
+  return shown;
 }
 
 const getStyles = (id: string) => `
@@ -229,6 +259,8 @@ export default function NavigationBar({
   floatingButtonShadow = '0 4px 8px rgba(0, 0, 0, 0.2)',
   floatingButtonVisibility,
 
+  media,
+
   /** Extra */
   className = '',
 }: NavigationBarProps) {
@@ -236,6 +268,7 @@ export default function NavigationBar({
   useInjectStyles(navId);
 
   const [mounted, setMounted] = useState(false); // ✅ NEW
+  const shown = useMediaShown(media);
     useEffect(() => {
       setMounted(true);
     }, []);
@@ -441,8 +474,11 @@ export default function NavigationBar({
   visibilityRef.current = onVisibilityChange;
 
   useEffect(() => {
-    visibilityRef.current?.({ hidden, height: currentHeight, mode });
-  }, [hidden, currentHeight, mode]);
+    // Not shown at all (`media`): reported as hidden with no height, so nothing waits above it.
+    visibilityRef.current?.(
+      shown ? { hidden, height: currentHeight, mode } : { hidden: true, height: '0px', mode },
+    );
+  }, [hidden, currentHeight, mode, shown]);
 
   // Helper to extract border thickness from border string (e.g., "1px solid rgba(...)" -> "1px")
   const extractBorderThickness = (borderStyle: string): string => {
@@ -453,6 +489,12 @@ export default function NavigationBar({
   // Update CSS variable for content spacing (nav height + padding + border + safe area + optional breakpoint spacing)
   useEffect(() => {
     if (typeof document === 'undefined') return;
+
+    // Not shown (`media`): the space is the app's to decide, not a bar's that is not there.
+    if (!shown) {
+      document.body.style.removeProperty('--nav-height');
+      return;
+    }
 
     let spacingValue: string;
 
@@ -522,7 +564,7 @@ export default function NavigationBar({
     }
 
     document.body.style.setProperty('--nav-height', spacingValue);
-  }, [currentHeight, barBorderTop, breakpointSpacing, hidden, floatingButton, floatingButtonBottom, floatingButtonHeight, floatingButtonPadding, fabClicked]);
+  }, [currentHeight, barBorderTop, breakpointSpacing, hidden, floatingButton, floatingButtonBottom, floatingButtonHeight, floatingButtonPadding, fabClicked, shown]);
 
   /** Decide FAB visibility */
   const shouldShowFab =
@@ -543,7 +585,7 @@ export default function NavigationBar({
 
 
 
-    if (!mounted) return null;
+    if (!mounted || !shown) return null;
 
   return (
     <>
