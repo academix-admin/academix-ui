@@ -610,6 +610,23 @@ export function useUnifiedScrollRestoration(
   const getScrollableContainer = (uid: string): HTMLElement | null => {
     if (typeof document === 'undefined') return null;
 
+    /*
+     * THE ELEMENT REGISTERED NOW, before anything remembered (1.10.1).
+     *
+     * A page registers its wrapper first and its Scaffold body a render later, when the body claims
+     * the scroll. The first answer was cached, so every Scaffold page was saved and restored through
+     * a wrapper that never scrolls: nothing was ever recorded, and on Safari — which forgets a hidden
+     * page's offset — every page came back at the top.
+     */
+    const registered = scrollBroadcaster.getRegisteredContainer(uid);
+    if (registered && document.contains(registered)) {
+      if (scrollData.scrollContainers.get(uid)?.element !== registered) {
+        const found = findScrollableContainer(uid);
+        if (found) scrollData.scrollContainers.set(uid, found);
+      }
+      return registered;
+    }
+
     const cached = scrollData.scrollContainers.get(uid);
     if (cached) {
       if (document.contains(cached.element)) {
@@ -632,9 +649,10 @@ export function useUnifiedScrollRestoration(
     container.scrollTop = position;
   };
 
-  const addScrollListener = (container: HTMLElement, handler: () => void) => {
-    container.addEventListener('scroll', handler, { passive: true });
-    return () => container.removeEventListener('scroll', handler);
+  const addScrollListener = (container: HTMLElement, handler: (event: Event) => void) => {
+    // Capturing, so a body inside the element first found is heard too (see attachScrollListener).
+    container.addEventListener('scroll', handler, { passive: true, capture: true });
+    return () => container.removeEventListener('scroll', handler, { capture: true });
   };
 
   // Set up listeners for ALL pages in the stack (same as group version)
@@ -739,8 +757,18 @@ export function useUnifiedScrollRestoration(
     // usually is not mounted yet, so the MutationObserver path runs instead and fires long after
     // this line has executed. A SECOND mounted stack changes that -- its container is already there
     // -- which is why this only showed up with sibling stacks, the exact shape academix-web runs.
-    function attachScrollListener(uid: string, container: HTMLElement, entry: StackEntry) {
-      const handleScroll = () => {
+    function attachScrollListener(uid: string, attachedTo: HTMLElement, entry: StackEntry) {
+      /*
+       * HEARD IN THE CAPTURE PHASE, and read from whatever scrolls NOW (1.10.1).
+       *
+       * The element found when the page mounted may be its wrapper, and the body that claims the
+       * scroll arrives a render later. A scroll event does not bubble, but it is captured on the way
+       * down — so a capturing listener on the wrapper hears the body. Only the page's registered
+       * scroller counts; a list scrolling sideways inside it is not the page moving.
+       */
+      const handleScroll = (event: Event) => {
+        const container = getScrollableContainer(uid) ?? attachedTo;
+        if (event.target !== container) return;
         const scrollPosition = getCurrentScrollPosition(container);
         // Only where the user put it — see `isUserScroll`. The broadcast below still goes out, so a
         // bar in autohide mode hears every movement.
@@ -775,7 +803,7 @@ export function useUnifiedScrollRestoration(
         });
       };
 
-      const removeListener = addScrollListener(container, handleScroll);
+      const removeListener = addScrollListener(attachedTo, handleScroll);
       scrollData.activeListeners.set(uid, removeListener);
     }
 
