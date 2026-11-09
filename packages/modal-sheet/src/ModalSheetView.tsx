@@ -310,7 +310,21 @@ const SheetBase = forwardRef<any, SheetProps>(({
 
   const animOpts = { ease, duration };
 
-  // State machine transitions
+  // What the consumer wants NOW, for callbacks that outlive the render that created them.
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+
+  /*
+   * State machine transitions: bring `state` to what `isOpen` asks for — re-checked whenever EITHER
+   * changes, not only when `isOpen` does.
+   *
+   * Reacting to `isOpen` alone assumed nothing else moves `state`, and the animations do. The
+   * entrance's last frame sets 'open'; a close landing in that same moment queued 'closing' and the
+   * frame's 'open' was applied after it in one batch. `isOpen` had not changed again, so nothing
+   * looked: the sheet stayed open, backdrop over the page, with `isOpen` false (JIMSteps, 21 Oct:
+   * a result sheet left over the next question). Mirror case: reopened during the slide-out, the
+   * 'closing' state ignored it and the sheet ended closed with `isOpen` true.
+   */
   useEffect(() => {
     if (isOpen && state === 'closed') {
       setVisible(true);          // mount children
@@ -326,7 +340,7 @@ const SheetBase = forwardRef<any, SheetProps>(({
     } else if (!isOpen && (state === 'open' || state === 'opening')) {
       setState('closing');
     }
-  }, [isOpen]);
+  }, [isOpen, state]);
 
   /*
    * Start the open animation ONCE per open — not every time the sheet is re-measured.
@@ -420,7 +434,12 @@ const SheetBase = forwardRef<any, SheetProps>(({
       y.set(Math.max(sheetHeight, effectiveMaxHeight));
       (animate as any)(y, 0, {
         ...animOpts,
-        onComplete: () => { setState('open'); onOpenEnd?.(); },
+        // Only an entrance still wanted becomes 'open'; a close since then has the last word.
+        onComplete: () => {
+          if (!isOpenRef.current) return;
+          setState((s) => (s === 'opening' ? 'open' : s));
+          onOpenEnd?.();
+        },
       });
     }, 32);
 
