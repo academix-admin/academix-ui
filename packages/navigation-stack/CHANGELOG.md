@@ -1,5 +1,16 @@
 # @academix-admin/navigation-stack
 
+## 1.10.1
+
+### Patch Changes
+
+- 163c01c: A page built on `Scaffold` comes back where it was left on Safari. The scroll restore picked a page's
+  scroller once, when the page mounted — the wrapper, which registers first — and the Scaffold body
+  that claims the scroll a render later was never listened to, so nothing was recorded. Chrome keeps a
+  hidden page's offset through `display: none` and hid it; Safari drops it, so on an iPhone every
+  Scaffold page went back to the top after a push and Back. The restore now follows the scroller
+  registered now, and hears it in the capture phase from wherever it first attached.
+
 ## 1.10.0
 
 - **`Scaffold snap`: a travelling app bar is never left half on screen.** With
