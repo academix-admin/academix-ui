@@ -770,37 +770,28 @@ export function useUnifiedScrollRestoration(
         const container = getScrollableContainer(uid) ?? attachedTo;
         if (event.target !== container) return;
         const scrollPosition = getCurrentScrollPosition(container);
-        // Only where the user put it — see `isUserScroll`. The broadcast below still goes out, so a
-        // bar in autohide mode hears every movement.
-        const record = isUserScroll(uid, container);
-        if (record) globalScrollData.scrollPositions.set(uid, scrollPosition);
-
-        const scrollHeight = container?.scrollHeight ?? 0;
-        const clientHeight = container?.clientHeight ?? 0;
-        const maxScroll = Math.max(scrollHeight - clientHeight, 0);
+        // Only where the user put it — see `isUserScroll`.
+        if (!isUserScroll(uid, container)) return;
+        globalScrollData.scrollPositions.set(uid, scrollPosition);
 
         // Recorded with every position: a pixel offset is only meaningful at the width it was taken
         // at, and the width can change between capture and restore (rotation, resize, a responsive
         // breakpoint).
-        if (record) {
-          globalScrollData.scrollMetrics.set(uid, {
-            width: container?.clientWidth ?? 0,
-            maxScroll,
-          });
-        }
-        const scrollPercentage = maxScroll > 0 ? (scrollPosition / maxScroll) * 100 : 0;
-
-        scrollBroadcaster.broadcast({
-          uid,
-          pageKey: entry.key,
-          position: scrollPosition,
-          scrollPosition,
-          scrollPercentage,
-          container,
-          clientHeight,
-          scrollHeight,
-          timestamp: Date.now(),
+        globalScrollData.scrollMetrics.set(uid, {
+          width: container.clientWidth,
+          maxScroll: Math.max(container.scrollHeight - container.clientHeight, 0),
         });
+
+        /*
+         * RECORDED HERE, NEVER BROADCAST (1.10.2).
+         *
+         * The page's shell (`NavPageShell`) relays every scroll of the element it registered, and
+         * every renderer draws pages through it. This listener used to broadcast as well, under the
+         * route key where the shell uses the uid; while it listened to a wrapper that never moved
+         * nobody noticed. Once 1.10.1 let it hear the Scaffold body, every scroll arrived twice
+         * under two names, and a NavigationBar in autohide — which shows itself whenever the
+         * source changes, a new page — showed itself on every scroll and never hid.
+         */
       };
 
       const removeListener = addScrollListener(attachedTo, handleScroll);

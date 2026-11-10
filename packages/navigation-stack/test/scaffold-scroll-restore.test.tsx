@@ -17,7 +17,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, act, cleanup } from '@testing-library/react';
-import NavigationStack, { Scaffold } from '../src/index';
+import NavigationStack, { Scaffold, scrollBroadcaster } from '../src/index';
 import { getRegistry } from '../src/core/registry';
 
 const Long = () => (
@@ -79,5 +79,35 @@ describe('a Scaffold page keeps its place through a push', () => {
     await settle(1000);
 
     expect(body.scrollTop).toBe(1200);
+  });
+
+  /*
+   * ONE SCROLL, ONE MESSAGE, ONE NAME. 1.10.1 let the restore listener hear the body, and it
+   * broadcast each scroll a second time under the route key where the shell uses the uid. An
+   * autohide NavigationBar takes a change of name for a new page and shows itself — so on every
+   * Scaffold page the bar never hid (9 Nov). The shell is the only relay.
+   */
+  it('a scroll of the body reaches subscribers once, under one name', async () => {
+    const { container } = render(
+      <NavigationStack id="scroll-relay" navLink={{ list: Long, detail: Detail }} entry="list" />,
+    );
+    await settle();
+    const body = container.querySelector('.navstack-column-body') as HTMLElement;
+    sized(body);
+    await settle(1000);
+
+    const heard: Array<{ position: number; pageKey: string }> = [];
+    const off = scrollBroadcaster.subscribe((e) => {
+      if (e.container === body) heard.push({ position: e.position, pageKey: e.pageKey });
+    });
+    heard.length = 0; // whatever was cached before this scroll
+
+    body.scrollTop = 600;
+    body.dispatchEvent(new Event('scroll'));
+    await settle(50);
+    off();
+
+    const now = heard.filter((e) => e.position === 600);
+    expect(now).toHaveLength(1);
   });
 });
