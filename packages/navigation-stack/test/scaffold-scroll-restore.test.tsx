@@ -60,7 +60,8 @@ describe('a Scaffold page keeps its place through a push', () => {
     // Past the moment the page is being restored on arrival, when its scroll events are not the user's.
     await settle(1000);
 
-    // Where the user put it. A scroll event does not bubble — as in a browser.
+    // Where the user put it — with the wheel, as a person does. A scroll event does not bubble.
+    body.dispatchEvent(new Event('wheel'));
     body.scrollTop = 1200;
     body.dispatchEvent(new Event('scroll'));
     await settle(50);
@@ -73,6 +74,43 @@ describe('a Scaffold page keeps its place through a push', () => {
     // What Safari does to the covered page.
     body.scrollTop = 0;
 
+    await act(async () => {
+      await api.pop();
+    });
+    await settle(1000);
+
+    expect(body.scrollTop).toBe(1200);
+  });
+
+  /*
+   * A SCROLL NOBODY MADE IS NOT WHERE THEY WERE (1.11.1). Safari, showing a tab again, fires a
+   * scroll event at 0 before that tab's restore runs; it was saved over the real position, and every
+   * tab switch on iPhone came back at the top (10 Nov).
+   */
+  it('a scroll to 0 with no hand behind it does not replace where they were', async () => {
+    const { container } = render(
+      <NavigationStack id="scroll-phantom" navLink={{ list: Long, detail: Detail }} entry="list" />,
+    );
+    await settle();
+    const api = getRegistry().get('scroll-phantom')!.api!;
+    const body = container.querySelector('.navstack-column-body') as HTMLElement;
+    sized(body);
+    await settle(1000);
+
+    body.dispatchEvent(new Event('touchstart'));
+    body.scrollTop = 1200;
+    body.dispatchEvent(new Event('scroll'));
+    await settle(1200);
+
+    // The browser, on its own: no touch, no wheel, no key.
+    body.scrollTop = 0;
+    body.dispatchEvent(new Event('scroll'));
+    await settle(50);
+
+    await act(async () => {
+      await api.push('detail');
+    });
+    await settle(400);
     await act(async () => {
       await api.pop();
     });

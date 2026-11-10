@@ -495,8 +495,32 @@ function isUserScroll(uid: string, container: HTMLElement): boolean {
   if ((restoringUntil.get(uid) ?? 0) > Date.now()) return false;
   if (container.clientHeight === 0) return false;
   if (container.closest('.navstack-page')?.hasAttribute('inert')) return false;
-  return true;
+  return heardFromPerson(uid);
 }
+
+/*
+ * A PERSON MOVED IT (1.11.1).
+ *
+ * Safari forgets a hidden page's offset, and when a tab is shown again it fires a scroll event at 0
+ * — before the restore for that tab has run. Since 1.10.1 the listener hears the page body, so that
+ * 0 was saved over the real position and the restore put the page back at the top: every tab switch
+ * on iPhone lost its place, while a push and a pop within one tab kept it (10 Nov).
+ *
+ * So a position is kept only when somebody moved the page: a wheel, a touch, a pointer or a key
+ * inside it shortly before, or the momentum that carries on after a flick (each event close behind a
+ * kept one). The browser tidying up a page it hid has none of these.
+ */
+const INTENT_MS = 1000;
+const MOMENTUM_GAP_MS = 250;
+const intentAt = new Map<string, number>();
+const keptAt = new Map<string, number>();
+
+function heardFromPerson(uid: string): boolean {
+  const now = Date.now();
+  return now - (intentAt.get(uid) ?? -Infinity) < INTENT_MS || now - (keptAt.get(uid) ?? -Infinity) < MOMENTUM_GAP_MS;
+}
+
+const INTENT_EVENTS = ['wheel', 'touchstart', 'touchmove', 'pointerdown', 'keydown'] as const;
 
 /**
  * Where to scroll to, given what the container looked like when the position was captured.
@@ -772,6 +796,7 @@ export function useUnifiedScrollRestoration(
         const scrollPosition = getCurrentScrollPosition(container);
         // Only where the user put it — see `isUserScroll`.
         if (!isUserScroll(uid, container)) return;
+        keptAt.set(uid, Date.now());
         globalScrollData.scrollPositions.set(uid, scrollPosition);
 
         // Recorded with every position: a pixel offset is only meaningful at the width it was taken
@@ -794,7 +819,18 @@ export function useUnifiedScrollRestoration(
          */
       };
 
-      const removeListener = addScrollListener(attachedTo, handleScroll);
+      const removeScroll = addScrollListener(attachedTo, handleScroll);
+      // What a person does inside the page, heard on the way down like the scroll (`heardFromPerson`).
+      const noteIntent = () => intentAt.set(uid, Date.now());
+      INTENT_EVENTS.forEach((type) =>
+        attachedTo.addEventListener(type, noteIntent, { passive: true, capture: true }),
+      );
+      const removeListener = () => {
+        removeScroll();
+        INTENT_EVENTS.forEach((type) =>
+          attachedTo.removeEventListener(type, noteIntent, { capture: true }),
+        );
+      };
       scrollData.activeListeners.set(uid, removeListener);
     }
 
