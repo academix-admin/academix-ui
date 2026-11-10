@@ -160,6 +160,23 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
       mo.observe(document.body, { childList: true, subtree: true });
     };
 
+    /*
+     * A KEYBOARD THAT WAS SEEN, AND THEN WENT (1.11.2).
+     *
+     * Focus alone holds the flag open — it has to, because iOS reports no inset on the first focus.
+     * But a keyboard can go without the field losing focus: swiped down, Android's Back, the iPad's
+     * hide key. The field kept focus, so the flag stayed open and the tab bar and floating buttons
+     * stayed hidden over a page with no keyboard on it (10 Nov). So once a keyboard has been MEASURED
+     * during a focus, its going closes the flag, focus or not; the next focus starts afresh.
+     *
+     * Measured two ways: the inset, and how much shorter the visible viewport is than the tallest it
+     * has been at this width — for a browser that shrinks the layout viewport with it, where the
+     * inset reads 0 throughout.
+     */
+    let sawKeyboard = false;
+    let tallest = vv.height;
+    let tallestAtWidth = vv.width;
+
     const apply = () => {
       frame = 0;
       const vh = vv.height;
@@ -171,7 +188,15 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
       root.style.setProperty('--ax-keyboard-inset', `${inset}px`);
       root.style.setProperty('--ax-viewport-offset-top', `${Math.round(vv.offsetTop)}px`);
       root.style.setProperty('--ax-vv-height', `${Math.round(vh)}px`);
-      setKb(!!activeField() || inset > 60);
+      if (Math.abs(vv.width - tallestAtWidth) > 1) {
+        // Turned or resized: what counts as full height starts again.
+        tallestAtWidth = vv.width;
+        tallest = vh;
+      }
+      tallest = Math.max(tallest, vh);
+      const measured = inset > 60 || tallest - vh > 150;
+      if (measured) sawKeyboard = true;
+      setKb(measured || (!!activeField() && !sawKeyboard));
     };
 
     const schedule = () => {
@@ -188,14 +213,19 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
     const onResume = () => apply();
 
     const onFocusIn = (e: Event) => {
-      if (isField(e.target)) { setKb(true); startWatch(e.target as Element); revealSoon(); }
+      if (isField(e.target)) {
+        sawKeyboard = false;
+        startWatch(e.target as Element);
+        apply();
+        revealSoon();
+      }
     };
     const onFocusOut = () => {
       // Defer: focus may be moving to another field; re-derive the authoritative state.
       window.setTimeout(() => {
         const el = activeField();
         if (el) startWatch(el);
-        else { stopWatch(); apply(); }
+        else { stopWatch(); sawKeyboard = false; apply(); }
       }, 60);
     };
 

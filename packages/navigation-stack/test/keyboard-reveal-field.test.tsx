@@ -101,3 +101,35 @@ describe('revealFocusedField', () => {
     expect(scroller.scrollTop).toBe(0);
   });
 });
+
+/*
+ * THE FLAG CLOSES WHEN THE KEYBOARD GOES, even if the field keeps focus (1.11.2). Swiped down or
+ * dismissed with Back, the field stayed focused and `data-ax-keyboard` stayed open, so the tab bar
+ * and the floating buttons stayed hidden over a page with no keyboard (10 Nov).
+ */
+describe('data-ax-keyboard', () => {
+  it('opens on focus, and closes when the keyboard goes though the field keeps focus', async () => {
+    const { field } = mount(false);
+    act(() => field.focus());
+    expect(document.documentElement.getAttribute('data-ax-keyboard')).toBe('open');
+
+    vv.height = 500; // the keyboard arrives
+    act(() => {
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(document.documentElement.getAttribute('data-ax-keyboard')).toBe('open');
+
+    vv.height = 800; // swiped away; the field is still focused
+    act(() => {
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(document.activeElement).toBe(field);
+    expect(document.documentElement.getAttribute('data-ax-keyboard')).toBeNull();
+  });
+
+  it('stays open on a focus whose keyboard has not been measured yet (iOS first focus)', async () => {
+    const { field } = mount(false);
+    act(() => field.focus());
+    expect(document.documentElement.getAttribute('data-ax-keyboard')).toBe('open');
+  });
+});
