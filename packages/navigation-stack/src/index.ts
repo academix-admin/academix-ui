@@ -87,7 +87,7 @@ export type { AppBarBehavior, BodyProps, ScaffoldProps } from './bodies';
 
 // Keyboard / viewport-inset primitives for a keyboard-safe app shell.
 export { useViewportInsets, ViewportInsetsProvider, useResizeToAvoidKeyboard } from './keyboard';
-export type { ResizeToAvoidKeyboardOptions } from './keyboard';
+export type { ResizeToAvoidKeyboardOptions, ViewportInsetsOptions } from './keyboard';
 
 // Overlay URL state (step 3) and reconstructible named overlays (step 4).
 export {

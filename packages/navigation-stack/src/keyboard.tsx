@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 /**
  * Keyboard / viewport-inset primitives (Workstream F, extracted from academix-web
@@ -29,13 +29,46 @@ import React, { useEffect } from 'react';
  * override. The common case (field already reasonably positioned) is fully handled.
  */
 
+export interface ViewportInsetsOptions {
+  /**
+   * Keep the focused field above the keyboard, the way a native screen does.
+   *
+   * A shell sized to the visible viewport shrinks when the keyboard rises, and whatever was in
+   * its lower part is then below the fold of the page's own scroll region — including, sometimes,
+   * the very field that was tapped. Android's `adjustResize` and Flutter's `Scaffold` answer the
+   * same moment by scrolling the field's own scroller just enough to show it, and so does this:
+   * on focus, and again each time the visible viewport gets shorter (the keyboard arriving, or
+   * growing a suggestion row), the nearest scrolling ancestor of the focused field is moved by the
+   * least amount that puts the field `margin` px clear of the keyboard. Nothing moves when it is
+   * already in view, and nothing moves while the person scrolls with the keyboard up.
+   *
+   * Opt-in, because it scrolls the page: `true` for the default 16px margin, or `{ margin }`.
+   */
+  revealFocusedField?: boolean | { margin?: number };
+}
+
+/** The nearest ancestor that scrolls vertically, or null when nothing does. */
+function scrollParentOf(node: Element): HTMLElement | null {
+  let el: HTMLElement | null = node.parentElement;
+  while (el && el !== document.body && el !== document.documentElement) {
+    const overflow = getComputedStyle(el).overflowY;
+    if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
 /**
  * Publishes the visible-viewport CSS variables from the VisualViewport API. Mount
  * once near the app root (e.g. via `ViewportInsetsProvider`). Sanity-clamped,
  * immediate on viewport change, and resume-safe (Safari can restore a stale
  * viewport after backgrounding).
  */
-export function useViewportInsets(): void {
+export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
+  // Read through a ref, so the listeners below are set up once however the option is passed.
+  const revealRef = useRef(options.revealFocusedField);
+  revealRef.current = options.revealFocusedField;
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const vv = window.visualViewport;
@@ -72,6 +105,42 @@ export function useViewportInsets(): void {
       const onScreen = r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
       return onScreen ? el : null;
     };
+
+    /*
+     * THE FOCUSED FIELD, BROUGHT CLEAR OF THE KEYBOARD (`revealFocusedField`).
+     *
+     * Measured against the VISIBLE viewport, not the scroller alone: during the keyboard's
+     * arrival the shell has not always caught up, and the field the person is about to type in is
+     * the one thing that must not sit under it. Only ever scrolls DOWN the page (field moved up):
+     * a field above the visible area was put there by the person scrolling, and a pinned header
+     * may be covering that edge anyway.
+     */
+    const reveal = () => {
+      const option = revealRef.current;
+      if (!option) return;
+      const margin = typeof option === 'object' && option.margin != null ? option.margin : 16;
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || !isField(el) || !el.isConnected) return;
+      const scroller = scrollParentOf(el);
+      if (!scroller) return;
+      const field = el.getBoundingClientRect();
+      if (field.width === 0 && field.height === 0) return;
+      const box = scroller.getBoundingClientRect();
+      const top = Math.max(box.top, vv.offsetTop);
+      const bottom = Math.min(box.bottom, vv.offsetTop + vv.height) - margin;
+      if (field.bottom <= bottom) return;
+      // A field taller than the room left shows its top, which is where the caret starts.
+      const by = Math.min(field.bottom - bottom, Math.max(0, field.top - top - margin));
+      if (by > 0) scroller.scrollTop += by;
+    };
+    let revealTimer = 0;
+    const revealSoon = () => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(reveal));
+      window.clearTimeout(revealTimer);
+      // And once the keyboard has finished arriving, for a platform that reports it late.
+      revealTimer = window.setTimeout(reveal, 350);
+    };
+    let lastHeight = vv.height;
 
     const setKb = (open: boolean) => {
       if (open) root.setAttribute('data-ax-keyboard', 'open');
@@ -110,10 +179,16 @@ export function useViewportInsets(): void {
       frame = window.requestAnimationFrame(apply);
     };
     const onVV = () => apply();
+    // Shorter means the keyboard came up or grew: the moment a field can end up under it.
+    const onVVResize = () => {
+      apply();
+      if (vv.height < lastHeight - 1) revealSoon();
+      lastHeight = vv.height;
+    };
     const onResume = () => apply();
 
     const onFocusIn = (e: Event) => {
-      if (isField(e.target)) { setKb(true); startWatch(e.target as Element); }
+      if (isField(e.target)) { setKb(true); startWatch(e.target as Element); revealSoon(); }
     };
     const onFocusOut = () => {
       // Defer: focus may be moving to another field; re-derive the authoritative state.
@@ -127,7 +202,7 @@ export function useViewportInsets(): void {
     apply();
     const t1 = window.setTimeout(apply, 300);
     const t2 = window.setTimeout(apply, 900);
-    vv.addEventListener('resize', onVV);
+    vv.addEventListener('resize', onVVResize);
     vv.addEventListener('scroll', onVV);
     window.addEventListener('resize', schedule);
     window.addEventListener('orientationchange', schedule);
@@ -143,7 +218,8 @@ export function useViewportInsets(): void {
       if (frame) window.cancelAnimationFrame(frame);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
-      vv.removeEventListener('resize', onVV);
+      window.clearTimeout(revealTimer);
+      vv.removeEventListener('resize', onVVResize);
       vv.removeEventListener('scroll', onVV);
       window.removeEventListener('resize', schedule);
       window.removeEventListener('orientationchange', schedule);
@@ -162,8 +238,11 @@ export function useViewportInsets(): void {
 }
 
 /** Mounts `useViewportInsets` and renders its children. Put near the app root. */
-export function ViewportInsetsProvider({ children }: { children?: React.ReactNode }) {
-  useViewportInsets();
+export function ViewportInsetsProvider({
+  children,
+  revealFocusedField,
+}: { children?: React.ReactNode } & ViewportInsetsOptions) {
+  useViewportInsets({ revealFocusedField });
   return <>{children}</>;
 }
 

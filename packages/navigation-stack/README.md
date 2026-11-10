@@ -374,6 +374,17 @@ useViewportInsets();                    // publish the keyboard/safe-area insets
 useResizeToAvoidKeyboard({ enabled });  // shrink the page instead of letting the keyboard cover it
 ```
 
+`revealFocusedField` (on both `useViewportInsets({ … })` and `<ViewportInsetsProvider … />`, 1.11.0)
+keeps the field being typed in above the keyboard, as a native screen does: on focus, and each time
+the visible viewport gets shorter, the field's nearest scrolling ancestor moves by the least amount
+that leaves it `margin` px (default 16) clear of the keyboard. A field already in view is left
+alone, and nothing moves while the person scrolls with the keyboard up. Off by default, because it
+scrolls the page. `true`, or `{ margin }`.
+
+```tsx
+<ViewportInsetsProvider revealFocusedField />
+```
+
 ## Nested & group stacks
 
 Render a `<NavigationStack />` inside a page of another stack — the child
