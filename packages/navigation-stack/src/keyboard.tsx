@@ -76,10 +76,9 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
     if (!vv) return; // no VisualViewport: leave 0px fallbacks
 
     let frame = 0;
-    // Proactive "keyboard open" signal driven by input focus, NOT only by the measured
-    // inset. On iOS the FIRST focus reads inset ~0 (Safari scrolls the document instead of
-    // shrinking, so vvOffsetTop cancels the height loss), which left the bottom nav showing
-    // until the keyboard was dropped + reopened. Focus fires immediately, so we OR it in.
+    // The "keyboard open" signal follows the MEASURED keyboard, with a short head start for a
+    // field the finger touched (1.12.1 — see HEAD_START below): on iOS the FIRST focus reads
+    // inset ~0 for a moment, and focus fires before any resize does.
     //
     // The focus state is derived LIVE from document.activeElement (not a cached boolean):
     // an overlay (SearchViewer/dialog) whose focused input is REMOVED from the DOM on close
@@ -163,19 +162,42 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
     /*
      * A KEYBOARD THAT WAS SEEN, AND THEN WENT (1.11.2).
      *
-     * Focus alone holds the flag open — it has to, because iOS reports no inset on the first focus.
-     * But a keyboard can go without the field losing focus: swiped down, Android's Back, the iPad's
-     * hide key. The field kept focus, so the flag stayed open and the tab bar and floating buttons
-     * stayed hidden over a page with no keyboard on it (10 Nov). So once a keyboard has been MEASURED
-     * during a focus, its going closes the flag, focus or not; the next focus starts afresh.
+     * A keyboard can go without the field losing focus: swiped down, Android's Back, the iPad's
+     * hide key. Focus held the flag open then, and the tab bar and floating buttons stayed hidden
+     * over a page with no keyboard on it (10 Nov). The flag now follows the measurement, so its
+     * going closes the flag, focus or not.
      *
      * Measured two ways: the inset, and how much shorter the visible viewport is than the tallest it
      * has been at this width — for a browser that shrinks the layout viewport with it, where the
      * inset reads 0 throughout.
      */
-    let sawKeyboard = false;
     let tallest = vv.height;
     let tallestAtWidth = vv.width;
+
+    /*
+     * THE KEYBOARD ITSELF, NOT FOCUS (1.12.1).
+     *
+     * Focus is not a keyboard. A page that focuses a field from code after an await — a till that
+     * puts the caret back in its box once the item is added — gets the focus and, on iOS, no
+     * keyboard, because Safari raises one only for a focus made inside a tap. The flag used to open
+     * for any focused field until a keyboard had been measured, so there it opened and stayed open:
+     * the tab bar and floating buttons hidden over a page with no keyboard (12 Nov).
+     *
+     * So the flag follows the keyboard as the visible viewport measures it. The one head start is a
+     * field the finger touched — the field, its label, or a box around it — where the keyboard is
+     * certainly on its way and iOS's first focus measures nothing for a moment: that opens it at
+     * once, for at most `HEAD_START` ms, and a keyboard measured in that time takes over. A focus
+     * from code, a mouse or a hardware key waits for the keyboard to be measured.
+     */
+    const HEAD_START = 1000;
+    let touched: { target: Element; at: number } | null = null;
+    let expectUntil = 0;
+    let expectTimer = 0;
+    const touchedField = (field: Element): boolean => {
+      if (!touched || Date.now() - touched.at > HEAD_START) return false;
+      const t = touched.target;
+      return t === field || t.contains(field) || (t.closest?.('label') as HTMLLabelElement | null)?.control === field;
+    };
 
     const apply = () => {
       frame = 0;
@@ -196,18 +218,15 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
       tallest = Math.max(tallest, vh);
       const measured = inset > 60 || tallest - vh > 150;
       const field = !!activeField();
-      if (measured && field) sawKeyboard = true;
+      // A keyboard has arrived: from here it is the measurement that says when it goes.
+      if (measured) expectUntil = 0;
       /*
        * NO FIELD, NO KEYBOARD (1.12.0). A soft keyboard cannot be up without a focused field, so the
-       * flag needs one. It used to be `measured || …`, and the measurement outlives the keyboard: on
-       * iPhone, Done blurs the field and the check that follows runs mid-animation, while the visible
-       * viewport is still short — the flag stayed open, and when Safari sent no resize at the end of
-       * the animation the tab bar and floating buttons stayed hidden over a page with no keyboard on
-       * it until the next touch (12 Nov). A pinch-zoom, which also shortens the visible viewport,
-       * hid them the same way. With a field: open while a keyboard measures, or before one has
-       * (iOS's first focus reports nothing), and closed once a measured one has gone.
+       * flag needs one: the measurement outlives the keyboard (on iPhone, Done blurs the field while
+       * the visible viewport is still short), and a pinch-zoom shortens it too. With a field: open
+       * while a keyboard measures, or in the head start of a field just touched (1.12.1).
        */
-      setKb(field && (measured || !sawKeyboard));
+      setKb(field && (measured || Date.now() < expectUntil));
     };
 
     const schedule = () => {
@@ -215,18 +234,32 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
       frame = window.requestAnimationFrame(apply);
     };
     const onVV = () => apply();
+    // And again once a keyboard's animation is over, for a platform that sends no resize at its end.
+    let settleTimer = 0;
     // Shorter means the keyboard came up or grew: the moment a field can end up under it.
     const onVVResize = () => {
       apply();
       if (vv.height < lastHeight - 1) revealSoon();
       lastHeight = vv.height;
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(apply, 400);
     };
     const onResume = () => apply();
 
+    // Only a finger or a pen: a mouse brings no soft keyboard.
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' || !(e.target instanceof Element)) return;
+      touched = { target: e.target, at: Date.now() };
+    };
+
     const onFocusIn = (e: Event) => {
       if (isField(e.target)) {
-        sawKeyboard = false;
-        startWatch(e.target as Element);
+        const el = e.target as Element;
+        window.clearTimeout(expectTimer);
+        expectUntil = touchedField(el) ? Date.now() + HEAD_START : 0;
+        // When the head start runs out, the flag is whatever the keyboard measures.
+        if (expectUntil) expectTimer = window.setTimeout(apply, HEAD_START + 20);
+        startWatch(el);
         apply();
         revealSoon();
       }
@@ -236,7 +269,7 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
       window.setTimeout(() => {
         const el = activeField();
         if (el) startWatch(el);
-        else { stopWatch(); sawKeyboard = false; apply(); }
+        else { stopWatch(); expectUntil = 0; apply(); }
       }, 60);
     };
 
@@ -249,6 +282,7 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
     window.addEventListener('orientationchange', schedule);
     window.addEventListener('pageshow', onResume);
     document.addEventListener('visibilitychange', onResume);
+    document.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true });
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
     // Swipe-to-dismiss (react-modal-sheet etc.) may not blur/remove the input synchronously;
@@ -260,6 +294,9 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(revealTimer);
+      window.clearTimeout(settleTimer);
+      window.clearTimeout(expectTimer);
+      document.removeEventListener('pointerdown', onPointerDown, true);
       vv.removeEventListener('resize', onVVResize);
       vv.removeEventListener('scroll', onVV);
       window.removeEventListener('resize', schedule);

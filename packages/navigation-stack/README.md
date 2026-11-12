@@ -392,10 +392,13 @@ scrolls the page. `true`, or `{ margin }`.
 ```
 
 `<html data-ax-keyboard="open">` — what an app shell reads to step its tab bar and floating buttons
-aside — is set only while a field has focus: open on focus (iOS's first focus reports no keyboard
-inset), and closed when a keyboard that was measured goes away, or the field is let go, whatever the
-viewport still measures (1.12.0 — on iPhone, Done used to leave it open mid-animation, and a
-pinch-zoom with no field focused opened it).
+aside — follows the keyboard itself, as the visible viewport measures it, and only while a field has
+focus (1.12.0: Done on iPhone, and a pinch-zoom, left it open). Focus alone is not a keyboard
+(1.12.1): a field focused from code — `input.focus()` after an await, which raises no keyboard on
+iOS — leaves the flag closed until a keyboard is measured. The one head start is a field the finger
+touched (the field, its label, or a box around it): that opens the flag at once, for at most a
+second, since iOS's first focus measures nothing for a moment; a keyboard measured in that time
+takes over, and none measured closes it again. A mouse click never opens it.
 
 ## Nested & group stacks
 

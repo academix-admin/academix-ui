@@ -55,16 +55,65 @@ afterEach(() => {
   document.documentElement.removeAttribute('data-ax-keyboard');
 });
 
+/** A finger on the field and the focus it brings, as a tap does. */
+const tap = (el: Element) =>
+  act(() => {
+    el.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' }));
+    (el as HTMLElement).focus();
+  });
+
 describe('data-ax-keyboard', () => {
-  it('opens on focus, before any keyboard is measured (iOS first focus)', async () => {
+  it('a touched field opens it at once, before any keyboard is measured (iOS first focus)', async () => {
+    const field = mount();
+    tap(field);
+    expect(flag()).toBe('open');
+  });
+
+  it('a focus from code is not a keyboard: it waits for one to be measured (1.12.1)', async () => {
+    // The till puts the caret back in its box after the item is added — after an await, so iOS
+    // raises no keyboard. The flag opened for it and stayed open over a page with no keyboard.
     const field = mount();
     act(() => field.focus());
+    expect(flag()).toBeNull();
+    await wait(1100);
+    expect(flag()).toBeNull();
+    // And if a keyboard does come, it opens.
+    await resize(450);
     expect(flag()).toBe('open');
+  });
+
+  it('a touched field whose keyboard never comes closes when the head start runs out', async () => {
+    const field = mount();
+    tap(field);
+    expect(flag()).toBe('open');
+    await wait(1100);
+    expect(flag()).toBeNull();
+  });
+
+  it('a touch elsewhere, then a focus from code, is not a head start', async () => {
+    const field = mount();
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+    act(() => {
+      button.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' }));
+      field.focus();
+    });
+    expect(flag()).toBeNull();
+    button.remove();
+  });
+
+  it('a mouse brings no keyboard', async () => {
+    const field = mount();
+    act(() => {
+      field.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'mouse' }));
+      field.focus();
+    });
+    expect(flag()).toBeNull();
   });
 
   it('closes when the field is let go, though the viewport still measures a keyboard', async () => {
     const field = mount();
-    act(() => field.focus());
+    tap(field);
     await resize(450); // the keyboard arrives
     expect(flag()).toBe('open');
     // Done: the field blurs mid-animation — the viewport is still short, and no resize follows.
@@ -75,7 +124,7 @@ describe('data-ax-keyboard', () => {
 
   it('a keyboard swiped away closes it, though the field keeps focus', async () => {
     const field = mount();
-    act(() => field.focus());
+    tap(field);
     await resize(450);
     expect(flag()).toBe('open');
     await resize(800);
