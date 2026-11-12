@@ -1133,6 +1133,21 @@ export function scrollIntoViewBelow(
   });
 }
 
+/**
+ * THE PAGE'S OWN SCROLL REGION, for an element on it (1.12.0).
+ *
+ * The `ColumnBody` it sits in — a Scaffold page's body — whether or not it overflows yet, which is what
+ * an IntersectionObserver root or a "walk up to the page" loop needs; else the nearest ancestor that
+ * genuinely scrolls. Null outside a page that scrolls. Apps were finding it by this package's class
+ * name, which is not a contract: this is.
+ */
+export function pageScrollerOf(node: Element | null | undefined): HTMLElement | null {
+  if (!node) return null;
+  const body = node.closest<HTMLElement>('.navstack-column-body');
+  if (body) return body;
+  return node instanceof HTMLElement ? findScrollParent(node) : null;
+}
+
 /** The nearest ancestor that genuinely scrolls vertically. */
 function findScrollParent(node: HTMLElement): HTMLElement | null {
   let el: HTMLElement | null = node.parentElement;

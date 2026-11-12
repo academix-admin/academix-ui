@@ -256,7 +256,13 @@ useInfiniteScrollObserver({ onLoadMore, hasMore });    // IntersectionObserver
 usePullToRefresh({ onRefresh });                       // returns { pulling, distance, refreshing }
 useScrollEvents({ onScroll, onReachEnd, onReachTop });
 scrollIntoViewBelow(el, opts) / useScrollIntoViewBelow()  // scroll something clear of a pinned bar
+pageScrollerOf(el)                                        // the page's own scroll region (1.12.0)
 ```
+
+`pageScrollerOf(el)` is the `ColumnBody` an element sits in — whether or not it overflows yet, which
+is what an IntersectionObserver `root` or a "walk up to the page" loop needs — else the nearest
+ancestor that scrolls; null outside a page that scrolls. Use it instead of the package's class names,
+which are not a contract.
 
 These live here rather than in a list library because they need the stack: a page that is not on top
 must not react to a scroll it cannot see, and a restored page must not fire "reached the end" while
@@ -384,6 +390,12 @@ scrolls the page. `true`, or `{ margin }`.
 ```tsx
 <ViewportInsetsProvider revealFocusedField />
 ```
+
+`<html data-ax-keyboard="open">` — what an app shell reads to step its tab bar and floating buttons
+aside — is set only while a field has focus: open on focus (iOS's first focus reports no keyboard
+inset), and closed when a keyboard that was measured goes away, or the field is let go, whatever the
+viewport still measures (1.12.0 — on iPhone, Done used to leave it open mid-animation, and a
+pinch-zoom with no field focused opened it).
 
 ## Nested & group stacks
 

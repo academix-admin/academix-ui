@@ -195,8 +195,19 @@ export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
       }
       tallest = Math.max(tallest, vh);
       const measured = inset > 60 || tallest - vh > 150;
-      if (measured) sawKeyboard = true;
-      setKb(measured || (!!activeField() && !sawKeyboard));
+      const field = !!activeField();
+      if (measured && field) sawKeyboard = true;
+      /*
+       * NO FIELD, NO KEYBOARD (1.12.0). A soft keyboard cannot be up without a focused field, so the
+       * flag needs one. It used to be `measured || …`, and the measurement outlives the keyboard: on
+       * iPhone, Done blurs the field and the check that follows runs mid-animation, while the visible
+       * viewport is still short — the flag stayed open, and when Safari sent no resize at the end of
+       * the animation the tab bar and floating buttons stayed hidden over a page with no keyboard on
+       * it until the next touch (12 Nov). A pinch-zoom, which also shortens the visible viewport,
+       * hid them the same way. With a field: open while a keyboard measures, or before one has
+       * (iOS's first focus reports nothing), and closed once a measured one has gone.
+       */
+      setKb(field && (measured || !sawKeyboard));
     };
 
     const schedule = () => {

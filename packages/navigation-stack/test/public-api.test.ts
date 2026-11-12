@@ -68,6 +68,7 @@ const PUBLIC_EXPORTS = [
   'usePullToRefresh',
   'scrollIntoViewBelow',
   'useScrollIntoViewBelow',
+  'pageScrollerOf',
   'revealInRow',
   'sidewaysScrollerOf',
   'useRevealTappedInRows',
