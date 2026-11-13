@@ -57,6 +57,16 @@ and defaults to what the package has always drawn.
 
 Exports: `BottomViewer` (default), `useBottomController`, `useBottomSheet`.
 
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.bottom-viewer-container`
+- `.bottom-viewer-header`
+- `.bottom-viewer-drag-handle`
+- `.bottom-viewer-cancel-btn`
+- `.bottom-viewer-content`
+
 ## License
 
 MIT © Academix

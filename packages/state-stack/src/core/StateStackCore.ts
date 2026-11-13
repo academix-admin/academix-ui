@@ -166,6 +166,8 @@ export class StateStackCore {
    * is per KEY and only reaches what is holding that key's value.
    */
   private invalidationListeners = new Map<string, Set<() => void>>();
+  /** upstream scope -> the scopes derived from it (`scopeDependsOn`). */
+  private scopeDependents = new Map<string, Set<string>>();
   /**
    * Keys that arrived with the page, not from this browser.
    *
@@ -607,7 +609,42 @@ export class StateStackCore {
     };
   }
 
+  /**
+   * THIS SCOPE IS MADE FROM THOSE (0.7.0). Declared once, where the data is defined, instead of at every
+   * write: invalidating any of `upstream` then invalidates `scope` too, and whatever depends on it in
+   * turn (cycle-safe). store-manager's receipts cached the shop's paper settings, the settings page
+   * invalidated only its own scope, and a removed logo kept printing; every writer had to remember every
+   * reader. Staleness only — `clearScope` (sign-out, account switch) cascades nothing.
+   *
+   * Returns the undo. Additive: a scope nobody declared behaves exactly as before.
+   */
+  scopeDependsOn(scope: string, upstream: string[]): () => void {
+    for (const u of upstream) {
+      if (u === scope) continue;
+      let set = this.scopeDependents.get(u);
+      if (!set) {
+        set = new Set();
+        this.scopeDependents.set(u, set);
+      }
+      set.add(scope);
+    }
+    return () => {
+      for (const u of upstream) {
+        const set = this.scopeDependents.get(u);
+        if (!set) continue;
+        set.delete(scope);
+        if (set.size === 0) this.scopeDependents.delete(u);
+      }
+    };
+  }
+
   invalidateScope(scope: string) {
+    this.invalidateWithDependents(scope, new Set());
+  }
+
+  private invalidateWithDependents(scope: string, seen: Set<string>) {
+    if (seen.has(scope)) return;
+    seen.add(scope);
     const keys = new Set<string>();
 
     const sm = this.stacks.get(scope);
@@ -642,6 +679,10 @@ export class StateStackCore {
      */
     const listeners = this.invalidationListeners.get(scope);
     if (listeners) for (const fn of [...listeners]) fn();
+
+    // And every scope made from this one (`scopeDependsOn`), once each however the graph loops.
+    const dependents = this.scopeDependents.get(scope);
+    if (dependents) for (const d of [...dependents]) this.invalidateWithDependents(d, seen);
   }
 
   async clearScope(scope: string, removePersist = true) {

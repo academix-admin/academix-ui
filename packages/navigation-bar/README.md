@@ -62,6 +62,14 @@ area, and the floating button's room while hidden), so a page can pad its foot b
 Exported types: `NavItem`, `NavigationBarProps`, `NavigationModeType`, `NavigationBarScrollEvent`,
 `NavigationBarVisibility`.
 
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.navigation-bar`
+- `.nav-item`
+- `.fab`
+
 ## License
 
 MIT © Academix

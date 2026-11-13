@@ -16,7 +16,7 @@ import { settleOverlayFragment } from './overlay/hash';
 
 let _groupStyleMountCount = 0;
 // Rendered components: loaders, transitions, error boundary, group + main stack.
-import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useSyncExternalStore, Suspense, lazy } from 'react';
 import type { ComponentType, ReactNode, ReactElement } from 'react';
 
 export function LazyRouteLoader({ lazyComponent }: { lazyComponent: () => LazyComponent }) {
@@ -431,6 +431,10 @@ export type GroupNavigationStackProps = {
 
 export const GROUP_STATE_STORAGE_KEY = 'navstack-group-state';
 
+const noSubscription = () => () => {};
+const notHydrating = () => false;
+const isHydrating = () => true;
+
 const _backKeptBy = new WeakMap<Event, string | null>();
 
 /**
@@ -558,11 +562,27 @@ export function GroupNavigationStack({
       return current;
     }
   };
-  const [activeStackId, setActiveStackId] = useState<string>(getInitialActiveStackId);
+  /*
+   * THE FIRST RENDER MATCHES THE SERVER'S (1.13.1). The server cannot read the URL, so it draws
+   * `current`; a client that drew the URL's tab in its hydration render (`?group=me-stack`) left the
+   * server's "Play is active" in the DOM — React does not repair attributes on hydration — and two
+   * tabs were drawn at once (JIMSteps, 13 Nov). Hydrating, the group starts at `current` and the mount
+   * effect below moves to the URL's tab; mounted in the browser alone, it starts at the URL's at once.
+   * `useSyncExternalStore` answers which: its server snapshot is used only while hydrating.
+   */
+  const hydrating = useSyncExternalStore(noSubscription, notHydrating, isHydrating);
+  /*
+   * The tab the URL asked for, read in the FIRST render: the stacks below mount before this group's
+   * effects run, and the one on screen may push and restamp the URL (`group=`) on its way in — read in
+   * the mount effect, the URL already named that tab and the group stayed on it.
+   */
+  const askedFor = useRef<string | null>(null);
+  if (askedFor.current === null && typeof window !== 'undefined') askedFor.current = getInitialActiveStackId();
+  const [activeStackId, setActiveStackId] = useState<string>(() => (hydrating ? current : askedFor.current ?? current));
 
   // Hydrate on mount
   useEffect(() => {
-    const initialActiveStackId = getInitialActiveStackId();
+    const initialActiveStackId = askedFor.current ?? getInitialActiveStackId();
 
     // Only update if different from current state
     if (initialActiveStackId !== activeStackId) {

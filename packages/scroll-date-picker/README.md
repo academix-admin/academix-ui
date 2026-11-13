@@ -61,6 +61,17 @@ The `CustomScrollDatePickerProps` type is exported for convenience.
 Client-only (ships the `"use client"` directive). Import it from a client
 component.
 
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.date-picker-container`
+- `.pickers-wrapper`
+- `.wheel-column`
+- `.wheel-item`
+- `.quick-buttons`
+- `.quick-button`
+
 ## License
 
 MIT © Academix

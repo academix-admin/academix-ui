@@ -61,6 +61,19 @@ optional and defaults to what the package has always drawn.
 Exports: `DialogViewer` (default), `useDialog`, `useDialogController`,
 `createAlertDialog`, `createConfirmDialog`, `createDestructiveDialog`.
 
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.dialog-overlay`
+- `.dialog-container`
+- `.dialog-header`
+- `.dialog-title`
+- `.dialog-content`
+- `.dialog-message`
+- `.dialog-actions`
+- `.dialog-button`
+
 ## License
 
 MIT © Academix

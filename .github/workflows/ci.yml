@@ -46,3 +46,25 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      # Every export locked by a test and named in its README (scripts/check-surface.mjs).
+      - name: Public surface
+        run: npm run check:surface
+
+      # Each package's gzipped entry within size-budgets.json.
+      - name: Size
+        run: npm run size
+
+  # The example apps on phone-shaped engines: WebKit as an iPhone, Chromium as an Android phone.
+  e2e:
+    name: e2e (WebKit iPhone, Chromium Android, desktop)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit chromium
+      - run: npm run e2e

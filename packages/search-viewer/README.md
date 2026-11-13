@@ -145,6 +145,19 @@ Returns a tuple `[searchId, operations, isOpen, searchState]`:
 `MultipleSearchViewer` and `EachViewer` build on the same engine for multi-select
 and composed layouts. Types (`SearchResult`, `SearchViewerProps`, …) are exported.
 
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.search-viewer-search`
+- `.search-viewer-search-back-button`
+- `.search-viewer-search-clear-button`
+- `.search-viewer-fullscreen-search`
+- `.search-viewer-content`
+- `.search-viewer-loading`
+- `.search-viewer-no-results`
+- `.search-viewer-error`
+
 ## License
 
 MIT © Academix

@@ -1,0 +1,19 @@
+{
+  "app-shell": 3072,
+  "bottom-viewer": 5120,
+  "dialog-viewer": 5632,
+  "forms": 3584,
+  "header": 3584,
+  "lottie-cache": 512,
+  "modal-sheet": 5120,
+  "navigation-bar": 4608,
+  "navigation-stack": 55808,
+  "overlay-route": 2048,
+  "pin-input": 2560,
+  "scroll-date-picker": 4608,
+  "search-viewer": 7680,
+  "selection-viewer": 7680,
+  "side-drawer": 2560,
+  "sidebar": 5632,
+  "state-stack": 16384
+}

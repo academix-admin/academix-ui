@@ -86,6 +86,16 @@ export default function Example() {
 All prop/interface types (`SheetProps`, `SheetContainerProps`, `SheetDetent`, …)
 are exported.
 
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.react-modal-sheet-backdrop`
+- `.react-modal-sheet-container`
+- `.react-modal-sheet-header-container`
+- `.react-modal-sheet-content`
+- `.react-modal-sheet-content-scroller`
+
 ## License
 
 MIT © Academix

@@ -535,6 +535,66 @@ Both the component and its hooks are client-only; the module carries the
 `'use client'` directive, so import it from client components. `isBrowser()` and
 `safeWindow()` are exported for guarding your own code.
 
+## Every other export
+
+The sections above cover the everyday API. These are the remaining exports, grouped by what they are for. Each is public, locked by `test/public-api.test.ts`, and covered by semver.
+
+**Pages and errors**
+
+| Export | What it does |
+|---|---|
+| `NavigationErrorBoundary` | Error boundary around lazy-loaded pages, so a page that fails to load doesn't take the stack down with it. |
+| `usePageSpecificLifecycle` | A page's lifecycle callbacks, cleaned up when that page leaves the stack. |
+| `getGroupOverlay(groupId)` | The overlay controller for a whole group, the layer above every tab. It has the same shape as `nav.overlay`, but is addressed by group id. |
+| `useOverlayEntry` | A declarative overlay: inserted on mount, removed on unmount, re-inserted when its `deps` change. By default it is bound above the page that rendered it. |
+
+**Route maps and tags**
+
+| Export | What it does |
+|---|---|
+| `aggregateNavigationMaps(...maps)` | Merges several route maps into one. |
+| `createTaggedNavigation`, `getComponentsByTag`, `getAvailableTags` | A tag registry beside the route map. Tags group pages without affecting routing. |
+
+**Paths (the URL codec, pure: no React, no DOM)**
+
+| Export | What it does |
+|---|---|
+| `resolvePath` | What a URL means without rendering anything: which pages it names, which is on top, and where the stack is mounted. Use it on a server or in a redirect. |
+| `buildPath(stack, navLink)` / `parsePath` | Write a stack as a path, and read it back, including what couldn't be accounted for. |
+| `splitBase(path, navLink)` | Where this stack's part of the path begins, for a stack mounted under a prefix such as `/s/7R8U2A`. |
+| `slugify` / `soleParamNamesOf` | Readable URL words, and the param names a path segment may omit. |
+
+**Objects passed between pages**
+
+| Export | What it does |
+|---|---|
+| `createObjectGetter`, `createReactiveObjectGetter`, `createObjectTypeGuard` | Typed, memoized getters and guards for objects passed with `provideObject` / `useObject`. |
+| `useDebugObjects` | Lists the objects available in the current stack, for troubleshooting. |
+
+**Scroll and gestures**
+
+| Export | What it does |
+|---|---|
+| `scrollBroadcaster` / `useScrollBroadcast` | Every page's scroll as one stream. The tab bar's `autohide` reads it (`onScroll={(cb) => scrollBroadcaster.subscribe(cb)}`). |
+| `sidewaysScrollerOf(el)` | The nearest ancestor that scrolls sideways and has room to move, or `null`. |
+| `hasNativeBackGesture()` | Whether the platform already has a back gesture at the screen edge (iOS, Android), so the stack's own swipe-back steps aside. |
+
+**Named overlays (overlays that survive a reload)**
+
+| Export | What it does |
+|---|---|
+| `registerOverlayFactory(key, factory)` / `getOverlayFactory` / `clearOverlayFactories` | Register an overlay that can be rebuilt from the URL after a reload. Call it once at startup. It returns an unregister function. |
+| `descriptorId`, `parseOverlays`, `serializeOverlays` | The descriptor codec: a stable id, and defensive parse and serialize of the overlay list kept in the URL. |
+| `OVERLAY_FRAGMENT_KEY`, `buildFragment`, `parseFragment`, `setInFragment`, `readOverlayFragment`, `writeOverlayFragment`, `settleOverlayFragment`, `claimOverlay`, `releaseOverlay`, `isOverlayClaimed`, `overlayClaims`, `closeUnrestoredOverlay`, `resetOverlayClaims`, `resetOverlaySettle` | Re-exported from `@academix-admin/overlay-route`, where they live and are documented. |
+
+**Devtools and tests**
+
+| Export | What it does |
+|---|---|
+| `installNavDevtools()` / `navDevtools` / `devtoolsEnabled()` | The navigation recorder (see Devtools above). `devtoolsEnabled()` says whether `window.__NAV_STACK_DEVTOOLS__` turned it on. |
+| `getPopHealth()` | How many pops the history log could account for (`named`) and how many fell back to counting (`counted`). An app that keeps falling back has a history writer that isn't declaring its entries. |
+| `resetNavigationLedgers(stackIds?)` | Clears every history ledger in one call. Use it between tests, never in an app. |
+
 ## License
 
 MIT © Academix

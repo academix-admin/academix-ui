@@ -60,6 +60,12 @@ sheet cannot trigger a server render. The fragment is not ours, though — `#sec
 `scrollIntoView` anchors are ordinary site behaviour — so this owns exactly one `&`-separated `ax=`
 segment and passes every other one through untouched, in its original order.
 
+## Less common exports
+
+- `OVERLAY_FRAGMENT_KEY` (`'ax'`): the one fragment segment this package owns.
+- `hasExternalHistoryWriter()`: whether a navigation library has taken over history writes. Use it in devtools only, and never branch behaviour on it.
+- `resetOverlayClaims()` / `resetOverlaySettle()`: clear the claims, and let a new document (or a test) schedule a settle again. These are for tests, not apps.
+
 ## API
 
 | | |

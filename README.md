@@ -1,63 +1,74 @@
 # Academix UI
 
-Open-source React libraries extracted from the Academix codebase, published
-under the `@academix-admin` scope.
+React packages for web apps that should feel like installed phone apps: tabs that keep their place, Back that does what the phone means, sheets and dialogs Back can close, and layouts the keyboard doesn't wreck. They're published under the `@academix-admin` scope, and each one works on its own.
 
-| Package | Description |
+## Start here
+
+**[`examples/app-shell`](./examples/app-shell)** is a starter. Copy it and you have a working app frame, built on [`@academix-admin/app-shell`](./packages/app-shell): tabs on a phone and a sidebar on a laptop, pages that push and pop, a form, full screen, and a pill that rides the tab bar.
+
+## Packages
+
+### The frame
+
+| Package | What it's for |
 | --- | --- |
-| [`@academix-admin/overlay-route`](./packages/overlay-route) | A sheet, picker or dialog gets its own history entry, so the platform's Back closes the OVERLAY rather than the page under it — plus reopening after a reload, and a one-function seam a navigation library fills so its pop ledger counts the entry. No dependencies. |
-| [`@academix-admin/navigation-stack`](./packages/navigation-stack) | Client-side navigation stack — transitions, swipe-back, scroll restoration, nested stacks, DI and a request/response bus. |
-| [`@academix-admin/state-stack`](./packages/state-stack) | Framework-agnostic cross-tab state — IndexedDB persistence, BroadcastChannel sync, undo/redo, atoms and route-scoped demand state. |
-| [`@academix-admin/scroll-date-picker`](./packages/scroll-date-picker) | iOS-style wheel/scroll date picker with magnifier, quick-date shortcuts and theming. Zero deps beyond React. |
-| [`@academix-admin/modal-sheet`](./packages/modal-sheet) | Gesture-driven bottom sheet built on Motion — snap detents, keyboard avoidance, compound `Sheet.*` API. |
-| [`@academix-admin/search-viewer`](./packages/search-viewer) | Debounced search & selection UI — local + async cursor-paginated sources, loading/empty/error states, plus composable `Row`/`Column` sections with automatic state aggregation. |
-| [`@academix-admin/selection-viewer`](./packages/selection-viewer) | Imperative selection sheet — search + pick from a list, scroll-triggered pagination, plus composable `Row`/`Column` sections with automatic state aggregation (built on `@academix-admin/modal-sheet`). |
-| [`@academix-admin/navigation-bar`](./packages/navigation-bar) | Configurable nav/tab bar — normal, floating and auto-hide-on-scroll modes. |
-| [`@academix-admin/sidebar`](./packages/sidebar) | Flexible, collapsible sidebar / side navigation with nested items. |
-| [`@academix-admin/dialog-viewer`](./packages/dialog-viewer) | Imperative alert / confirm / destructive dialogs via a controller hook. |
-| [`@academix-admin/side-drawer`](./packages/side-drawer) | Lightweight portal-based side drawer / off-canvas panel. |
-| [`@academix-admin/bottom-viewer`](./packages/bottom-viewer) | Imperative bottom-sheet viewer (built on `@academix-admin/modal-sheet`). |
-| [`@academix-admin/lottie-cache`](./packages/lottie-cache) | Tiny in-memory cache + preloader for Lottie animation JSON. |
+| [`app-shell`](./packages/app-shell) | The whole app frame from one component: one stack per tab, a tab bar on phones and a sidebar on wide screens, keyboard-safe sizing, safe areas, tap-again-to-go-home, and Back that stays in its tab. |
+| [`navigation-stack`](./packages/navigation-stack) | Pages and tabs without a router: transitions, swipe-back, scroll restoration, nested and grouped stacks, params, and a keyboard-safe layout. |
+| [`navigation-bar`](./packages/navigation-bar) | The bottom tab bar: normal, floating, or hidden while you scroll. |
+| [`sidebar`](./packages/sidebar) | The side rail for wide screens, collapsible. |
+| [`header`](./packages/header) | A page's title bar, with back and actions. |
 
-## Repo layout
+### Overlays
 
-```
-academix-ui/
-├── packages/
-│   ├── overlay-route/      # @academix-admin/overlay-route
-│   ├── navigation-stack/   # @academix-admin/navigation-stack
-│   └── state-stack/        # @academix-admin/state-stack
-├── package.json            # npm workspaces root
-├── tsconfig.base.json      # shared TS config
-└── .changeset/             # versioning & release
-```
+| Package | What it's for |
+| --- | --- |
+| [`overlay-route`](./packages/overlay-route) | A sheet, picker or dialog gets its own history entry, so Back closes the overlay and not the page under it, and it reopens after a reload. |
+| [`modal-sheet`](./packages/modal-sheet) | A gesture-driven bottom sheet: snap points and keyboard avoidance. |
+| [`bottom-viewer`](./packages/bottom-viewer) | A bottom sheet you open from code. |
+| [`dialog-viewer`](./packages/dialog-viewer) | Alert, confirm and destructive dialogs from a controller hook. |
+| [`selection-viewer`](./packages/selection-viewer) | Pick one from a list in a sheet, with search and paging. |
+| [`search-viewer`](./packages/search-viewer) | Debounced search over local and server data, with loading, empty and error states. |
+| [`side-drawer`](./packages/side-drawer) | A slide-in panel. |
+
+### Inputs
+
+| Package | What it's for |
+| --- | --- |
+| [`forms`](./packages/forms) | Headless text input, select field, checkbox and radio group. |
+| [`pin-input`](./packages/pin-input) | OTP and PIN boxes, and an on-screen keypad. |
+| [`scroll-date-picker`](./packages/scroll-date-picker) | An iOS-style wheel date picker. |
+
+### Data
+
+| Package | What it's for |
+| --- | --- |
+| [`state-stack`](./packages/state-stack) | Fetched and shared state: IndexedDB persistence, sync across tabs, scoped invalidation, per-request stores for server rendering. |
+| [`lottie-cache`](./packages/lottie-cache) | Preload and cache Lottie animation JSON. |
+
+## What every package promises
+
+Each promise below is enforced by a check, not just a convention. `npm run verify` runs all of them.
+
+- **Every export is documented and locked.** Each one is named in its package's README, and `test/public-api.test.ts` fails if one disappears (`npm run check:surface`).
+- **The parts are styleable.** Each part carries a stable class name, listed under "Styling the parts" in the package's README and held by `test/parts.test.ts`. You never need to reach into internals.
+- **They stay small.** Each package's gzipped size has a budget in `size-budgets.json` (`npm run size`).
+- **Phone behaviour is tested on phone engines.** `e2e/` runs the example apps in WebKit as an iPhone and Chromium as an Android phone, with touch (`npm run e2e`).
+- **React 18 and 19.**
 
 ## Develop
 
 ```bash
-npm install          # install all workspaces
-npm run build        # build every package (tsup → ESM + CJS + d.ts)
-npm run typecheck    # type-check every package
+npm install
+npm run verify       # build, typecheck, unit tests, public surface, sizes
+npm run e2e          # the example apps in WebKit (iPhone) and Chromium (Android)
 ```
 
-Each package builds with [`tsup`](https://tsup.egoist.dev/) to dual ESM/CJS with
-generated type declarations, `react`/`react-dom` as peer dependencies, and the
-`"use client"` directive preserved for React Server Components.
+Each package builds with [tsup](https://tsup.egoist.dev/) to ESM and CJS with type declarations. `react` and `react-dom` are peer dependencies, and the `"use client"` directive is kept for React Server Components.
 
 ## Release
 
-Versioning and publishing use [Changesets](https://github.com/changesets/changesets):
-
-```bash
-npx changeset            # record intended version bumps
-npx changeset version    # apply bumps + update changelogs
-npm run release          # build all, then changeset publish
-```
-
-Publishing requires an `NPM_TOKEN` with access to the `@academix` org (the root
-`.npmrc` reads it from the environment). Packages are published with
-`--access public`.
+[Changesets](https://github.com/changesets/changesets): `npx changeset` records a bump, `npx changeset version` applies it, and `npm run release` builds and publishes. Publishing needs an `NPM_TOKEN` with access to the scope (the root `.npmrc` reads it from the environment). Run `npm run verify` and `npm run e2e` first.
 
 ## License
 
-MIT © Academix
+MIT

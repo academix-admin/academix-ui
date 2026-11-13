@@ -1,0 +1,27 @@
+{
+  "name": "academix-app-shell-starter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A phone-app starter on @academix-admin/app-shell: two tabs, pages that push, a form, full screen, a pill that rides the tab bar.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@academix-admin/app-shell": "^0.1.0",
+    "@academix-admin/navigation-bar": "^0.2.0",
+    "@academix-admin/navigation-stack": "^1.13.1",
+    "@academix-admin/sidebar": "^0.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

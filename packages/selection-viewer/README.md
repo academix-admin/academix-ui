@@ -97,6 +97,30 @@ prop/type (`SelectionViewerProps`, `SelectionState`, `TitleProps`, `SearchProps`
 `NoResultProps`, `ErrorProps`, `CancelButtonProps`, `LayoutProps`, `Padding`, `SnapPoint`,
 `RowProps`, `ColumnProps`).
 
+## Building your own sections
+
+`Row` and `Column` report their loading state up to the viewer, so its `selectionState` reflects every section. To write your own section that takes part:
+
+- `RowAggregateContext`: a section reports its own state into the nearest `Column` through this context (`report(id, state)` / `unreport(id)`).
+- `SelectionViewerAggregateContext`: a column reports its combined state to the `SelectionViewer`.
+- `computeAggregateState(states)`: how several states combine. Any `data` wins, then any `loading`; all `empty` is `empty`; any `error` is `error`; otherwise `initial`.
+
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.selection-viewer-header`
+- `.selection-viewer-drag-handle`
+- `.selection-viewer-cancel`
+- `.selection-viewer-search`
+- `.selection-viewer-search-back-button`
+- `.selection-viewer-search-clear-button`
+- `.selection-viewer-fullscreen-search`
+- `.selection-viewer-content`
+- `.selection-viewer-loading`
+- `.selection-viewer-no-results`
+- `.selection-viewer-error`
+
 ## License
 
 MIT © Academix

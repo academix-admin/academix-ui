@@ -88,7 +88,7 @@ const FACADE_KEYS = [
 const CORE_METHODS = [
   'ensureHydrated', 'subscribe', 'notify', 'setTTL',
   'enableAutoClearOnZero', 'disableAutoClearOnZero',
-  'invalidateScope', 'clearScope', 'clearByPathname', 'clearCurrentPath', 'clearKey',
+  'invalidateScope', 'scopeDependsOn', 'clearScope', 'clearByPathname', 'clearCurrentPath', 'clearKey',
   'clearByPrefix', 'clearByCondition', 'clearMatching',
   'canUndo', 'canRedo', 'undo', 'redo', 'setHistoryDepth',
   'isLoaded', 'markLoaded', 'clearLoaded',

@@ -208,6 +208,19 @@ consumers re-read on their next demand. `useInvalidation` is the other half, for
 their loader — a paginated list, an infinite scroll, a read assembled from several calls — which
 nothing else can call.
 
+**Declare what a scope is made from, once.** When cached data is built from another scope's data, say
+so where the data is defined, and every write to the source reaches it, however many readers there are:
+
+```ts
+// Receipts print the shop's paper settings: a change to the settings makes them stale too.
+StateStack.core.scopeDependsOn('receipts', ['store_settings']);
+
+StateStack.core.invalidateScope('store_settings'); // 'receipts' goes stale as well
+```
+
+It carries on down a chain (`a` <- `b` <- `c`), visits each scope once even if the graph loops, and
+returns an undo. It cascades staleness only: `clearScope` clears exactly the scope it is given.
+
 **This is not `clearScope`.** Clearing deletes the values, so a write in one place empties a list
 somewhere else and whoever was reading it loses their place. Clear only when the data must not be
 seen again — signing out, or switching account. Everything else is staleness, and the answer to
@@ -352,6 +365,15 @@ being taken away.
 const Settings = lazy(() => import('./settings-page'));
 <Suspense fallback={<Skeleton />}><Settings /></Suspense>
 ```
+
+## Less common exports
+
+| Export | What it does |
+|---|---|
+| `StateStackProvider` / `createRequestStore()` | A store per server render. In the browser there is one store; on a server, a module is shared by every request, so wrap the tree being rendered in `<StateStackProvider store={createRequestStore()}>` and one shopper's data never reaches another's render. An app that provides nothing keeps the singleton. |
+| `getDefaultStorage()` | The storage adapter in use when none was configured. |
+| `useResolvedPathname` / `useLocationPathname` | The pathname hook scopes are keyed by: the configured one, and the dependency-free default backed by `window.location`. |
+| `isEmptyValue(v)` | Whether a value counts as "nothing loaded" (`null`, `undefined`, `[]`, `{}`, an empty `Map` or `Set`; a string never is), which is the guard that stops an empty result overwriting a cached one. |
 
 ## Storage adapters
 

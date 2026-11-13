@@ -32,6 +32,13 @@ export default function Example() {
 Rendered through a React portal (`react-dom`). `SideDrawerProps` typing is
 exported.
 
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.sidedrawer`
+- `.sidedrawer-backdrop`
+
 ## License
 
 MIT © Academix

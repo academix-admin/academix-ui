@@ -12,7 +12,11 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "release": "npm run build && changeset publish"
+    "release": "npm run build && changeset publish",
+    "check:surface": "node scripts/check-surface.mjs --strict",
+    "size": "node scripts/check-size.mjs",
+    "e2e": "playwright test",
+    "verify": "npm run build && npm run typecheck && npm test && npm run check:surface && npm run size"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.9",

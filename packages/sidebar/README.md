@@ -46,6 +46,8 @@ export function Rail({ active, setActive }) {
 }
 ```
 
+The component is the default export. It is also exported by name as `Sidebar` (`import { Sidebar } from '@academix-admin/sidebar'`). For a whole app frame (sidebar on wide screens, tab bar on phones), use `@academix-admin/app-shell`, which is built on it.
+
 ## Props
 
 | Prop | What it does |
@@ -65,6 +67,20 @@ export function Rail({ active, setActive }) {
 The rail writes its current width to `--sidebar-width` on `<html>`.
 
 Exported types: `NavItem`, `SidebarProps`.
+
+## Styling the parts
+
+Each part carries a stable class name you can style from your own CSS. These names are public: a release that renames or removes one is a breaking change (`test/parts.test.ts` holds them).
+
+- `.sidebar`
+- `.sidebar-header`
+- `.sidebar-logo`
+- `.sidebar-toggle`
+- `.sidebar-nav`
+- `.sidebar-item`
+- `.sidebar-item-icon`
+- `.sidebar-item-text`
+- `.sidebar-footer`
 
 ## License
 
