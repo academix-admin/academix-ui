@@ -1432,8 +1432,32 @@ export default function NavigationStack(props: {
           }
           describeThisEntry(currentRegEntry);
           markKeptInTab(event);
+        } else if (groupStackId && !currentRegEntry.parentId) {
+          // Not the keeper: this tab stays, and the entry must say where it is, or switching back to
+          // it later restores it from the older entry (People's Customer 2 lost, 13 Nov).
+          describeThisEntry(currentRegEntry, false);
         }
         return;
+      }
+
+      /*
+       * ONLY THE TAB THE ENTRY BELONGS TO MOVES (`backStaysInTab`, 1.13.0).
+       *
+       * Every stack in the group hears the popstate, and each rebuilt from the entry it landed on. The
+       * entry is older than the other tabs' present: Stock → Product 1, People → Customer 2, back to
+       * Stock, Back — Stock popped to its list, as it should, and People went back to its first page
+       * too, because the entry Back landed on was written before Customer 2 was opened. A native tab
+       * bar never does that. So under `backStaysInTab` a Back moves the tab the entry was stamped by
+       * (the tab on screen, for an entry with no tab), and every other tab stays where it is and makes
+       * the entry say so.
+       */
+      if (groupContext?.backStaysInTab && groupStackId && !currentRegEntry.parentId) {
+        const stamped = (event.state as { group?: unknown } | null)?.group;
+        const owner = typeof stamped === 'string' ? stamped : groupContext.getCurrent();
+        if (owner !== groupStackId) {
+          describeThisEntry(currentRegEntry, false);
+          return;
+        }
       }
 
       // The browser has already moved. Mark the re-derive so emit() does not ALSO hand history
@@ -1452,10 +1476,10 @@ export default function NavigationStack(props: {
     };
 
     /** Make the entry the browser is standing on say where this stack is (a replace). */
-    const describeThisEntry = (reg: RegistryEntry) => {
+    const describeThisEntry = (reg: RegistryEntry, claimGroup = true) => {
       try {
         const localPath = buildUrlPath([{ navLink: mergedNavLink, stack: reg.stack }]);
-        updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, 'replace');
+        updateNavQueryParamForStack(id, localPath, groupContext, groupStackId, 'replace', undefined, claimGroup);
       } catch { /* a description is never worth breaking a navigation for */ }
     };
 

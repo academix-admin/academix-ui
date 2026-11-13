@@ -866,6 +866,11 @@ export function updateNavQueryParamForStack(
   mode: 'push' | 'replace' = 'replace',
   /** Stack depth this entry represents; recorded so pops can give back the right number. */
   depthForLedger?: number,
+  /**
+   * Whether this write says the entry is this tab's (`group`). A tab that did not move, correcting
+   * its own part of an entry the tab on screen owns, must not take the entry over (1.13.0).
+   */
+  claimGroup = true,
 ) {
   if (typeof window === "undefined") return;
 
@@ -903,8 +908,11 @@ export function updateNavQueryParamForStack(
 
     const newParam = buildCombinedNavParam(map);
 
+    // The entry's tab as it stands, for a write that only corrects its own part.
+    const heldGroup = (window.history.state as { group?: unknown } | null)?.group;
+    const group = claimGroup ? groupStackId : typeof heldGroup === 'string' ? heldGroup : url.searchParams.get('group');
     if (newParam) {
-      if (groupContext) url.searchParams.set('group', groupStackId || '');
+      if (groupContext && group) url.searchParams.set('group', group);
       url.searchParams.set('nav', newParam);
     } else {
       if (groupContext) url.searchParams.delete('group');
@@ -967,7 +975,7 @@ export function updateNavQueryParamForStack(
           mode: 'replace',
           href: newHref,
           navParam: newParam,
-          state: { group: groupContext ? groupStackId : undefined },
+          state: { group: groupContext ? group ?? undefined : undefined },
         });
       }
     }

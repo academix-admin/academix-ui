@@ -1,5 +1,20 @@
 # @academix-admin/navigation-stack
 
+## 1.13.0
+
+### Minor Changes
+
+- `useViewportInsets` / `ViewportInsetsProvider` mounted more than once share one listener. The first copy
+  installs the keyboard and visible-viewport listeners, the last to unmount removes them, and the focused
+  field is revealed when any copy asks for it (with the widest margin asked). An app shell can now set the
+  keyboard handling up itself without fighting an app that also mounts the provider at its root.
+
+  Fix — under `backStaysInTab`, Back moves only the tab it belongs to. Stock → Product 1, People →
+  Customer 2, back to Stock, Back: Stock popped to its list as it should, and People was reset to its first
+  page as well, because every tab rebuilt from (or was left described by) the older entry Back landed on.
+  Now a tab that did not move keeps its pages and corrects its own part of the entry, without claiming the
+  entry for itself. Found by the new WebKit/Chromium phone tests (`e2e/`).
+
 ## 1.12.1
 
 ### Patch Changes

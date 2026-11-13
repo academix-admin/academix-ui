@@ -108,9 +108,16 @@ describe('revealFocusedField', () => {
  * and the floating buttons stayed hidden over a page with no keyboard (10 Nov).
  */
 describe('data-ax-keyboard', () => {
-  it('opens on focus, and closes when the keyboard goes though the field keeps focus', async () => {
+  // A tap, as a finger makes it: the field touched, then focused (1.12.1 — focus alone is not a keyboard).
+  const tap = (el: HTMLElement) =>
+    act(() => {
+      el.dispatchEvent(Object.assign(new Event('pointerdown', { bubbles: true }), { pointerType: 'touch' }));
+      el.focus();
+    });
+
+  it('opens on a tap, and closes when the keyboard goes though the field keeps focus', async () => {
     const { field } = mount(false);
-    act(() => field.focus());
+    tap(field);
     expect(document.documentElement.getAttribute('data-ax-keyboard')).toBe('open');
 
     vv.height = 500; // the keyboard arrives
@@ -127,9 +134,9 @@ describe('data-ax-keyboard', () => {
     expect(document.documentElement.getAttribute('data-ax-keyboard')).toBeNull();
   });
 
-  it('stays open on a focus whose keyboard has not been measured yet (iOS first focus)', async () => {
+  it('opens on a tapped field whose keyboard has not been measured yet (iOS first focus)', async () => {
     const { field } = mount(false);
-    act(() => field.focus());
+    tap(field);
     expect(document.documentElement.getAttribute('data-ax-keyboard')).toBe('open');
   });
 });

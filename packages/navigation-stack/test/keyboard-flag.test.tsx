@@ -160,3 +160,42 @@ describe('pageScrollerOf', () => {
     expect(pageScrollerOf(getByTestId('loose'))).toBeNull();
   });
 });
+
+describe('several copies mounted (1.13.0)', () => {
+  it('listen once, and keep working until the last copy goes', async () => {
+    const added = { n: 0 };
+    const add = vv.addEventListener.bind(vv);
+    vv.addEventListener = ((type: string, ...rest: unknown[]) => {
+      if (type === 'resize') added.n += 1;
+      return (add as (...a: unknown[]) => void)(type, ...rest);
+    }) as typeof vv.addEventListener;
+
+    const two = render(
+      <>
+        <ViewportInsetsProvider />
+        <ViewportInsetsProvider revealFocusedField />
+        <input data-testid="field" />
+      </>,
+    );
+    expect(added.n).toBe(1);
+
+    // One copy goes: the other still measures.
+    two.rerender(
+      <>
+        <ViewportInsetsProvider revealFocusedField />
+        <input data-testid="field" />
+      </>,
+    );
+    const field = two.getByTestId('field') as HTMLInputElement;
+    field.getBoundingClientRect = () =>
+      ({ top: 300, bottom: 344, height: 44, left: 0, right: 390, width: 390, x: 0, y: 300, toJSON() {} }) as DOMRect;
+    act(() => field.focus());
+    await resize(450);
+    expect(flag()).toBe('open');
+
+    // The last copy goes: nothing is left measuring, and nothing is left flagged.
+    two.unmount();
+    expect(flag()).toBeNull();
+    expect(document.documentElement.style.getPropertyValue('--ax-vv-height')).toBe('');
+  });
+});

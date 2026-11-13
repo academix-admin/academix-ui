@@ -11,3 +11,8 @@ coverage/
 
 # Local validation tarballs (npm pack output)
 .tarballs/
+
+# Playwright (e2e/)
+test-results/
+playwright-report/
+examples/*/dist/

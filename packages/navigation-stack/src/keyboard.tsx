@@ -64,255 +64,294 @@ function scrollParentOf(node: Element): HTMLElement | null {
  * immediate on viewport change, and resume-safe (Safari can restore a stale
  * viewport after backgrounding).
  */
+type RevealOption = ViewportInsetsOptions['revealFocusedField'];
+
+/*
+ * ONE LISTENER, HOWEVER MANY COPIES ARE MOUNTED (1.13.0).
+ *
+ * An app shell sets the keyboard handling up itself (app-shell's `AppShell`), so a new app gets it with
+ * nothing to wire; an app that already mounts `ViewportInsetsProvider` at its root then has two. Two
+ * copies each listened, measured and wrote the same variables and the same flag. Now every copy
+ * registers here: the first installs the listeners, the last to unmount removes them, and the focused
+ * field is revealed when any copy asks for it, with the widest margin asked.
+ */
+const registrants = new Set<{ current: RevealOption }>();
+let uninstall: (() => void) | null = null;
+
+function revealOption(): RevealOption {
+  let out: RevealOption = false;
+  for (const r of registrants) {
+    const o = r.current;
+    if (!o) continue;
+    const margin = typeof o === 'object' && o.margin != null ? o.margin : 16;
+    const had = !out ? -1 : typeof out === 'object' && out.margin != null ? out.margin : 16;
+    if (margin > had) out = margin === 16 && o === true ? true : { margin };
+  }
+  return out;
+}
+
 export function useViewportInsets(options: ViewportInsetsOptions = {}): void {
-  // Read through a ref, so the listeners below are set up once however the option is passed.
+  // Read through a ref, so the listeners are set up once however the option is passed.
   const revealRef = useRef(options.revealFocusedField);
   revealRef.current = options.revealFocusedField;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const vv = window.visualViewport;
-    const root = document.documentElement;
-    if (!vv) return; // no VisualViewport: leave 0px fallbacks
-
-    let frame = 0;
-    // The "keyboard open" signal follows the MEASURED keyboard, with a short head start for a
-    // field the finger touched (1.12.1 — see HEAD_START below): on iOS the FIRST focus reads
-    // inset ~0 for a moment, and focus fires before any resize does.
-    //
-    // The focus state is derived LIVE from document.activeElement (not a cached boolean):
-    // an overlay (SearchViewer/dialog) whose focused input is REMOVED from the DOM on close
-    // does not fire `focusout`/`blur` in Chromium — a cached `focused=true` would then stay
-    // stuck and leave the nav hidden forever. A MutationObserver catches that silent removal
-    // so the signal self-clears even when no viewport resize fires.
-    const isField = (el: any): boolean =>
-      !!el &&
-      /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) &&
-      !(el as HTMLInputElement).readOnly &&
-      (el as HTMLInputElement).type !== 'hidden' &&
-      (el as HTMLElement).getAttribute?.('contenteditable') !== 'true';
-
-    const activeField = (): Element | null => {
-      const el = document.activeElement as HTMLElement | null;
-      if (!el || !isField(el)) return null;
-      const r = el.getBoundingClientRect();
-      // A focused field with no box, or one pushed OUT of the visible viewport — e.g. an
-      // overlay (SearchViewer/sheet) SWIPED off-screen while its input keeps focus — must not
-      // hold the keyboard signal open. (A keyboard-open field is scrolled INTO view, so it
-      // still passes.) This complements the MutationObserver, which only catches DOM removal.
-      if (r.width === 0 && r.height === 0) return null;
-      const onScreen = r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
-      return onScreen ? el : null;
-    };
-
-    /*
-     * THE FOCUSED FIELD, BROUGHT CLEAR OF THE KEYBOARD (`revealFocusedField`).
-     *
-     * Measured against the VISIBLE viewport, not the scroller alone: during the keyboard's
-     * arrival the shell has not always caught up, and the field the person is about to type in is
-     * the one thing that must not sit under it. Only ever scrolls DOWN the page (field moved up):
-     * a field above the visible area was put there by the person scrolling, and a pinned header
-     * may be covering that edge anyway.
-     */
-    const reveal = () => {
-      const option = revealRef.current;
-      if (!option) return;
-      const margin = typeof option === 'object' && option.margin != null ? option.margin : 16;
-      const el = document.activeElement as HTMLElement | null;
-      if (!el || !isField(el) || !el.isConnected) return;
-      const scroller = scrollParentOf(el);
-      if (!scroller) return;
-      const field = el.getBoundingClientRect();
-      if (field.width === 0 && field.height === 0) return;
-      const box = scroller.getBoundingClientRect();
-      const top = Math.max(box.top, vv.offsetTop);
-      const bottom = Math.min(box.bottom, vv.offsetTop + vv.height) - margin;
-      if (field.bottom <= bottom) return;
-      // A field taller than the room left shows its top, which is where the caret starts.
-      const by = Math.min(field.bottom - bottom, Math.max(0, field.top - top - margin));
-      if (by > 0) scroller.scrollTop += by;
-    };
-    let revealTimer = 0;
-    const revealSoon = () => {
-      window.requestAnimationFrame(() => window.requestAnimationFrame(reveal));
-      window.clearTimeout(revealTimer);
-      // And once the keyboard has finished arriving, for a platform that reports it late.
-      revealTimer = window.setTimeout(reveal, 350);
-    };
-    let lastHeight = vv.height;
-
-    const setKb = (open: boolean) => {
-      if (open) root.setAttribute('data-ax-keyboard', 'open');
-      else root.removeAttribute('data-ax-keyboard');
-    };
-
-    // Watch for the focused field being detached from the DOM (silent, no focusout).
-    let watched: Element | null = null;
-    let mo: MutationObserver | null = null;
-    const stopWatch = () => { if (mo) { mo.disconnect(); mo = null; } watched = null; };
-    const startWatch = (el: Element) => {
-      watched = el;
-      if (mo || typeof MutationObserver === 'undefined') return;
-      mo = new MutationObserver(() => {
-        if (watched && !watched.isConnected) { stopWatch(); apply(); }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    };
-
-    /*
-     * A KEYBOARD THAT WAS SEEN, AND THEN WENT (1.11.2).
-     *
-     * A keyboard can go without the field losing focus: swiped down, Android's Back, the iPad's
-     * hide key. Focus held the flag open then, and the tab bar and floating buttons stayed hidden
-     * over a page with no keyboard on it (10 Nov). The flag now follows the measurement, so its
-     * going closes the flag, focus or not.
-     *
-     * Measured two ways: the inset, and how much shorter the visible viewport is than the tallest it
-     * has been at this width — for a browser that shrinks the layout viewport with it, where the
-     * inset reads 0 throughout.
-     */
-    let tallest = vv.height;
-    let tallestAtWidth = vv.width;
-
-    /*
-     * THE KEYBOARD ITSELF, NOT FOCUS (1.12.1).
-     *
-     * Focus is not a keyboard. A page that focuses a field from code after an await — a till that
-     * puts the caret back in its box once the item is added — gets the focus and, on iOS, no
-     * keyboard, because Safari raises one only for a focus made inside a tap. The flag used to open
-     * for any focused field until a keyboard had been measured, so there it opened and stayed open:
-     * the tab bar and floating buttons hidden over a page with no keyboard (12 Nov).
-     *
-     * So the flag follows the keyboard as the visible viewport measures it. The one head start is a
-     * field the finger touched — the field, its label, or a box around it — where the keyboard is
-     * certainly on its way and iOS's first focus measures nothing for a moment: that opens it at
-     * once, for at most `HEAD_START` ms, and a keyboard measured in that time takes over. A focus
-     * from code, a mouse or a hardware key waits for the keyboard to be measured.
-     */
-    const HEAD_START = 1000;
-    let touched: { target: Element; at: number } | null = null;
-    let expectUntil = 0;
-    let expectTimer = 0;
-    const touchedField = (field: Element): boolean => {
-      if (!touched || Date.now() - touched.at > HEAD_START) return false;
-      const t = touched.target;
-      return t === field || t.contains(field) || (t.closest?.('label') as HTMLLabelElement | null)?.control === field;
-    };
-
-    const apply = () => {
-      frame = 0;
-      const vh = vv.height;
-      const raw = window.innerHeight - vh - vv.offsetTop;
-      // A soft keyboard can never be taller than the visible viewport; anything
-      // >= vvHeight (or negative) is a transient/bogus value (iOS resizes AND
-      // scrolls) — treat as "no keyboard" rather than writing garbage.
-      const inset = raw > 0 && raw < vh ? Math.round(raw) : 0;
-      root.style.setProperty('--ax-keyboard-inset', `${inset}px`);
-      root.style.setProperty('--ax-viewport-offset-top', `${Math.round(vv.offsetTop)}px`);
-      root.style.setProperty('--ax-vv-height', `${Math.round(vh)}px`);
-      if (Math.abs(vv.width - tallestAtWidth) > 1) {
-        // Turned or resized: what counts as full height starts again.
-        tallestAtWidth = vv.width;
-        tallest = vh;
-      }
-      tallest = Math.max(tallest, vh);
-      const measured = inset > 60 || tallest - vh > 150;
-      const field = !!activeField();
-      // A keyboard has arrived: from here it is the measurement that says when it goes.
-      if (measured) expectUntil = 0;
-      /*
-       * NO FIELD, NO KEYBOARD (1.12.0). A soft keyboard cannot be up without a focused field, so the
-       * flag needs one: the measurement outlives the keyboard (on iPhone, Done blurs the field while
-       * the visible viewport is still short), and a pinch-zoom shortens it too. With a field: open
-       * while a keyboard measures, or in the head start of a field just touched (1.12.1).
-       */
-      setKb(field && (measured || Date.now() < expectUntil));
-    };
-
-    const schedule = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(apply);
-    };
-    const onVV = () => apply();
-    // And again once a keyboard's animation is over, for a platform that sends no resize at its end.
-    let settleTimer = 0;
-    // Shorter means the keyboard came up or grew: the moment a field can end up under it.
-    const onVVResize = () => {
-      apply();
-      if (vv.height < lastHeight - 1) revealSoon();
-      lastHeight = vv.height;
-      window.clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(apply, 400);
-    };
-    const onResume = () => apply();
-
-    // Only a finger or a pen: a mouse brings no soft keyboard.
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.pointerType === 'mouse' || !(e.target instanceof Element)) return;
-      touched = { target: e.target, at: Date.now() };
-    };
-
-    const onFocusIn = (e: Event) => {
-      if (isField(e.target)) {
-        const el = e.target as Element;
-        window.clearTimeout(expectTimer);
-        expectUntil = touchedField(el) ? Date.now() + HEAD_START : 0;
-        // When the head start runs out, the flag is whatever the keyboard measures.
-        if (expectUntil) expectTimer = window.setTimeout(apply, HEAD_START + 20);
-        startWatch(el);
-        apply();
-        revealSoon();
-      }
-    };
-    const onFocusOut = () => {
-      // Defer: focus may be moving to another field; re-derive the authoritative state.
-      window.setTimeout(() => {
-        const el = activeField();
-        if (el) startWatch(el);
-        else { stopWatch(); expectUntil = 0; apply(); }
-      }, 60);
-    };
-
-    apply();
-    const t1 = window.setTimeout(apply, 300);
-    const t2 = window.setTimeout(apply, 900);
-    vv.addEventListener('resize', onVVResize);
-    vv.addEventListener('scroll', onVV);
-    window.addEventListener('resize', schedule);
-    window.addEventListener('orientationchange', schedule);
-    window.addEventListener('pageshow', onResume);
-    document.addEventListener('visibilitychange', onResume);
-    document.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true });
-    document.addEventListener('focusin', onFocusIn, true);
-    document.addEventListener('focusout', onFocusOut, true);
-    // Swipe-to-dismiss (react-modal-sheet etc.) may not blur/remove the input synchronously;
-    // re-derive on touch release so a sheet swiped off-screen restores the nav.
-    document.addEventListener('touchend', schedule, { passive: true });
-
+    registrants.add(revealRef);
+    if (!uninstall) uninstall = installViewportInsets();
     return () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      window.clearTimeout(revealTimer);
-      window.clearTimeout(settleTimer);
-      window.clearTimeout(expectTimer);
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      vv.removeEventListener('resize', onVVResize);
-      vv.removeEventListener('scroll', onVV);
-      window.removeEventListener('resize', schedule);
-      window.removeEventListener('orientationchange', schedule);
-      window.removeEventListener('pageshow', onResume);
-      document.removeEventListener('visibilitychange', onResume);
-      document.removeEventListener('focusin', onFocusIn, true);
-      document.removeEventListener('focusout', onFocusOut, true);
-      document.removeEventListener('touchend', schedule);
-      stopWatch();
-      root.style.removeProperty('--ax-keyboard-inset');
-      root.style.removeProperty('--ax-viewport-offset-top');
-      root.style.removeProperty('--ax-vv-height');
-      root.removeAttribute('data-ax-keyboard');
+      registrants.delete(revealRef);
+      if (registrants.size === 0 && uninstall) {
+        const done = uninstall;
+        uninstall = null;
+        done();
+      }
     };
   }, []);
+}
+
+function installViewportInsets(): () => void {
+  const vv = window.visualViewport;
+  const root = document.documentElement;
+  if (!vv) return () => {}; // no VisualViewport: leave 0px fallbacks
+
+  let frame = 0;
+  // The "keyboard open" signal follows the MEASURED keyboard, with a short head start for a
+  // field the finger touched (1.12.1 — see HEAD_START below): on iOS the FIRST focus reads
+  // inset ~0 for a moment, and focus fires before any resize does.
+  //
+  // The focus state is derived LIVE from document.activeElement (not a cached boolean):
+  // an overlay (SearchViewer/dialog) whose focused input is REMOVED from the DOM on close
+  // does not fire `focusout`/`blur` in Chromium — a cached `focused=true` would then stay
+  // stuck and leave the nav hidden forever. A MutationObserver catches that silent removal
+  // so the signal self-clears even when no viewport resize fires.
+  const isField = (el: any): boolean =>
+    !!el &&
+    /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) &&
+    !(el as HTMLInputElement).readOnly &&
+    (el as HTMLInputElement).type !== 'hidden' &&
+    (el as HTMLElement).getAttribute?.('contenteditable') !== 'true';
+
+  const activeField = (): Element | null => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || !isField(el)) return null;
+    const r = el.getBoundingClientRect();
+    // A focused field with no box, or one pushed OUT of the visible viewport — e.g. an
+    // overlay (SearchViewer/sheet) SWIPED off-screen while its input keeps focus — must not
+    // hold the keyboard signal open. (A keyboard-open field is scrolled INTO view, so it
+    // still passes.) This complements the MutationObserver, which only catches DOM removal.
+    if (r.width === 0 && r.height === 0) return null;
+    const onScreen = r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
+    return onScreen ? el : null;
+  };
+
+  /*
+   * THE FOCUSED FIELD, BROUGHT CLEAR OF THE KEYBOARD (`revealFocusedField`).
+   *
+   * Measured against the VISIBLE viewport, not the scroller alone: during the keyboard's
+   * arrival the shell has not always caught up, and the field the person is about to type in is
+   * the one thing that must not sit under it. Only ever scrolls DOWN the page (field moved up):
+   * a field above the visible area was put there by the person scrolling, and a pinned header
+   * may be covering that edge anyway.
+   */
+  const reveal = () => {
+    const option = revealOption();
+    if (!option) return;
+    const margin = typeof option === 'object' && option.margin != null ? option.margin : 16;
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || !isField(el) || !el.isConnected) return;
+    const scroller = scrollParentOf(el);
+    if (!scroller) return;
+    const field = el.getBoundingClientRect();
+    if (field.width === 0 && field.height === 0) return;
+    const box = scroller.getBoundingClientRect();
+    const top = Math.max(box.top, vv.offsetTop);
+    const bottom = Math.min(box.bottom, vv.offsetTop + vv.height) - margin;
+    if (field.bottom <= bottom) return;
+    // A field taller than the room left shows its top, which is where the caret starts.
+    const by = Math.min(field.bottom - bottom, Math.max(0, field.top - top - margin));
+    if (by > 0) scroller.scrollTop += by;
+  };
+  let revealTimer = 0;
+  const revealSoon = () => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(reveal));
+    window.clearTimeout(revealTimer);
+    // And once the keyboard has finished arriving, for a platform that reports it late.
+    revealTimer = window.setTimeout(reveal, 350);
+  };
+  let lastHeight = vv.height;
+
+  const setKb = (open: boolean) => {
+    if (open) root.setAttribute('data-ax-keyboard', 'open');
+    else root.removeAttribute('data-ax-keyboard');
+  };
+
+  // Watch for the focused field being detached from the DOM (silent, no focusout).
+  let watched: Element | null = null;
+  let mo: MutationObserver | null = null;
+  const stopWatch = () => { if (mo) { mo.disconnect(); mo = null; } watched = null; };
+  const startWatch = (el: Element) => {
+    watched = el;
+    if (mo || typeof MutationObserver === 'undefined') return;
+    mo = new MutationObserver(() => {
+      if (watched && !watched.isConnected) { stopWatch(); apply(); }
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+  };
+
+  /*
+   * A KEYBOARD THAT WAS SEEN, AND THEN WENT (1.11.2).
+   *
+   * A keyboard can go without the field losing focus: swiped down, Android's Back, the iPad's
+   * hide key. Focus held the flag open then, and the tab bar and floating buttons stayed hidden
+   * over a page with no keyboard on it (10 Nov). The flag now follows the measurement, so its
+   * going closes the flag, focus or not.
+   *
+   * Measured two ways: the inset, and how much shorter the visible viewport is than the tallest it
+   * has been at this width — for a browser that shrinks the layout viewport with it, where the
+   * inset reads 0 throughout.
+   */
+  let tallest = vv.height;
+  let tallestAtWidth = vv.width;
+
+  /*
+   * THE KEYBOARD ITSELF, NOT FOCUS (1.12.1).
+   *
+   * Focus is not a keyboard. A page that focuses a field from code after an await — a till that
+   * puts the caret back in its box once the item is added — gets the focus and, on iOS, no
+   * keyboard, because Safari raises one only for a focus made inside a tap. The flag used to open
+   * for any focused field until a keyboard had been measured, so there it opened and stayed open:
+   * the tab bar and floating buttons hidden over a page with no keyboard (12 Nov).
+   *
+   * So the flag follows the keyboard as the visible viewport measures it. The one head start is a
+   * field the finger touched — the field, its label, or a box around it — where the keyboard is
+   * certainly on its way and iOS's first focus measures nothing for a moment: that opens it at
+   * once, for at most `HEAD_START` ms, and a keyboard measured in that time takes over. A focus
+   * from code, a mouse or a hardware key waits for the keyboard to be measured.
+   */
+  const HEAD_START = 1000;
+  let touched: { target: Element; at: number } | null = null;
+  let expectUntil = 0;
+  let expectTimer = 0;
+  const touchedField = (field: Element): boolean => {
+    if (!touched || Date.now() - touched.at > HEAD_START) return false;
+    const t = touched.target;
+    return t === field || t.contains(field) || (t.closest?.('label') as HTMLLabelElement | null)?.control === field;
+  };
+
+  const apply = () => {
+    frame = 0;
+    const vh = vv.height;
+    const raw = window.innerHeight - vh - vv.offsetTop;
+    // A soft keyboard can never be taller than the visible viewport; anything
+    // >= vvHeight (or negative) is a transient/bogus value (iOS resizes AND
+    // scrolls) — treat as "no keyboard" rather than writing garbage.
+    const inset = raw > 0 && raw < vh ? Math.round(raw) : 0;
+    root.style.setProperty('--ax-keyboard-inset', `${inset}px`);
+    root.style.setProperty('--ax-viewport-offset-top', `${Math.round(vv.offsetTop)}px`);
+    root.style.setProperty('--ax-vv-height', `${Math.round(vh)}px`);
+    if (Math.abs(vv.width - tallestAtWidth) > 1) {
+      // Turned or resized: what counts as full height starts again.
+      tallestAtWidth = vv.width;
+      tallest = vh;
+    }
+    tallest = Math.max(tallest, vh);
+    const measured = inset > 60 || tallest - vh > 150;
+    const field = !!activeField();
+    // A keyboard has arrived: from here it is the measurement that says when it goes.
+    if (measured) expectUntil = 0;
+    /*
+     * NO FIELD, NO KEYBOARD (1.12.0). A soft keyboard cannot be up without a focused field, so the
+     * flag needs one: the measurement outlives the keyboard (on iPhone, Done blurs the field while
+     * the visible viewport is still short), and a pinch-zoom shortens it too. With a field: open
+     * while a keyboard measures, or in the head start of a field just touched (1.12.1).
+     */
+    setKb(field && (measured || Date.now() < expectUntil));
+  };
+
+  const schedule = () => {
+    if (frame) return;
+    frame = window.requestAnimationFrame(apply);
+  };
+  const onVV = () => apply();
+  // And again once a keyboard's animation is over, for a platform that sends no resize at its end.
+  let settleTimer = 0;
+  // Shorter means the keyboard came up or grew: the moment a field can end up under it.
+  const onVVResize = () => {
+    apply();
+    if (vv.height < lastHeight - 1) revealSoon();
+    lastHeight = vv.height;
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(apply, 400);
+  };
+  const onResume = () => apply();
+
+  // Only a finger or a pen: a mouse brings no soft keyboard.
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse' || !(e.target instanceof Element)) return;
+    touched = { target: e.target, at: Date.now() };
+  };
+
+  const onFocusIn = (e: Event) => {
+    if (isField(e.target)) {
+      const el = e.target as Element;
+      window.clearTimeout(expectTimer);
+      expectUntil = touchedField(el) ? Date.now() + HEAD_START : 0;
+      // When the head start runs out, the flag is whatever the keyboard measures.
+      if (expectUntil) expectTimer = window.setTimeout(apply, HEAD_START + 20);
+      startWatch(el);
+      apply();
+      revealSoon();
+    }
+  };
+  const onFocusOut = () => {
+    // Defer: focus may be moving to another field; re-derive the authoritative state.
+    window.setTimeout(() => {
+      const el = activeField();
+      if (el) startWatch(el);
+      else { stopWatch(); expectUntil = 0; apply(); }
+    }, 60);
+  };
+
+  apply();
+  const t1 = window.setTimeout(apply, 300);
+  const t2 = window.setTimeout(apply, 900);
+  vv.addEventListener('resize', onVVResize);
+  vv.addEventListener('scroll', onVV);
+  window.addEventListener('resize', schedule);
+  window.addEventListener('orientationchange', schedule);
+  window.addEventListener('pageshow', onResume);
+  document.addEventListener('visibilitychange', onResume);
+  document.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true });
+  document.addEventListener('focusin', onFocusIn, true);
+  document.addEventListener('focusout', onFocusOut, true);
+  // Swipe-to-dismiss (react-modal-sheet etc.) may not blur/remove the input synchronously;
+  // re-derive on touch release so a sheet swiped off-screen restores the nav.
+  document.addEventListener('touchend', schedule, { passive: true });
+
+  return () => {
+    if (frame) window.cancelAnimationFrame(frame);
+    window.clearTimeout(t1);
+    window.clearTimeout(t2);
+    window.clearTimeout(revealTimer);
+    window.clearTimeout(settleTimer);
+    window.clearTimeout(expectTimer);
+    document.removeEventListener('pointerdown', onPointerDown, true);
+    vv.removeEventListener('resize', onVVResize);
+    vv.removeEventListener('scroll', onVV);
+    window.removeEventListener('resize', schedule);
+    window.removeEventListener('orientationchange', schedule);
+    window.removeEventListener('pageshow', onResume);
+    document.removeEventListener('visibilitychange', onResume);
+    document.removeEventListener('focusin', onFocusIn, true);
+    document.removeEventListener('focusout', onFocusOut, true);
+    document.removeEventListener('touchend', schedule);
+    stopWatch();
+    root.style.removeProperty('--ax-keyboard-inset');
+    root.style.removeProperty('--ax-viewport-offset-top');
+    root.style.removeProperty('--ax-vv-height');
+    root.removeAttribute('data-ax-keyboard');
+  };
 }
 
 /** Mounts `useViewportInsets` and renders its children. Put near the app root. */
