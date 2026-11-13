@@ -1,5 +1,15 @@
 # @academix-admin/navigation-stack
 
+## 1.13.1
+
+### Patch Changes
+
+- 41a8f7b: `GroupNavigationStack` hydrates on the tab the server drew (`current`) and moves to the URL's `?group=`
+  tab right after. Opening a server-rendered app on another tab's URL used to draw two tabs at once: the
+  client's first render picked the URL's tab, and React left the server's "active" on the first one.
+- Updated dependencies [41a8f7b]
+  - @academix-admin/overlay-route@0.1.2
+
 ## 1.13.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/forms",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Flutter-idiom, headless form-field components (TextInput, SelectField, Checkbox, RadioGroup) — accessible semantic markup, style every slot via a classNames slot-map.",
   "keywords": [
     "react",

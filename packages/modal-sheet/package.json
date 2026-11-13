@@ -1,6 +1,6 @@
 {
   "name": "@academix-admin/modal-sheet",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A flexible, gesture-driven bottom-sheet / modal for React with snap detents, built on Motion.",
   "keywords": [
     "react",
@@ -73,6 +73,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@academix-admin/overlay-route": "^0.1.0"
+    "@academix-admin/overlay-route": "^0.1.2"
   }
 }
