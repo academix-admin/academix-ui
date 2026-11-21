@@ -22,3 +22,9 @@ export type {
   RadioGroupClassNames,
   RadioOption,
 } from './RadioGroup/RadioGroup';
+
+export { ChoiceChips } from './ChoiceChips/ChoiceChips';
+export type { ChoiceChipsProps, ChoiceChipsClassNames, ChoiceChipOption } from './ChoiceChips/ChoiceChips';
+
+export { NumberStepper } from './NumberStepper/NumberStepper';
+export type { NumberStepperProps, NumberStepperClassNames } from './NumberStepper/NumberStepper';

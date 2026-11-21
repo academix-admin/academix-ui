@@ -8,6 +8,8 @@ import * as api from '../src/index';
 
 const PUBLIC_EXPORTS = [
   'Checkbox',
+  'ChoiceChips',
+  'NumberStepper',
   'RadioGroup',
   'SelectField',
   'TextInput',
